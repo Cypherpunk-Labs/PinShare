@@ -1,0 +1,1 @@
+<?php $yourExampleFilesSite = 'examplefile.com'  ?>
