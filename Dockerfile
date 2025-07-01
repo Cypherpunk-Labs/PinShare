@@ -8,6 +8,7 @@ COPY internal ./internal
 RUN go mod tidy && go build .
 
 FROM --platform=${BUILDPLATFORM:-linux/amd64} chromedp/headless-shell:latest as headless 
+RUN ls -alh  /usr/lib/
 
 FROM --platform=${BUILDPLATFORM:-linux/amd64} ipfs/kubo:latest
 # https://github.com/ipfs/kubo/blob/master/Dockerfile
