@@ -8,7 +8,7 @@ COPY internal ./internal
 RUN go mod tidy && go build .
 
 FROM --platform=${BUILDPLATFORM:-linux/amd64} chromedp/headless-shell:latest as headless 
-RUN ls -alh  /usr/lib/
+# RUN ls -alh  /usr/lib/
 
 FROM --platform=${BUILDPLATFORM:-linux/amd64} ipfs/kubo:latest
 # https://github.com/ipfs/kubo/blob/master/Dockerfile
@@ -23,7 +23,8 @@ COPY entrypoint.sh /opt/pinshare/bin/entrypoint.sh
 COPY --from=builder /build/pinshare /opt/pinshare/bin/pinshare
 
 COPY --from=headless /headless-shell /opt/headless-shell 
-COPY --from=headless /usr/lib/aarch64-linux-gnu/ /lib/
+# COPY --from=headless /usr/lib/aarch64-linux-gnu/ /lib/
+COPY --from=headless /usr/lib/x86_64-linux-gnu/ /lib/
 
 
 ENTRYPOINT ["/sbin/tini", "--", "sh"]
