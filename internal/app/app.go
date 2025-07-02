@@ -25,6 +25,40 @@ var (
 	kadDHT     *dht.IpfsDHT
 )
 
+func setupID(idFile string) crypto.PrivKey {
+	var privKey crypto.PrivKey
+	keyBytes, err := os.ReadFile(idFile)
+	if err == nil {
+		privKey, err = crypto.UnmarshalPrivateKey(keyBytes)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[ERROR] Error unmarshalling private key from %s: %v\n", idFile, err)
+			os.Exit(1)
+		}
+		fmt.Printf("[INFO] Loaded identity from %s\n", idFile)
+	} else if os.IsNotExist(err) {
+		fmt.Printf("[INFO] Identity file %s not found, generating new identity...\n", idFile)
+		privKey, _, err = crypto.GenerateKeyPair(crypto.Ed25519, -1)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[ERROR] Error generating private key: %v\n", err)
+			os.Exit(1)
+		}
+		keyBytes, err = crypto.MarshalPrivateKey(privKey)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[ERROR] Error marshalling private key: %v\n", err)
+			os.Exit(1)
+		}
+		if err = os.WriteFile(idFile, keyBytes, 0600); err != nil {
+			fmt.Fprintf(os.Stderr, "[ERROR] Error saving private key to %s: %v\n", idFile, err)
+			os.Exit(1)
+		}
+		fmt.Printf("[INFO] Saved new identity to %s\n", idFile)
+	} else {
+		fmt.Fprintf(os.Stderr, "[ERROR] Error reading identity file %s: %v\n", idFile, err)
+		os.Exit(1)
+	}
+	return privKey
+}
+
 func Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -41,36 +75,7 @@ func Start() {
 		}
 	}
 
-	var privKey crypto.PrivKey
-	keyBytes, err := os.ReadFile(appconf.IdentityKeyFile)
-	if err == nil {
-		privKey, err = crypto.UnmarshalPrivateKey(keyBytes)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "[ERROR] Error unmarshalling private key from %s: %v\n", appconf.IdentityKeyFile, err)
-			os.Exit(1)
-		}
-		fmt.Printf("[INFO] Loaded identity from %s\n", appconf.IdentityKeyFile)
-	} else if os.IsNotExist(err) {
-		fmt.Printf("[INFO] Identity file %s not found, generating new identity...\n", appconf.IdentityKeyFile)
-		privKey, _, err = crypto.GenerateKeyPair(crypto.Ed25519, -1)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "[ERROR] Error generating private key: %v\n", err)
-			os.Exit(1)
-		}
-		keyBytes, err = crypto.MarshalPrivateKey(privKey)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "[ERROR] Error marshalling private key: %v\n", err)
-			os.Exit(1)
-		}
-		if err = os.WriteFile(appconf.IdentityKeyFile, keyBytes, 0600); err != nil {
-			fmt.Fprintf(os.Stderr, "[ERROR] Error saving private key to %s: %v\n", appconf.IdentityKeyFile, err)
-			os.Exit(1)
-		}
-		fmt.Printf("[INFO] Saved new identity to %s\n", appconf.IdentityKeyFile)
-	} else {
-		fmt.Fprintf(os.Stderr, "[ERROR] Error reading identity file %s: %v\n", appconf.IdentityKeyFile, err)
-		os.Exit(1)
-	}
+	privKey := setupID(appconf.IdentityKeyFile)
 
 	Node, err = p2p.NewHost(ctx, appconf.Libp2pPort, privKey)
 	if err != nil {

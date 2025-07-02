@@ -13,6 +13,7 @@ var testCmd = &cobra.Command{
 	Long:  `Tests a file identified by its SHA256 hash.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Println("[DEBUG] CMD test called")
 		fileSHA256 := args[0]
 
 		verdict, err := psfs.GetVirusTotalVerdictByHash(fileSHA256)

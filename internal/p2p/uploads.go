@@ -31,6 +31,7 @@ func ProcessUploads(folderPath string) {
 			if appconfInstance.FFSkipVT {
 				fresult = true
 			} else {
+				fmt.Println("[INFO] File Security checking file: " + f + " with SHA256: " + fsha256)
 				result, err := psfs.GetVirusTotalVerdictByHash(fsha256) // true == safe
 				if err != nil {
 					fmt.Println("[ERROR] (GetVirusTotalVerdictByHash) " + string(err.Error()))
