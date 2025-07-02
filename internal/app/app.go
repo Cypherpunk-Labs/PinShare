@@ -75,29 +75,6 @@ func Start() {
 		}
 	}
 
-	privKey := setupID(appconf.IdentityKeyFile)
-
-	Node, err = p2p.NewHost(ctx, appconf.Libp2pPort, privKey)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[ERROR] Failed to create libp2p host: %v\n", err)
-		os.Exit(1)
-	}
-	defer Node.Close()
-
-	fmt.Printf("[INFO] Libp2p Host ID: %s\n", Node.ID())
-	fmt.Println("[INFO] Libp2p Host Addresses:")
-	for _, addr := range Node.Addrs() {
-		fullAddr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/p2p/%s", Node.ID().String()))
-		peerAddr := addr.Encapsulate(fullAddr)
-		fmt.Printf("  %s\n", peerAddr)
-	}
-
-	kadDHT, err = dht.New(ctx, Node)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[ERROR] Failed to create DHT: %v\n", err)
-		os.Exit(1)
-	}
-
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -126,6 +103,30 @@ func Start() {
 		fmt.Println("[INFO] No command given. Libp2p host is running. Press Ctrl+C to exit.")
 		// ---------
 		// start libp2p service here
+
+		privKey := setupID(appconf.IdentityKeyFile)
+
+		Node, err = p2p.NewHost(ctx, appconf.Libp2pPort, privKey)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[ERROR] Failed to create libp2p host: %v\n", err)
+			os.Exit(1)
+		}
+		defer Node.Close()
+
+		fmt.Printf("[INFO] Libp2p Host ID: %s\n", Node.ID())
+		fmt.Println("[INFO] Libp2p Host Addresses:")
+		for _, addr := range Node.Addrs() {
+			fullAddr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/p2p/%s", Node.ID().String()))
+			peerAddr := addr.Encapsulate(fullAddr)
+			fmt.Printf("  %s\n", peerAddr)
+		}
+
+		kadDHT, err = dht.New(ctx, Node)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[ERROR] Failed to create DHT: %v\n", err)
+			os.Exit(1)
+		}
+
 		fmt.Println("[INFO] Bootstrapping DHT...")
 		if err = kadDHT.Bootstrap(ctx); err != nil {
 			fmt.Fprintf(os.Stderr, "[WARNING] DHT bootstrap failed: %v. Node will attempt to discover peers through other means or retry.\n", err)
