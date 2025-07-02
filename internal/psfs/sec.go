@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -17,8 +18,6 @@ import (
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
-	cid "github.com/ipfs/go-cid"
-	mh "github.com/multiformats/go-multihash"
 	// 	cid "github.com/ipfs/go-cid"
 	// mh "github.com/multiformats/go-multihash"
 )
@@ -91,52 +90,52 @@ import (
 // 	return finalCid.String(), nil
 // }
 
-func getCID(filePath string) (string, error) {
+// func getCID(filePath string) (string, error) {
 
-	// // TODO Block01: not correct code on small file nor large
-	// data, err := ioutil.ReadFile(filePath)
-	// if err != nil {
-	// 	fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
-	// 	os.Exit(1)
-	// }
+// 	// // TODO Block01: not correct code on small file nor large
+// 	// data, err := ioutil.ReadFile(filePath)
+// 	// if err != nil {
+// 	// 	fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
+// 	// 	os.Exit(1)
+// 	// }
 
-	// fileNode := unixfs.NewFSNode(unixfs.TFile)
-	// fileNode.AddBlockSize(uint64(len(data)))
-	// fileNode.SetData(data)
+// 	// fileNode := unixfs.NewFSNode(unixfs.TFile)
+// 	// fileNode.AddBlockSize(uint64(len(data)))
+// 	// fileNode.SetData(data)
 
-	// serialized, err := fileNode.GetBytes()
-	// if err != nil {
-	// 	return "", fmt.Errorf("error serializing UnixFS node: %v", err)
-	// }
+// 	// serialized, err := fileNode.GetBytes()
+// 	// if err != nil {
+// 	// 	return "", fmt.Errorf("error serializing UnixFS node: %v", err)
+// 	// }
 
-	// hash, err := mh.Sum(serialized, mh.SHA2_256, -1)
-	// if err != nil {
-	// 	return "", fmt.Errorf("error creating hash: %v", err)
-	// }
+// 	// hash, err := mh.Sum(serialized, mh.SHA2_256, -1)
+// 	// if err != nil {
+// 	// 	return "", fmt.Errorf("error creating hash: %v", err)
+// 	// }
 
-	// // cid := cid.NewCidV1(cid.DagProtobuf, hash)
-	// cid := cid.NewCidV1(cid.Raw, hash)
-	// fmt.Println(hash)
-	// // TODO Block01:
+// 	// // cid := cid.NewCidV1(cid.DagProtobuf, hash)
+// 	// cid := cid.NewCidV1(cid.Raw, hash)
+// 	// fmt.Println(hash)
+// 	// // TODO Block01:
 
-	// TODO Block 02: seems to work for smaller file, but not larger
-	sha256, _ := GetSHA256(filePath)
-	hxhash, _ := hex.DecodeString("1220" + sha256)
-	cid := cid.NewCidV1(cid.Raw, mh.Multihash(hxhash))
-	// TODO Block 02
+// 	// TODO Block 02: seems to work for smaller file, but not larger
+// 	sha256, _ := GetSHA256(filePath)
+// 	hxhash, _ := hex.DecodeString("1220" + sha256)
+// 	cid := cid.NewCidV1(cid.Raw, mh.Multihash(hxhash))
+// 	// TODO Block 02
 
-	fmt.Printf("CID: %s\n", cid.String())
-	return cid.String(), nil
-}
+// 	fmt.Printf("CID: %s\n", cid.String())
+// 	return cid.String(), nil
+// }
 
-func validateCID(cidString string) (bool, error) {
-	cidObj, err := cid.Decode(cidString)
-	if err != nil {
-		return false, err
-	}
-	fmt.Print(cidObj.Hash()) // 122064936ff52a67ed4c029521fd3fbaa1c66a3689f6437af929e6cd7c9897da8112
-	return true, nil
-}
+// func validateCID(cidString string) (bool, error) {
+// 	cidObj, err := cid.Decode(cidString)
+// 	if err != nil {
+// 		return false, err
+// 	}
+// 	fmt.Print(cidObj.Hash()) // 122064936ff52a67ed4c029521fd3fbaa1c66a3689f6437af929e6cd7c9897da8112
+// 	return true, nil
+// }
 
 func GetSHA256(path string) (string, error) {
 	file, err := os.Open(path)
@@ -156,6 +155,8 @@ func GetSHA256(path string) (string, error) {
 	return hashString, nil
 }
 
+// container error
+// 2025/07/02 10:53:39 page load error net::ERR_CONNECTION_TIMED_OUT
 func GetVirusTotalVerdictByHash(hash string) (bool, error) {
 	// safe == true
 	// unsafe == false
@@ -236,15 +237,20 @@ func GetVirusTotalVerdictByHash(hash string) (bool, error) {
 	// BUG: After some hours some other response is received, somehow leading to a true response that accepts file into metadata and filesystem on both sides.
 }
 
-func SendFileToVirusTotal(filepath string) (bool, error) {
+func SendFileToVirusTotal(inputfilepath string) (bool, error) {
 	baseurl := "https://www.virustotal.com"
 	uri := "/gui/home/upload"
 	url := baseurl + uri
 
+	absPath, err := filepath.Abs(inputfilepath)
+	if err != nil {
+
+	}
+
 	options := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.DisableGPU,
 		chromedp.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"),
-		// chromedp.Flag("headless", false),
+		chromedp.Flag("headless", false),
 	)
 	allocctx, cancel := chromedp.NewExecAllocator(context.Background(), options...)
 	defer cancel()
@@ -258,7 +264,7 @@ func SendFileToVirusTotal(filepath string) (bool, error) {
 		case *page.EventFileChooserOpened:
 			go func(backendNodeID cdp.BackendNodeID) {
 				if err := chromedp.Run(cdpctx,
-					dom.SetFileInputFiles([]string{filepath}).
+					dom.SetFileInputFiles([]string{absPath}).
 						WithBackendNodeID(backendNodeID),
 				); err != nil {
 					log.Fatal(err)
@@ -272,11 +278,14 @@ func SendFileToVirusTotal(filepath string) (bool, error) {
 	var ids []cdp.NodeID
 	var htmlContent string
 
-	err := chromedp.Run(cdpctx,
+	// selector1 := `document.querySelector('home-view').shadowRoot.querySelector('vt-ui-main-upload-form').shadowRoot.querySelector('#infoIcon')`
+	selector2 := `document.querySelector("#view-container > home-view").shadowRoot.querySelector("#uploadForm").shadowRoot.querySelector("#infoIcon")`
+	err = chromedp.Run(cdpctx,
 		page.SetInterceptFileChooserDialog(true),
 		chromedp.Navigate(url),
 		chromedp.Sleep(2*time.Second),
-		chromedp.NodeIDs(`document.querySelector('home-view').shadowRoot.querySelector('vt-ui-main-upload-form').shadowRoot.querySelector('#infoIcon')`, &ids, chromedp.ByJSPath),
+
+		chromedp.NodeIDs(selector2, &ids, chromedp.ByJSPath),
 		chromedp.ActionFunc(func(cdpctx context.Context) error {
 			if len(ids) < 1 {
 				return fmt.Errorf("[ERROR] selector %q did not return any nodes", ids)
@@ -288,6 +297,11 @@ func SendFileToVirusTotal(filepath string) (bool, error) {
 			chromedp.KeyEvent(kb.Enter).Do(cdpctx)
 			return nil
 		}),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = chromedp.Run(cdpctx,
 		chromedp.WaitVisible(`document.querySelector('file-view')`, chromedp.ByJSPath),
 		chromedp.Evaluate(`
 			(function() {
@@ -315,9 +329,6 @@ func SendFileToVirusTotal(filepath string) (bool, error) {
 			})()
 		`, &htmlContent),
 	)
-	if err != nil {
-		log.Fatal(err)
-	}
 	chromedp.Cancel(cdpctx)
 
 	if htmlContent != "" {

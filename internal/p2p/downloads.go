@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"fmt"
-	"pinshare/internal/config"
 	"pinshare/internal/psfs"
 	"pinshare/internal/store"
 )
@@ -11,7 +10,7 @@ func ProcessDownload(metadata store.BaseMetadata) (bool, error) {
 	returnValue := false
 
 	var fresult bool
-	if config.FF_skip_vt {
+	if appconfInstance.FFSkipVT {
 		fresult = true
 	} else {
 		result, err := psfs.GetVirusTotalVerdictByHash(metadata.FileSHA256) // true == safe
@@ -23,9 +22,9 @@ func ProcessDownload(metadata store.BaseMetadata) (bool, error) {
 	}
 	if fresult {
 		// ipfs get
-		psfs.GetFileIPFS(metadata.IPFSCID, config.CacheFolder+"/"+metadata.IPFSCID+"."+metadata.FileType)
+		psfs.GetFileIPFS(metadata.IPFSCID, appconfInstance.CacheFolder+"/"+metadata.IPFSCID+"."+metadata.FileType)
 		// check file type
-		ftype, err := psfs.ValidateFileType(config.CacheFolder + "/" + metadata.IPFSCID + "." + metadata.FileType)
+		ftype, err := psfs.ValidateFileType(appconfInstance.CacheFolder + "/" + metadata.IPFSCID + "." + metadata.FileType)
 		if err != nil {
 			return returnValue, err
 		}

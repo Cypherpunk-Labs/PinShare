@@ -1,4 +1,5 @@
-FROM --platform=${BUILDPLATFORM:-linux/amd64} golang:latest as builder
+FROM golang:latest as builder
+# FROM --platform=${BUILDPLATFORM:-linux/amd64} golang:latest as builder
 RUN mkdir /build
 WORKDIR /build
 COPY main.go .
@@ -7,10 +8,14 @@ COPY go.sum .
 COPY internal ./internal 
 RUN go mod tidy && go build .
 
-FROM --platform=${BUILDPLATFORM:-linux/amd64} chromedp/headless-shell:latest as headless 
+# FROM --platform=${BUILDPLATFORM:-linux/amd64} chromedp/headless-shell:latest as headless 
+FROM chromedp/headless-shell:latest as headless 
 # RUN ls -alh  /usr/lib/
+RUN mkdir -p /opt/libs && cp -r /usr/lib/x86_64-linux-gnu/* /opt/libs/ || cp -r /usr/lib/aarch64-linux-gnu/* /opt/libs/
+# RUN ls -alh  /opt/libs/
 
-FROM --platform=${BUILDPLATFORM:-linux/amd64} ipfs/kubo:latest
+# FROM --platform=${BUILDPLATFORM:-linux/amd64} ipfs/kubo:latest
+FROM ipfs/kubo:latest
 # https://github.com/ipfs/kubo/blob/master/Dockerfile
 # 2025/06/26 13:15:14 exec: "google-chrome": executable file not found in $PATH
 
@@ -24,8 +29,8 @@ COPY --from=builder /build/pinshare /opt/pinshare/bin/pinshare
 
 COPY --from=headless /headless-shell /opt/headless-shell 
 # COPY --from=headless /usr/lib/aarch64-linux-gnu/ /lib/
-COPY --from=headless /usr/lib/x86_64-linux-gnu/ /lib/
-
+# COPY --from=headless /usr/lib/x86_64-linux-gnu/ /lib/
+COPY --from=headless /opt/libs/ /lib/
 
 ENTRYPOINT ["/sbin/tini", "--", "sh"]
 CMD [ "/opt/pinshare/bin/entrypoint.sh" ]
@@ -38,6 +43,11 @@ ENV GITHUB_TIMELINE_ACCESS_TOKEN=REDACTED
 ENV PORT-IPFS=5001
 ENV PORT-API=9090
 ENV PORT-ADMIN-API=10000
+
+ENV PS_FF_MOVE_UPLOAD=false 
+ENV PS_FF_SENDFILE_VT=false 
+ENV PS_FF_SKIP_VT=false 
+ENV PS_FF_IGNORE_UPLOADS_IN_METADATA=true
 
 #  content scanner api
 EXPOSE 9090 

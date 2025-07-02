@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"fmt"
-	"pinshare/internal/config"
 	"pinshare/internal/psfs"
 	"pinshare/internal/store"
 	"strings"
@@ -29,7 +28,7 @@ func ProcessUploads(folderPath string) {
 			}
 
 			var fresult bool
-			if config.FF_skip_vt {
+			if appconfInstance.FFSkipVT {
 				fresult = true
 			} else {
 				result, err := psfs.GetVirusTotalVerdictByHash(fsha256) // true == safe
@@ -41,7 +40,7 @@ func ProcessUploads(folderPath string) {
 				fresult = result
 			}
 
-			if config.FF_ignore_uploads_in_metadata {
+			if appconfInstance.FFIgnoreUploadsInMetadata {
 				_, exists := store.GlobalStore.GetFile(fsha256)
 				if exists {
 					fmt.Printf("[WARNING] File already exists in GlobalStore with SHA256: %s \n", fsha256)
@@ -71,8 +70,8 @@ func ProcessUploads(folderPath string) {
 					}
 					fmt.Println("[INFO] File: " + f + " ++added to GlobalStore with CID: " + fcid)
 					count = count + 1
-					if config.FF_move_upload {
-						err := psfs.MoveFile(folderPath+"/"+f, config.CacheFolder+"/"+f)
+					if appconfInstance.FFMoveUpload {
+						err := psfs.MoveFile(folderPath+"/"+f, appconfInstance.CacheFolder+"/"+f)
 						if err != nil {
 							fmt.Println("[ERROR] Error moving file: ", err)
 						}
@@ -80,15 +79,14 @@ func ProcessUploads(folderPath string) {
 				}
 			} else {
 				fmt.Println("[ERROR] File Security check failed for file: " + f + " with SHA256: " + fsha256)
-				if config.FF_sendfile_vt {
+				if appconfInstance.FFSendFileVT {
 					// TODO: uploadFile to VT here and wait for next loop
 				}
 			}
 		} else {
 			fmt.Println("[ERROR] File type invalid for file: " + f)
-			if config.FF_move_upload {
-				// move file from config.UploadFolder to config.RejectFolder
-				err := psfs.MoveFile(folderPath+"/"+f, config.RejectFolder+"/"+f)
+			if appconfInstance.FFMoveUpload {
+				err := psfs.MoveFile(folderPath+"/"+f, appconfInstance.RejectFolder+"/"+f)
 				if err != nil {
 					fmt.Println("[ERROR] Error moving file: ", err)
 				}
@@ -98,6 +96,6 @@ func ProcessUploads(folderPath string) {
 		}
 	}
 	if count >= 1 {
-		store.GlobalStore.Save(config.DataFile)
+		store.GlobalStore.Save(appconfInstance.MetaDataFile)
 	}
 }

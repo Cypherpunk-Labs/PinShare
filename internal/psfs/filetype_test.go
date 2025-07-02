@@ -21,61 +21,61 @@ func Test_validateFileType(t *testing.T) {
 		{
 			name:    "test02",
 			args:    args{filepath: "../../test/test01/test02.exe"},
-			want:    true,
+			want:    false, // true, // not on AllowedList
 			wantErr: false,
 		},
 		{
 			name:    "test03",
 			args:    args{filepath: "../../test/test01/test03.rtf"},
-			want:    true,
+			want:    false, // true, // not on AllowedList
 			wantErr: false,
 		},
 		{
 			name:    "test04",
 			args:    args{filepath: "../../test/test01/test04.md"},
-			want:    true,
+			want:    false, // true, // not on AllowedList
 			wantErr: false,
 		},
 		{
 			name:    "test05",
 			args:    args{filepath: "../../test/test01/test05.json"},
-			want:    true,
+			want:    false, // true, // not on AllowedList
 			wantErr: false,
 		},
 		{
 			name:    "test06",
 			args:    args{filepath: "../../test/test01/test06.php"},
-			want:    true,
+			want:    false, // true, // not on AllowedList
 			wantErr: false,
 		},
 		{
 			name:    "test07",
 			args:    args{filepath: "../../test/test01/test07.xml"},
-			want:    true,
+			want:    false, // true, // not on AllowedList
 			wantErr: false,
 		},
 		{
 			name:    "test08",
 			args:    args{filepath: "../../test/test01/test08.txt"},
-			want:    true,
+			want:    false, // true, // not on AllowedList
 			wantErr: false,
 		},
 		{
 			name:    "test09",
 			args:    args{filepath: "../../test/test01/test09.html"},
-			want:    true,
+			want:    false, // true, // not on AllowedList
 			wantErr: false,
 		},
 		{
 			name:    "test10",
 			args:    args{filepath: "../../test/test01/test10_v3.epub"},
-			want:    true,
+			want:    false, // true, // not on AllowedList
 			wantErr: false,
 		},
 		{
 			name:    "test11",
 			args:    args{filepath: "../../test/test01/test11.csv"},
-			want:    true,
+			want:    false, // true, // not on AllowedList
 			wantErr: false,
 		},
 		{

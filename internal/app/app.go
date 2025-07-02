@@ -26,33 +26,32 @@ var (
 )
 
 func Start() {
-	main()
-}
-
-func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	createFolders()
+	appconf, _ := config.LoadConfig()
+	p2p.SetAppConfig(appconf)
 
-	err := store.GlobalStore.Load(config.DataFile)
+	createFolders(appconf)
+
+	err := store.GlobalStore.Load(appconf.MetaDataFile)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "Warning: could not load data file '%s': %v\n", config.DataFile, err)
+			fmt.Fprintf(os.Stderr, "Warning: could not load data file '%s': %v\n", appconf.MetaDataFile, err)
 		}
 	}
 
 	var privKey crypto.PrivKey
-	keyBytes, err := os.ReadFile(config.IdentityKeyFile)
+	keyBytes, err := os.ReadFile(appconf.IdentityKeyFile)
 	if err == nil {
 		privKey, err = crypto.UnmarshalPrivateKey(keyBytes)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "[ERROR] Error unmarshalling private key from %s: %v\n", config.IdentityKeyFile, err)
+			fmt.Fprintf(os.Stderr, "[ERROR] Error unmarshalling private key from %s: %v\n", appconf.IdentityKeyFile, err)
 			os.Exit(1)
 		}
-		fmt.Printf("[INFO] Loaded identity from %s\n", config.IdentityKeyFile)
+		fmt.Printf("[INFO] Loaded identity from %s\n", appconf.IdentityKeyFile)
 	} else if os.IsNotExist(err) {
-		fmt.Printf("[INFO] Identity file %s not found, generating new identity...\n", config.IdentityKeyFile)
+		fmt.Printf("[INFO] Identity file %s not found, generating new identity...\n", appconf.IdentityKeyFile)
 		privKey, _, err = crypto.GenerateKeyPair(crypto.Ed25519, -1)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "[ERROR] Error generating private key: %v\n", err)
@@ -63,17 +62,17 @@ func main() {
 			fmt.Fprintf(os.Stderr, "[ERROR] Error marshalling private key: %v\n", err)
 			os.Exit(1)
 		}
-		if err = os.WriteFile(config.IdentityKeyFile, keyBytes, 0600); err != nil {
-			fmt.Fprintf(os.Stderr, "[ERROR] Error saving private key to %s: %v\n", config.IdentityKeyFile, err)
+		if err = os.WriteFile(appconf.IdentityKeyFile, keyBytes, 0600); err != nil {
+			fmt.Fprintf(os.Stderr, "[ERROR] Error saving private key to %s: %v\n", appconf.IdentityKeyFile, err)
 			os.Exit(1)
 		}
-		fmt.Printf("[INFO] Saved new identity to %s\n", config.IdentityKeyFile)
+		fmt.Printf("[INFO] Saved new identity to %s\n", appconf.IdentityKeyFile)
 	} else {
-		fmt.Fprintf(os.Stderr, "[ERROR] Error reading identity file %s: %v\n", config.IdentityKeyFile, err)
+		fmt.Fprintf(os.Stderr, "[ERROR] Error reading identity file %s: %v\n", appconf.IdentityKeyFile, err)
 		os.Exit(1)
 	}
 
-	Node, err = p2p.NewHost(ctx, config.Libp2pPort, privKey)
+	Node, err = p2p.NewHost(ctx, appconf.Libp2pPort, privKey)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[ERROR] Failed to create libp2p host: %v\n", err)
 		os.Exit(1)
@@ -107,7 +106,7 @@ func main() {
 		PeriodicPublishInterval: 1 * time.Minute, // TODO decide on good period, set low for testing
 	}
 
-	P2PManager, err = p2p.NewPubSubManager(ctx, Node, kadDHT, store.GlobalStore, config.DataFile, pubSubConfig)
+	P2PManager, err = p2p.NewPubSubManager(ctx, Node, kadDHT, store.GlobalStore, appconf.MetaDataFile, pubSubConfig)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[ERROR] Failed to create PubSub Manager: %v\n", err)
 		os.Exit(1)
@@ -115,7 +114,7 @@ func main() {
 
 	fmt.Println("[INFO] PubSub Manager initialized.")
 
-	go startFileWatcher(ctx, config.UploadFolder, config.WatchInterval)
+	go startFileWatcher(ctx, appconf.UploadFolder, appconf.WatchInterval)
 
 	go func() {
 		time.Sleep(1 * time.Second)
@@ -156,7 +155,7 @@ func main() {
 	go func() {
 		<-sigCh
 		fmt.Println("\n[INFO] Received shutdown signal, closing libp2p host and saving data...")
-		if errStoreSave := store.GlobalStore.Save(config.DataFile); errStoreSave != nil {
+		if errStoreSave := store.GlobalStore.Save(appconf.MetaDataFile); errStoreSave != nil {
 			fmt.Fprintf(os.Stderr, "[ERROR] Error saving data on exit: %v\n", errStoreSave)
 		}
 		cancel()
@@ -168,11 +167,12 @@ func main() {
 
 	if err := cmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "[ERROR] CLI Error: %s\n", err)
-		if errSave := store.GlobalStore.Save(config.DataFile); errSave != nil {
+		if errSave := store.GlobalStore.Save(appconf.MetaDataFile); errSave != nil {
 			fmt.Fprintf(os.Stderr, "[ERROR] Error saving data after command error: %v\n", errSave)
 		}
 		os.Exit(1)
 	}
+	// TODO: this whole startup is a mess and needs fixing.
 
 	if len(os.Args) == 1 {
 		fmt.Println("[INFO] No command given. Libp2p host is running. Press Ctrl+C to exit.")
@@ -202,14 +202,14 @@ func startFileWatcher(ctx context.Context, folderPath string, interval time.Dura
 	}
 }
 
-func createFolders() {
-	if err := os.MkdirAll(config.UploadFolder, 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "[ERROR] Error creating upload directory '%s': %v\n", config.UploadFolder, err)
+func createFolders(appconf *config.AppConfig) {
+	if err := os.MkdirAll(appconf.UploadFolder, 0755); err != nil {
+		fmt.Fprintf(os.Stderr, "[ERROR] Error creating upload directory '%s': %v\n", appconf.UploadFolder, err)
 	}
-	if err := os.MkdirAll(config.CacheFolder, 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "[ERROR] Error creating upload directory '%s': %v\n", config.CacheFolder, err)
+	if err := os.MkdirAll(appconf.CacheFolder, 0755); err != nil {
+		fmt.Fprintf(os.Stderr, "[ERROR] Error creating upload directory '%s': %v\n", appconf.CacheFolder, err)
 	}
-	if err := os.MkdirAll(config.RejectFolder, 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "[ERROR] Error creating reject directory '%s': %v\n", config.RejectFolder, err)
+	if err := os.MkdirAll(appconf.RejectFolder, 0755); err != nil {
+		fmt.Fprintf(os.Stderr, "[ERROR] Error creating reject directory '%s': %v\n", appconf.RejectFolder, err)
 	}
 }
