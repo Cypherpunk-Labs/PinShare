@@ -18,7 +18,7 @@ func ProcessDownload(metadata store.BaseMetadata) (bool, error) {
 		if err != nil {
 			return returnValue, err
 		}
-		fmt.Println("[INFO] File Security check passed for CID: " + metadata.IPFSCID + " with SHA256: " + metadata.FileSHA256)
+		// fmt.Println("[INFO] File Security check verdict for CID: " + metadata.IPFSCID + " with SHA256: " + metadata.FileSHA256)
 		fresult = result
 	}
 	if fresult {

@@ -97,63 +97,6 @@ func Start() {
 		fmt.Fprintf(os.Stderr, "[ERROR] Failed to create DHT: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Println("[INFO] Bootstrapping DHT...")
-	if err = kadDHT.Bootstrap(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "[WARNING] DHT bootstrap failed: %v. Node will attempt to discover peers through other means or retry.\n", err)
-	} else {
-		fmt.Println("[INFO] DHT bootstrap process initiated.")
-	}
-
-	pubSubConfig := p2p.PubSubConfig{
-		TopicAdvertiseInterval:  30 * time.Second, // How often to run FindPeers loop
-		AutoTopicDiscovery:      true,
-		EnablePeriodicPublish:   true,
-		PeriodicPublishInterval: 1 * time.Minute, // TODO decide on good period, set low for testing
-	}
-
-	P2PManager, err = p2p.NewPubSubManager(ctx, Node, kadDHT, store.GlobalStore, appconf.MetaDataFile, pubSubConfig)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[ERROR] Failed to create PubSub Manager: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Println("[INFO] PubSub Manager initialized.")
-
-	go startFileWatcher(ctx, appconf.UploadFolder, appconf.WatchInterval)
-
-	go func() {
-		time.Sleep(1 * time.Second)
-		fmt.Println("[INFO] Bootstrapping libp2p host against known peers (if any)...")
-		p2p.Bootstrap(ctx, Node)
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				if Node != nil && Node.Network() != nil && P2PManager != nil {
-					fmt.Printf("\n[INFO] ----- Periodic Status Update -----\n")
-					fmt.Printf("[INFO] Connected to %d peers.\n", len(Node.Network().Peers()))
-
-					fmt.Println("[INFO] Host Addresses:")
-					for _, addr := range Node.Addrs() {
-						fullAddr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/p2p/%s", Node.ID()))
-						peerAddr := addr.Encapsulate(fullAddr)
-						fmt.Printf("  %s\n", peerAddr)
-					}
-
-					topicPeers := P2PManager.ListPeers()
-					if topicPeers != nil {
-						fmt.Printf("[INFO] PubSub peers on metadata topic: %d (%v)\n", len(topicPeers), topicPeers)
-					} else {
-						fmt.Printf("[INFO] PubSub peers on metadata topic: 0 (manager or topic not fully initialized for listing)\n")
-					}
-					fmt.Printf("[INFO] ------------------------------------\n")
-				}
-			}
-		}
-	}()
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -168,7 +111,7 @@ func Start() {
 		os.Exit(0)
 	}()
 
-	cmd.SetP2PManager(P2PManager)
+	// cmd.SetP2PManager(P2PManager)
 
 	if err := cmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "[ERROR] CLI Error: %s\n", err)
@@ -181,6 +124,67 @@ func Start() {
 
 	if len(os.Args) == 1 {
 		fmt.Println("[INFO] No command given. Libp2p host is running. Press Ctrl+C to exit.")
+		// ---------
+		// start libp2p service here
+		fmt.Println("[INFO] Bootstrapping DHT...")
+		if err = kadDHT.Bootstrap(ctx); err != nil {
+			fmt.Fprintf(os.Stderr, "[WARNING] DHT bootstrap failed: %v. Node will attempt to discover peers through other means or retry.\n", err)
+		} else {
+			fmt.Println("[INFO] DHT bootstrap process initiated.")
+		}
+
+		pubSubConfig := p2p.PubSubConfig{
+			TopicAdvertiseInterval:  30 * time.Second, // How often to run FindPeers loop
+			AutoTopicDiscovery:      true,
+			EnablePeriodicPublish:   true,
+			PeriodicPublishInterval: 1 * time.Minute, // TODO decide on good period, set low for testing
+		}
+
+		P2PManager, err = p2p.NewPubSubManager(ctx, Node, kadDHT, store.GlobalStore, appconf.MetaDataFile, pubSubConfig)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[ERROR] Failed to create PubSub Manager: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Println("[INFO] PubSub Manager initialized.")
+
+		go func() {
+			time.Sleep(1 * time.Second)
+			fmt.Println("[INFO] Bootstrapping libp2p host against known peers (if any)...")
+			p2p.Bootstrap(ctx, Node)
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					if Node != nil && Node.Network() != nil && P2PManager != nil {
+						fmt.Printf("\n[INFO] ----- Periodic Status Update -----\n")
+						fmt.Printf("[INFO] Connected to %d peers.\n", len(Node.Network().Peers()))
+
+						fmt.Println("[INFO] Host Addresses:")
+						for _, addr := range Node.Addrs() {
+							fullAddr, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/p2p/%s", Node.ID()))
+							peerAddr := addr.Encapsulate(fullAddr)
+							fmt.Printf("  %s\n", peerAddr)
+						}
+
+						topicPeers := P2PManager.ListPeers()
+						if topicPeers != nil {
+							fmt.Printf("[INFO] PubSub peers on metadata topic: %d (%v)\n", len(topicPeers), topicPeers)
+						} else {
+							fmt.Printf("[INFO] PubSub peers on metadata topic: 0 (manager or topic not fully initialized for listing)\n")
+						}
+						fmt.Printf("[INFO] ------------------------------------\n")
+					}
+				}
+			}
+		}()
+
+		go startFileWatcher(ctx, appconf.UploadFolder, appconf.WatchInterval)
+		// end libp2p service here
+		// ---------
 		<-ctx.Done()
 		fmt.Println("[INFO] Libp2p host shutting down.")
 	}
