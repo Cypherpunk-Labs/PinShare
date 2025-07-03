@@ -164,19 +164,26 @@ func GetVirusTotalVerdictByHash(hash string) (bool, error) {
 	uri := "/gui/file/"
 	url := baseurl + uri + hash
 
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
 	options := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.DisableGPU,
 		chromedp.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"),
+		chromedp.Flag("headless", true),
 	)
-	allocctx, cancel := chromedp.NewExecAllocator(context.Background(), options...)
+	ctx, cancel = chromedp.NewExecAllocator(ctx, options...)
 	defer cancel()
 
 	// var screenshotBuffer []byte
 	var htmlContent string
-	cdpctx, cancel := chromedp.NewContext(allocctx)
+	ctx, cancel = chromedp.NewContext(
+		ctx,
+		// chromedp.WithDebugf(log.Printf),
+	)
 	defer cancel()
 
-	err := chromedp.Run(cdpctx,
+	err := chromedp.Run(ctx,
 		chromedp.Navigate(url),
 		chromedp.Sleep(2*time.Second),
 
@@ -209,7 +216,7 @@ func GetVirusTotalVerdictByHash(hash string) (bool, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	chromedp.Cancel(cdpctx)
+	chromedp.Cancel(ctx)
 
 	// err = os.WriteFile("screenshot.png", screenshotBuffer, 00644)
 	// if err != nil {
@@ -242,6 +249,9 @@ func SendFileToVirusTotal(inputfilepath string) (bool, error) {
 	uri := "/gui/home/upload"
 	url := baseurl + uri
 
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
 	absPath, err := filepath.Abs(inputfilepath)
 	if err != nil {
 
@@ -250,20 +260,23 @@ func SendFileToVirusTotal(inputfilepath string) (bool, error) {
 	options := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.DisableGPU,
 		chromedp.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"),
-		chromedp.Flag("headless", false),
+		chromedp.Flag("headless", true),
 	)
-	allocctx, cancel := chromedp.NewExecAllocator(context.Background(), options...)
+	ctx, cancel = chromedp.NewExecAllocator(ctx, options...)
 	defer cancel()
 
-	cdpctx, cancel := chromedp.NewContext(allocctx)
+	ctx, cancel = chromedp.NewContext(
+		ctx,
+		// chromedp.WithDebugf(log.Printf),
+	)
 	defer cancel()
 
 	var dialogMessage string
-	chromedp.ListenTarget(cdpctx, func(ev interface{}) {
+	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		switch ev := ev.(type) {
 		case *page.EventFileChooserOpened:
 			go func(backendNodeID cdp.BackendNodeID) {
-				if err := chromedp.Run(cdpctx,
+				if err := chromedp.Run(ctx,
 					dom.SetFileInputFiles([]string{absPath}).
 						WithBackendNodeID(backendNodeID),
 				); err != nil {
@@ -280,7 +293,7 @@ func SendFileToVirusTotal(inputfilepath string) (bool, error) {
 
 	// selector1 := `document.querySelector('home-view').shadowRoot.querySelector('vt-ui-main-upload-form').shadowRoot.querySelector('#infoIcon')`
 	selector2 := `document.querySelector("#view-container > home-view").shadowRoot.querySelector("#uploadForm").shadowRoot.querySelector("#infoIcon")`
-	err = chromedp.Run(cdpctx,
+	err = chromedp.Run(ctx,
 		page.SetInterceptFileChooserDialog(true),
 		chromedp.Navigate(url),
 		chromedp.Sleep(2*time.Second),
@@ -301,7 +314,7 @@ func SendFileToVirusTotal(inputfilepath string) (bool, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = chromedp.Run(cdpctx,
+	err = chromedp.Run(ctx,
 		chromedp.WaitVisible(`document.querySelector('file-view')`, chromedp.ByJSPath),
 		chromedp.Evaluate(`
 			(function() {
@@ -329,7 +342,7 @@ func SendFileToVirusTotal(inputfilepath string) (bool, error) {
 			})()
 		`, &htmlContent),
 	)
-	chromedp.Cancel(cdpctx)
+	chromedp.Cancel(ctx)
 
 	if htmlContent != "" {
 		split := strings.Split(htmlContent, ">")

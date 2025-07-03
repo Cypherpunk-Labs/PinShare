@@ -66,15 +66,6 @@ func Start() {
 	appconf, _ := config.LoadConfig()
 	p2p.SetAppConfig(appconf)
 
-	createFolders(appconf)
-
-	err := store.GlobalStore.Load(appconf.MetaDataFile)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "Warning: could not load data file '%s': %v\n", appconf.MetaDataFile, err)
-		}
-	}
-
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -103,6 +94,14 @@ func Start() {
 		fmt.Println("[INFO] No command given. Libp2p host is running. Press Ctrl+C to exit.")
 		// ---------
 		// start libp2p service here
+		createFolders(appconf)
+
+		err := store.GlobalStore.Load(appconf.MetaDataFile)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				fmt.Fprintf(os.Stderr, "Warning: could not load data file '%s': %v\n", appconf.MetaDataFile, err)
+			}
+		}
 
 		privKey := setupID(appconf.IdentityKeyFile)
 

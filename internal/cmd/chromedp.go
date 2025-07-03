@@ -10,13 +10,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var cdpCmd = &cobra.Command{
-	Use:   "cdp <fileSHA256>",
+var testcdpCmd = &cobra.Command{
+	Use:   "testcdp <fileSHA256>",
 	Short: "Test ChromeDP",
 	Long:  `Test ChromeDP and get browser version.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("[DEBUG] CMD cdp called")
+		fmt.Println("[DEBUG] CMD testcdp called")
 		chromedpTest()
 
 		return nil
@@ -63,5 +63,5 @@ func chromedpTest() {
 }
 
 func init() {
-	rootCmd.AddCommand(cdpCmd)
+	rootCmd.AddCommand(testcdpCmd)
 }
