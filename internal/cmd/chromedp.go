@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/chromedp/chromedp"
-
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +24,21 @@ var cdpCmd = &cobra.Command{
 }
 
 func chromedpTest() {
-	ctx, cancel := chromedp.NewContext(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
+	defer cancel()
+
+	options := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.DisableGPU,
+		chromedp.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"),
+		chromedp.Flag("headless", true),
+	)
+	ctx, cancel = chromedp.NewExecAllocator(ctx, options...)
+	defer cancel()
+
+	ctx, cancel = chromedp.NewContext(
+		ctx,
+		chromedp.WithDebugf(log.Printf),
+	)
 	defer cancel()
 
 	var version string
