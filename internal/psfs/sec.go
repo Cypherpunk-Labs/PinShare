@@ -164,7 +164,7 @@ func GetVirusTotalVerdictByHash(hash string) (bool, error) {
 	uri := "/gui/file/"
 	url := baseurl + uri + hash
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
 	options := append(chromedp.DefaultExecAllocatorOptions[:],
@@ -249,7 +249,7 @@ func SendFileToVirusTotal(inputfilepath string) (bool, error) {
 	uri := "/gui/home/upload"
 	url := baseurl + uri
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
 	absPath, err := filepath.Abs(inputfilepath)
@@ -259,6 +259,7 @@ func SendFileToVirusTotal(inputfilepath string) (bool, error) {
 
 	options := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.DisableGPU,
+		// chromedp.ExecPath(),
 		chromedp.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"),
 		chromedp.Flag("headless", true),
 	)

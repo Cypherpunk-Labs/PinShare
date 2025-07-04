@@ -24,7 +24,7 @@ var testcdpCmd = &cobra.Command{
 }
 
 func chromedpTest() {
-	ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	options := append(chromedp.DefaultExecAllocatorOptions[:],
@@ -37,7 +37,7 @@ func chromedpTest() {
 
 	ctx, cancel = chromedp.NewContext(
 		ctx,
-		chromedp.WithDebugf(log.Printf),
+		// chromedp.WithDebugf(log.Printf),
 	)
 	defer cancel()
 
