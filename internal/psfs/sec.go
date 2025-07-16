@@ -300,21 +300,42 @@ func SendFileToVirusTotal(inputfilepath string) (bool, error) {
 		chromedp.Sleep(2*time.Second),
 
 		chromedp.NodeIDs(selector2, &ids, chromedp.ByJSPath),
-		chromedp.ActionFunc(func(cdpctx context.Context) error {
+		chromedp.ActionFunc(func(ctx context.Context) error {
 			if len(ids) < 1 {
 				return fmt.Errorf("[ERROR] selector %q did not return any nodes", ids)
 			}
-			err := dom.Focus().WithNodeID(ids[0]).Do(cdpctx)
+			err := dom.Focus().WithNodeID(ids[0]).Do(ctx)
 			if err != nil {
 				return err
 			}
-			chromedp.KeyEvent(kb.Enter).Do(cdpctx)
+			chromedp.KeyEvent(kb.Enter).Do(ctx)
 			return nil
 		}),
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// TODO: now have a confirm button to click.
+	selectorconfirm := `document.querySelector("#view-container > home-view").shadowRoot.querySelector("#uploadForm").shadowRoot.querySelector("#confirmUploadButton")`
+	err = chromedp.Run(ctx,
+		chromedp.NodeIDs(selectorconfirm, &ids, chromedp.ByJSPath),
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			if len(ids) < 1 {
+				return fmt.Errorf("[ERROR] selector %q did not return any nodes", ids)
+			}
+			err := dom.Focus().WithNodeID(ids[0]).Do(ctx)
+			if err != nil {
+				return err
+			}
+			chromedp.KeyEvent(kb.Enter).Do(ctx)
+			return nil
+		}),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	err = chromedp.Run(ctx,
 		chromedp.WaitVisible(`document.querySelector('file-view')`, chromedp.ByJSPath),
 		chromedp.Evaluate(`

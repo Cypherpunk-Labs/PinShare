@@ -37,7 +37,7 @@ func ProcessUploads(folderPath string) {
 					fmt.Println("[ERROR] (GetVirusTotalVerdictByHash) " + string(err.Error()))
 					return
 				}
-				fmt.Println("[INFO] File Security check passed for file: " + f + " with SHA256: " + fsha256)
+				// fmt.Println("[INFO] File Security check passed for file: " + f + " with SHA256: " + fsha256)
 				fresult = result
 			}
 
@@ -79,9 +79,25 @@ func ProcessUploads(folderPath string) {
 					}
 				}
 			} else {
-				fmt.Println("[ERROR] File Security check failed for file: " + f + " with SHA256: " + fsha256)
 				if appconfInstance.FFSendFileVT {
-					// TODO: uploadFile to VT here and wait for next loop
+					fmt.Println("[INFO] Submitting File to 3rd Party for Security check for file: " + f + " with SHA256: " + fsha256)
+					submitresult, err := psfs.SendFileToVirusTotal(folderPath + "/" + f)
+					if err != nil {
+						fmt.Println("[ERROR] Error submitting file for security check: ", err)
+					}
+					if submitresult {
+						fmt.Println("[INFO] Submission Passed Security check for file: " + f + " with SHA256: " + fsha256)
+					} else {
+						fmt.Println("[ERROR] File Security check failed for file: " + f + " with SHA256: " + fsha256)
+						if appconfInstance.FFMoveUpload {
+							err := psfs.MoveFile(folderPath+"/"+f, appconfInstance.RejectFolder+"/"+f)
+							if err != nil {
+								fmt.Println("[ERROR] Error moving file: ", err)
+							}
+						}
+					}
+				} else {
+					fmt.Println("[ERROR] File Security check failed for file: " + f + " with SHA256: " + fsha256)
 				}
 			}
 		} else {

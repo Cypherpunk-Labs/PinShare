@@ -8,20 +8,23 @@ import (
 
 // Default values for configuration
 const (
-	defaultUploadFolder    = "./upload"
-	defaultCacheFolder     = "./cache"
-	defaultRejectFolder    = "./rejected"
-	defaultMetaDataFile    = "metadata.json"
-	defaultIdentityKeyFile = "identity.key"
-	defaultLibp2pPort      = 50001
-	defaultWatchInterval   = 2 * time.Minute
-	defaultOrgName         = "Cypherpunk"
-	defaultGroupName       = "TestLab"
+	defaultUploadFolder     = "./upload"
+	defaultCacheFolder      = "./cache"
+	defaultRejectFolder     = "./rejected"
+	defaultMetaDataFile     = "metadata.json"
+	defaultIdentityKeyFile  = "identity.key"
+	defaultLibp2pPort       = 50001
+	defaultWatchInterval    = 2 * time.Minute
+	defaultOrgName          = "Cypherpunk"
+	defaultGroupName        = "TestLab"
+	defaultMetadataTopicID  = "/metadata-sync/1.0.0"
+	defaultFilteringTopicID = "/filtering-sync/1.0.0"
 )
 
 // Default values for Feature Flags
 const (
 	defaultFF                        = false // ENVVAR NAME
+	defaultFFCache                   = false // PS_FF_CACHE
 	defaultFFMoveUpload              = false // PS_FF_MOVE_UPLOAD
 	defaultFFSendFileVT              = false // PS_FF_SENDFILE_VT
 	defaultFFSkipVT                  = false // PS_FF_SKIP_VT
@@ -39,6 +42,9 @@ type AppConfig struct {
 	WatchInterval             time.Duration
 	OrgName                   string
 	GroupName                 string
+	MetadataTopicID           string
+	FilteringTopicID          string
+	FFCache                   bool
 	FFMoveUpload              bool
 	FFSendFileVT              bool
 	FFSkipVT                  bool
@@ -59,6 +65,9 @@ func LoadConfig() (*AppConfig, error) {
 		WatchInterval:             defaultWatchInterval,
 		OrgName:                   defaultOrgName,
 		GroupName:                 defaultGroupName,
+		MetadataTopicID:           defaultMetadataTopicID,
+		FilteringTopicID:          defaultFilteringTopicID,
+		FFCache:                   defaultFFCache,
 		FFMoveUpload:              defaultFFMoveUpload,
 		FFSendFileVT:              defaultFFSendFileVT,
 		FFSkipVT:                  defaultFFSkipVT,
@@ -76,6 +85,24 @@ func LoadConfig() (*AppConfig, error) {
 		}
 		return nil
 	}
+
+	// Helper function to parse string environment variables
+	parseStringEnv := func(key string, target *string) error {
+		if val, ok := os.LookupEnv(key); ok {
+			*target = val
+		}
+		return nil
+	}
+
+	//TODO: Loadin the Org/Group names
+	if err := parseStringEnv("PS_ORGNAME", &conf.OrgName); err != nil {
+		return nil, err
+	}
+	if err := parseStringEnv("PS_GROUPNAME", &conf.GroupName); err != nil {
+		return nil, err
+	}
+	conf.MetadataTopicID = "/" + conf.OrgName + "/" + conf.GroupName + conf.MetadataTopicID
+	conf.FilteringTopicID = "/" + conf.OrgName + "/" + conf.GroupName + conf.FilteringTopicID
 
 	if err := parseBoolEnv("PS_FF_MOVE_UPLOAD", &conf.FFMoveUpload); err != nil {
 		return nil, err

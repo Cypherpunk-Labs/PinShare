@@ -87,6 +87,9 @@ ENV PORT-IPFS=5001
 ENV PORT-API=9090
 ENV PORT-ADMIN-API=10000
 
+ENV PS_ORGNAME=CypherPunk
+ENV PS_GROUPNAME=LabRat250710
+
 ENV PS_FF_MOVE_UPLOAD=false 
 ENV PS_FF_SENDFILE_VT=false 
 ENV PS_FF_SKIP_VT=false 
@@ -100,7 +103,7 @@ EXPOSE 10000
 EXPOSE 4001
 # Swarm UDP; should be exposed to the public
 EXPOSE 4001/udp
-# Daemon API; must not be exposed publicly but to client services under you control
+# Private Daemon API; **must not be exposed publicly** but to client services under you control
 EXPOSE 5001
 # Web Gateway; can be exposed publicly with a proxy, e.g. as https://ipfs.example.org
 EXPOSE 8080

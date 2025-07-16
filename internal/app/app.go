@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"pinshare/internal/api"
 	"pinshare/internal/cmd"
 	"pinshare/internal/config"
 	"pinshare/internal/p2p"
@@ -138,6 +139,7 @@ func Start() {
 			AutoTopicDiscovery:      true,
 			EnablePeriodicPublish:   true,
 			PeriodicPublishInterval: 1 * time.Minute, // TODO decide on good period, set low for testing
+			TopicID:                 appconf.MetadataTopicID,
 		}
 
 		P2PManager, err = p2p.NewPubSubManager(ctx, Node, kadDHT, store.GlobalStore, appconf.MetaDataFile, pubSubConfig)
@@ -183,6 +185,16 @@ func Start() {
 		}()
 
 		go startFileWatcher(ctx, appconf.UploadFolder, appconf.WatchInterval)
+		go func() {
+			api.Start()
+			for {
+				select {
+				case <-ctx.Done():
+					fmt.Println("[INFO] Stopping API.")
+					return
+				}
+			}
+		}()
 		// end libp2p service here
 		// ---------
 		<-ctx.Done()
