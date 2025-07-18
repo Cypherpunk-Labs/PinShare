@@ -2,7 +2,9 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 
 	"pinshare/internal/store"
@@ -122,9 +124,17 @@ func Start() {
 	// get an `http.Handler` that we can use
 	h := Handler(server)
 
+	// generate random number between 01 and 99
+	// TODO: This is a temporary solution for testing purposes.
+	// In a real application, the port should be configurable.
+	min := 1
+	max := 99
+	randomNumber := rand.Intn(max-min+1) + min
+	port := fmt.Sprintf("90%02d", randomNumber)
+
 	// In a real app, you'd likely get this from config.
 	// Matching the port from the OpenAPI spec example.
-	addr := "0.0.0.0:9090"
+	addr := "0.0.0.0:" + port
 	s := &http.Server{
 		Handler: h,
 		Addr:    addr,

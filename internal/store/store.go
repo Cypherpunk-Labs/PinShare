@@ -12,20 +12,30 @@ import (
 // In a full CRDT system, fields like Tags, ModerationVotes, CommunityLabels
 // would be specific CRDT types (e.g., OR-Set, PN-Counter).
 type BaseMetadata struct {
-	FileSHA256 string `json:"fileSHA256"` // Primary key
-	IPFSCID    string `json:"ipfsCID"`
-	// Title           string          `json:"title"`           // LWW-Register (Last-Write-Wins)
-	// Author          string          `json:"author"`          // LWW-Register
-	FileType string `json:"fileType"`
-	// FileName        string          `json:"fileName"`        // LWW-Register
-	// Date            string          `json:"date"`            // LWW-Register (consider time.Time if strict parsing needed)
-	// ScientificField string          `json:"scientificField"` // LWW-Register
-	// Tags            map[string]bool `json:"tags"`            // Simulating an OR-Set; bool true if tag exists
-	// ModerationVotes int             `json:"moderationVotes"` // Simulating a PN-Counter
-	// CommunityLabels map[string]int  `json:"communityLabels"` // Simulating a map of Label -> PN-Counter (vote count)
-	LastUpdated time.Time `json:"lastUpdated"` // Timestamp for LWW or general record update
-	AddedAt     time.Time `json:"addedAt"`
+	FileSHA256      string          `json:"fileSHA256"` // Primary key
+	IPFSCID         string          `json:"ipfsCID"`
+	FileType        string          `json:"fileType"`
+	LastUpdated     time.Time       `json:"lastUpdated"` // Timestamp for LWW or general record update
+	AddedAt         time.Time       `json:"addedAt"`
+	ModerationVotes int             `json:"moderationVotes"` // Simulating a PN-Counter
+	Tags            map[string]bool `json:"tags"`            // Simulating an OR-Set; bool true if tag exists
 }
+
+// // TODO: So we will have very specific labels/tags for the content 1-1, and other tags that will label content with 1-many.
+// type TagMetadata struct {
+// 	IPFSCID string `json:"ipfsCID"`
+// 	// TODO: Decide if to use Key Value pairs for tags, and how to keep our tags immutable
+// 	Tag string `json:"tag"` // TODO: I want to enable not just a single tag but mutiple tags in an immutable way.
+// 	// Title           string          `json:"title"`           // LWW-Register (Last-Write-Wins)
+// 	// Author          string          `json:"author"`          // LWW-Register
+// 	// FileName        string          `json:"fileName"`        // LWW-Register
+// 	// Date            string          `json:"date"`            // LWW-Register (consider time.Time if strict parsing needed)
+// 	// ScientificField string          `json:"scientificField"` // LWW-Register
+// 	// Tags            map[string]bool `json:"tags"`            // Simulating an OR-Set; bool true if tag exists
+// 	ModerationVotes int `json:"moderationVotes"` // Simulating a PN-Counter // TODO: I want to allow users to vote on each Tag only once but also allow them to change at a later time.
+// 	// CommunityLabels map[string]int  `json:"communityLabels"` // Simulating a map of Label -> PN-Counter (vote count)
+// 	AddedByNodeID string `json:"a"`
+// }
 
 // MetadataStore holds all file metadata in memory.
 type MetadataStore struct {
@@ -242,10 +252,10 @@ func (s *MetadataStore) AddTag(sha256, tag string) error {
 	if !exists {
 		return fmt.Errorf("file with SHA256 %s not found", sha256)
 	}
-	// if meta.Tags == nil {
-	// 	meta.Tags = make(map[string]bool)
-	// }
-	// meta.Tags[tag] = true               // In a real OR-Set, this would involve unique IDs per add.
+	if meta.Tags == nil {
+		meta.Tags = make(map[string]bool)
+	}
+	meta.Tags[tag] = true               // In a real OR-Set, this would involve unique IDs per add.
 	meta.LastUpdated = time.Now().UTC() // TODO should this be with .UTC() also
 	return nil                          // Commands handle saving
 }
@@ -259,17 +269,17 @@ func (s *MetadataStore) RemoveTag(sha256, tag string) error {
 	if !exists {
 		return fmt.Errorf("file with SHA256 %s not found", sha256)
 	}
-	// if meta.Tags == nil {
-	// 	// No tags to remove from
-	// 	return nil
-	// }
-	// delete(meta.Tags, tag)              // In a real OR-Set, this adds a tombstone.
+	if meta.Tags == nil {
+		// No tags to remove from
+		return nil
+	}
+	delete(meta.Tags, tag)              // In a real OR-Set, this adds a tombstone.
 	meta.LastUpdated = time.Now().UTC() // TODO should this be with .UTC() also
 	return nil                          // Commands handle saving
 }
 
 // VoteForRemoval increments the moderation vote count for a file. Simulates PN-Counter increment.
-func (s *MetadataStore) VoteForRemoval(sha256 string) error {
+func (s *MetadataStore) VoteForRemoval(sha256 string, increment bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -277,7 +287,11 @@ func (s *MetadataStore) VoteForRemoval(sha256 string) error {
 	if !exists {
 		return fmt.Errorf("file with SHA256 %s not found", sha256)
 	}
-	// meta.ModerationVotes++
+	if increment {
+		meta.ModerationVotes++
+	} else {
+		meta.ModerationVotes--
+	}
 	meta.LastUpdated = time.Now().UTC() // TODO should this be with .UTC() also
 	return nil                          // Commands handle saving
 }

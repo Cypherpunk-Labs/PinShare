@@ -104,100 +104,100 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  # /files/{fileSHA256}/tags:
-  #   post:
-  #     summary: Add a tag to a file
-  #     operationId: addTag
-  #     tags:
-  #       - Tags
-  #     description: Adds a tag to a file's metadata. This simulates an OR-Set 'add' operation. The operation is idempotent; adding an existing tag has no effect.
-  #     parameters:
-  #       - name: fileSHA256
-  #         in: path
-  #         required: true
-  #         description: The SHA256 hash of the file.
-  #         schema:
-  #           type: string
-  #           format: sha256
-  #     requestBody:
-  #       required: true
-  #       content:
-  #         application/json:
-  #           schema:
-  #             type: object
-  #             properties:
-  #               tag:
-  #                 type: string
-  #                 description: The tag to add.
-  #                 example: "scientific-research"
-  #             required:
-  #               - tag
-  #     responses:
-  #       '204':
-  #         description: Tag added successfully.
-  #       '404':
-  #         description: File not found.
-  #         content:
-  #           application/json:
-  #             schema:
-  #               $ref: '#/components/schemas/Error'
+  /files/{fileSHA256}/tags:
+    post:
+      summary: Add a tag to a file
+      operationId: addTag
+      tags:
+        - Tags
+      description: Adds a tag to a file's metadata. This simulates an OR-Set 'add' operation. The operation is idempotent; adding an existing tag has no effect.
+      parameters:
+        - name: fileSHA256
+          in: path
+          required: true
+          description: The SHA256 hash of the file.
+          schema:
+            type: string
+            format: sha256
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tag:
+                  type: string
+                  description: The tag to add.
+                  example: "scientific-research"
+              required:
+                - tag
+      responses:
+        '204':
+          description: Tag added successfully.
+        '404':
+          description: File not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
-  # /files/{fileSHA256}/tags/{tagName}:
-  #   delete:
-  #     summary: Remove a tag from a file
-  #     operationId: removeTag
-  #     tags:
-  #       - Tags
-  #     description: Removes a tag from a file's metadata. This simulates an OR-Set 'remove' operation.
-  #     parameters:
-  #       - name: fileSHA256
-  #         in: path
-  #         required: true
-  #         description: The SHA256 hash of the file.
-  #         schema:
-  #           type: string
-  #           format: sha256
-  #       - name: tagName
-  #         in: path
-  #         required: true
-  #         description: The tag to remove.
-  #         schema:
-  #           type: string
-  #           example: "scientific-research"
-  #     responses:
-  #       '204':
-  #         description: Tag removed successfully.
-  #       '404':
-  #         description: File not found.
-  #         content:
-  #           application/json:
-  #             schema:
-  #               $ref: '#/components/schemas/Error'
+  /files/{fileSHA256}/tags/{tagName}:
+    delete:
+      summary: Remove a tag from a file
+      operationId: removeTag
+      tags:
+        - Tags
+      description: Removes a tag from a file's metadata. This simulates an OR-Set 'remove' operation.
+      parameters:
+        - name: fileSHA256
+          in: path
+          required: true
+          description: The SHA256 hash of the file.
+          schema:
+            type: string
+            format: sha256
+        - name: tagName
+          in: path
+          required: true
+          description: The tag to remove.
+          schema:
+            type: string
+            example: "scientific-research"
+      responses:
+        '204':
+          description: Tag removed successfully.
+        '404':
+          description: File not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
-  # /files/{fileSHA256}/votes/removal:
-  #   post:
-  #     summary: Vote for file removal
-  #     operationId: voteForRemoval
-  #     tags:
-  #       - Moderation
-  #     description: Increments the moderation vote counter to flag a file for removal. This simulates a PN-Counter 'increment' operation.
-  #     parameters:
-  #       - name: fileSHA256
-  #         in: path
-  #         required: true
-  #         description: The SHA256 hash of the file.
-  #         schema:
-  #           type: string
-  #           format: sha256
-  #     responses:
-  #       '204':
-  #         description: Vote cast successfully.
-  #       '404':
-  #         description: File not found.
-  #         content:
-  #           application/json:
-  #             schema:
-  #               $ref: '#/components/schemas/Error'
+  /files/{fileSHA256}/votes/removal:
+    post:
+      summary: Vote for file removal
+      operationId: voteForRemoval
+      tags:
+        - Moderation
+      description: Increments the moderation vote counter to flag a file for removal. This simulates a PN-Counter 'increment' operation.
+      parameters:
+        - name: fileSHA256
+          in: path
+          required: true
+          description: The SHA256 hash of the file.
+          schema:
+            type: string
+            format: sha256
+      responses:
+        '204':
+          description: Vote cast successfully.
+        '404':
+          description: File not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
 components:
   schemas:
@@ -238,18 +238,18 @@ components:
         #   type: string
         #   description: LWW-Register for the scientific field.
         #   example: "Low Energy Nuclear Reactions"
-        # tags:
-        #   type: object
-        #   description: An OR-Set of tags. Keys are the tags, value is always true.
-        #   additionalProperties:
-        #     type: boolean
-        #   example:
-        #     "LENR": true
-        #     "cold-fusion": true
-        # moderationVotes:
-        #   type: integer
-        #   description: A PN-Counter for community votes to remove the file.
-        #   example: 0
+        tags:
+          type: object
+          description: An OR-Set of tags. Keys are the tags, value is always true.
+          additionalProperties:
+            type: boolean
+          example:
+            "LENR": true
+            "cold-fusion": true
+        moderationVotes:
+          type: integer
+          description: A PN-Counter for community votes to remove the file.
+          example: 0
         # communityLabels:
         #   type: object
         #   description: A map of community-provided labels to a PN-Counter of votes for that label.
