@@ -36,6 +36,12 @@ type BaseMetadata struct {
 
 	// LastUpdated Timestamp for the last update to this record (LWW clock).
 	LastUpdated *time.Time `json:"lastUpdated,omitempty"`
+
+	// ModerationVotes A PN-Counter for community votes to remove the file.
+	ModerationVotes *int `json:"moderationVotes,omitempty"`
+
+	// Tags An OR-Set of tags. Keys are the tags, value is always true.
+	Tags *map[string]bool `json:"tags,omitempty"`
 }
 
 // Error defines model for Error.
@@ -47,6 +53,18 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+// P2PStatus Information about the local P2P node.
+type P2PStatus struct {
+	// Addresses The listening multiaddresses of the local node.
+	Addresses []string `json:"addresses"`
+
+	// ConnectedPeers The number of currently connected peers.
+	ConnectedPeers int `json:"connectedPeers"`
+
+	// Id The Peer ID of the local node.
+	Id string `json:"id"`
+}
+
 // WritableMetadata The set of fields that can be written by a client when adding or updating a file's metadata.
 type WritableMetadata struct {
 	// FileType The MIME type of the file.
@@ -56,8 +74,35 @@ type WritableMetadata struct {
 	IpfsCID string `json:"ipfsCID"`
 }
 
+// AddTagJSONBody defines parameters for AddTag.
+type AddTagJSONBody struct {
+	// Tag The tag to add.
+	Tag string `json:"tag"`
+}
+
+// ConnectToPeerJSONBody defines parameters for ConnectToPeer.
+type ConnectToPeerJSONBody struct {
+	// Multiaddr The full multiaddress of the peer (e.g., /ip4/127.0.0.1/tcp/4001/p2p/12D3Koo...).
+	Multiaddr string `json:"multiaddr"`
+}
+
+// SendDirectMessageJSONBody defines parameters for SendDirectMessage.
+type SendDirectMessageJSONBody struct {
+	// Message The text message to send.
+	Message string `json:"message"`
+}
+
 // AddOrUpdateFileJSONRequestBody defines body for AddOrUpdateFile for application/json ContentType.
 type AddOrUpdateFileJSONRequestBody = WritableMetadata
+
+// AddTagJSONRequestBody defines body for AddTag for application/json ContentType.
+type AddTagJSONRequestBody AddTagJSONBody
+
+// ConnectToPeerJSONRequestBody defines body for ConnectToPeer for application/json ContentType.
+type ConnectToPeerJSONRequestBody ConnectToPeerJSONBody
+
+// SendDirectMessageJSONRequestBody defines body for SendDirectMessage for application/json ContentType.
+type SendDirectMessageJSONRequestBody SendDirectMessageJSONBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -70,6 +115,27 @@ type ServerInterface interface {
 	// Add or update file metadata (Upsert)
 	// (PUT /files/{fileSHA256})
 	AddOrUpdateFile(w http.ResponseWriter, r *http.Request, fileSHA256 string)
+	// Add a tag to a file
+	// (POST /files/{fileSHA256}/tags)
+	AddTag(w http.ResponseWriter, r *http.Request, fileSHA256 string)
+	// Remove a tag from a file
+	// (DELETE /files/{fileSHA256}/tags/{tagName})
+	RemoveTag(w http.ResponseWriter, r *http.Request, fileSHA256 string, tagName string)
+	// Vote for file removal
+	// (POST /files/{fileSHA256}/votes/removal)
+	VoteForRemoval(w http.ResponseWriter, r *http.Request, fileSHA256 string)
+	// List connected peers
+	// (GET /p2p/peers)
+	ListP2PPeers(w http.ResponseWriter, r *http.Request)
+	// Connect to a peer
+	// (POST /p2p/peers)
+	ConnectToPeer(w http.ResponseWriter, r *http.Request)
+	// Send a direct message to a peer
+	// (POST /p2p/peers/{peerID}/message)
+	SendDirectMessage(w http.ResponseWriter, r *http.Request, peerID string)
+	// Get P2P node status
+	// (GET /p2p/status)
+	GetP2PStatus(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -136,6 +202,157 @@ func (siw *ServerInterfaceWrapper) AddOrUpdateFile(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.AddOrUpdateFile(w, r, fileSHA256)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AddTag operation middleware
+func (siw *ServerInterfaceWrapper) AddTag(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "fileSHA256" -------------
+	var fileSHA256 string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "fileSHA256", r.PathValue("fileSHA256"), &fileSHA256, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileSHA256", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddTag(w, r, fileSHA256)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveTag operation middleware
+func (siw *ServerInterfaceWrapper) RemoveTag(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "fileSHA256" -------------
+	var fileSHA256 string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "fileSHA256", r.PathValue("fileSHA256"), &fileSHA256, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileSHA256", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "tagName" -------------
+	var tagName string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "tagName", r.PathValue("tagName"), &tagName, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tagName", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveTag(w, r, fileSHA256, tagName)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// VoteForRemoval operation middleware
+func (siw *ServerInterfaceWrapper) VoteForRemoval(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "fileSHA256" -------------
+	var fileSHA256 string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "fileSHA256", r.PathValue("fileSHA256"), &fileSHA256, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "fileSHA256", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.VoteForRemoval(w, r, fileSHA256)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListP2PPeers operation middleware
+func (siw *ServerInterfaceWrapper) ListP2PPeers(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListP2PPeers(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ConnectToPeer operation middleware
+func (siw *ServerInterfaceWrapper) ConnectToPeer(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConnectToPeer(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SendDirectMessage operation middleware
+func (siw *ServerInterfaceWrapper) SendDirectMessage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "peerID" -------------
+	var peerID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "peerID", r.PathValue("peerID"), &peerID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "peerID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SendDirectMessage(w, r, peerID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetP2PStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetP2PStatus(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetP2PStatus(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -268,6 +485,13 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("GET "+options.BaseURL+"/files", wrapper.ListAllFiles)
 	m.HandleFunc("GET "+options.BaseURL+"/files/{fileSHA256}", wrapper.GetFileBySHA256)
 	m.HandleFunc("PUT "+options.BaseURL+"/files/{fileSHA256}", wrapper.AddOrUpdateFile)
+	m.HandleFunc("POST "+options.BaseURL+"/files/{fileSHA256}/tags", wrapper.AddTag)
+	m.HandleFunc("DELETE "+options.BaseURL+"/files/{fileSHA256}/tags/{tagName}", wrapper.RemoveTag)
+	m.HandleFunc("POST "+options.BaseURL+"/files/{fileSHA256}/votes/removal", wrapper.VoteForRemoval)
+	m.HandleFunc("GET "+options.BaseURL+"/p2p/peers", wrapper.ListP2PPeers)
+	m.HandleFunc("POST "+options.BaseURL+"/p2p/peers", wrapper.ConnectToPeer)
+	m.HandleFunc("POST "+options.BaseURL+"/p2p/peers/{peerID}/message", wrapper.SendDirectMessage)
+	m.HandleFunc("GET "+options.BaseURL+"/p2p/status", wrapper.GetP2PStatus)
 
 	return m
 }
@@ -275,33 +499,51 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

@@ -46,7 +46,7 @@ COPY --from=ipfs /usr/local/bin/container_init_run /usr/local/bin/container_init
 # Add suid bit on fusermount so it will run properly
 RUN chmod 4755 /usr/local/bin/fusermount
 
-# Fix permissions on start_ipfs (ignore the build machine's permissions)
+# change permissions on start_ipfs (ignore the build machine's permissions)
 RUN chmod 0755 /usr/local/bin/start_ipfs
 
 # Create the fs-repo directory and switch to a non-privileged user.

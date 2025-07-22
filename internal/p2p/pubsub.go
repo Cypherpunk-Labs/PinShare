@@ -227,6 +227,7 @@ func (psm *PubSubManager) handleIncomingMessages() {
 
 			fmt.Printf("[PUBSUB] Received message from %s (topic: %s)\n", msg.ReceivedFrom.String(), psm.psc.TopicID)
 
+			// TODO: here we could begin to handle different message types over the same topic.
 			var receivedMeta store.BaseMetadata
 			if err := json.Unmarshal(msg.Data, &receivedMeta); err != nil {
 				fmt.Printf("[ERROR] Failed to unmarshal received metadata from %s: %v\n", msg.ReceivedFrom.String(), err)

@@ -12,6 +12,7 @@ import (
 	"pinshare/internal/cmd"
 	"pinshare/internal/config"
 	"pinshare/internal/p2p"
+	"pinshare/internal/psfs"
 	"pinshare/internal/store"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -63,6 +64,7 @@ func setupID(idFile string) crypto.PrivKey {
 func Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	var LoadedMetaData bool = false
 
 	appconf, _ := config.LoadConfig()
 	p2p.SetAppConfig(appconf)
@@ -72,8 +74,10 @@ func Start() {
 	go func() {
 		<-sigCh
 		fmt.Println("\n[INFO] Received shutdown signal, closing libp2p host and saving data...")
-		if errStoreSave := store.GlobalStore.Save(appconf.MetaDataFile); errStoreSave != nil {
-			fmt.Fprintf(os.Stderr, "[ERROR] Error saving data on exit: %v\n", errStoreSave)
+		if LoadedMetaData {
+			if errStoreSave := store.GlobalStore.Save(appconf.MetaDataFile); errStoreSave != nil {
+				fmt.Fprintf(os.Stderr, "[ERROR] Error saving data on exit: %v\n", errStoreSave)
+			}
 		}
 		cancel()
 		time.Sleep(1 * time.Second)
@@ -84,12 +88,13 @@ func Start() {
 
 	if err := cmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "[ERROR] CLI Error: %s\n", err)
-		if errSave := store.GlobalStore.Save(appconf.MetaDataFile); errSave != nil {
-			fmt.Fprintf(os.Stderr, "[ERROR] Error saving data after command error: %v\n", errSave)
+		if LoadedMetaData {
+			if errSave := store.GlobalStore.Save(appconf.MetaDataFile); errSave != nil {
+				fmt.Fprintf(os.Stderr, "[ERROR] Error saving data after command error: %v\n", errSave)
+			}
 		}
 		os.Exit(1)
 	}
-	// TODO: this whole startup is a mess and needs fixing.
 
 	if len(os.Args) == 1 {
 		fmt.Println("[INFO] No command given. Libp2p host is running. Press Ctrl+C to exit.")
@@ -103,6 +108,7 @@ func Start() {
 				fmt.Fprintf(os.Stderr, "Warning: could not load data file '%s': %v\n", appconf.MetaDataFile, err)
 			}
 		}
+		LoadedMetaData = true
 
 		privKey := setupID(appconf.IdentityKeyFile)
 
@@ -112,6 +118,9 @@ func Start() {
 			os.Exit(1)
 		}
 		defer Node.Close()
+
+		// Set up the handler for direct messages
+		p2p.SetDirectMessageHandler(Node)
 
 		fmt.Printf("[INFO] Libp2p Host ID: %s\n", Node.ID())
 		fmt.Println("[INFO] Libp2p Host Addresses:")
@@ -185,8 +194,13 @@ func Start() {
 		}()
 
 		go startFileWatcher(ctx, appconf.UploadFolder, appconf.WatchInterval)
+
+		if !appconf.FFArchiveNode {
+			go bansetRoutine(ctx, appconf, appconf.WatchInterval) // TODO: ?define own config?
+		}
+
 		go func() {
-			api.Start()
+			api.Start(ctx, Node)
 			for {
 				select {
 				case <-ctx.Done():
@@ -199,6 +213,28 @@ func Start() {
 		// ---------
 		<-ctx.Done()
 		fmt.Println("[INFO] Libp2p host shutting down.")
+	}
+}
+
+func bansetRoutine(ctx context.Context, appconf *config.AppConfig, interval time.Duration) {
+	fmt.Println("[INFO] Starting banset routine")
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			fmt.Println("[INFO] Running banset routine")
+			Files := store.GlobalStore.GetAllFiles()
+			for _, file := range Files {
+				if file.BanSet > 0 {
+					psfs.UnpinFileIPFS(file.IPFSCID)
+				}
+			}
+		case <-ctx.Done():
+			fmt.Println("[INFO] Stopping banset routine")
+			return
+		}
 	}
 }
 

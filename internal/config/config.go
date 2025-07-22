@@ -24,6 +24,7 @@ const (
 // Default values for Feature Flags
 const (
 	defaultFF                        = false // ENVVAR NAME
+	defaultFFArchiveNode             = false // PS_FF_ARCHIVE_NODE
 	defaultFFCache                   = false // PS_FF_CACHE
 	defaultFFMoveUpload              = false // PS_FF_MOVE_UPLOAD
 	defaultFFSendFileVT              = false // PS_FF_SENDFILE_VT
@@ -44,6 +45,7 @@ type AppConfig struct {
 	GroupName                 string
 	MetadataTopicID           string
 	FilteringTopicID          string
+	FFArchiveNode             bool
 	FFCache                   bool
 	FFMoveUpload              bool
 	FFSendFileVT              bool
@@ -67,6 +69,7 @@ func LoadConfig() (*AppConfig, error) {
 		GroupName:                 defaultGroupName,
 		MetadataTopicID:           defaultMetadataTopicID,
 		FilteringTopicID:          defaultFilteringTopicID,
+		FFArchiveNode:             defaultFFArchiveNode,
 		FFCache:                   defaultFFCache,
 		FFMoveUpload:              defaultFFMoveUpload,
 		FFSendFileVT:              defaultFFSendFileVT,

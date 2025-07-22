@@ -1,13 +1,17 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand"
+	"net"
 	"net/http"
 
+	"pinshare/internal/p2p"
 	"pinshare/internal/store"
+
+	"github.com/libp2p/go-libp2p/core/host"
 )
 
 // Server implements the ServerInterface.
@@ -33,6 +37,7 @@ func writeError(w http.ResponseWriter, code int, message string) {
 func (s *Server) ListAllFiles(w http.ResponseWriter, r *http.Request) {
 	allStoreFiles := store.GlobalStore.GetAllFiles()
 	apiFiles := make([]BaseMetadata, len(allStoreFiles))
+	// TODO: should we filter out the bansets if so we need to adjust our length. or use add instead of make
 
 	for i, f := range allStoreFiles {
 		// Create copies of the time values to take their addresses.
@@ -44,6 +49,7 @@ func (s *Server) ListAllFiles(w http.ResponseWriter, r *http.Request) {
 			FileType:    f.FileType,
 			LastUpdated: &lastUpdated,
 			AddedAt:     &addedAt,
+			// TODO: add remaining fields
 		}
 	}
 
@@ -118,23 +124,105 @@ func (s *Server) AddOrUpdateFile(w http.ResponseWriter, r *http.Request, fileSHA
 	_ = json.NewEncoder(w).Encode(apiFile)
 }
 
-func Start() {
+func (s *Server) AddTag(w http.ResponseWriter, r *http.Request, fileSHA256 string) {
+	// TODO:
+}
+
+func (s *Server) RemoveTag(w http.ResponseWriter, r *http.Request, fileSHA256 string, tagName string) {
+	// TODO:
+}
+
+func (s *Server) VoteForRemoval(w http.ResponseWriter, r *http.Request, fileSHA256 string) {
+	// TODO:
+}
+
+func (s *Server) ListP2PPeers(w http.ResponseWriter, r *http.Request) {
+	// TODO:
+}
+
+func (s *Server) ConnectToPeer(w http.ResponseWriter, r *http.Request) {
+	// TODO:
+}
+
+func (s *Server) SendDirectMessage(w http.ResponseWriter, r *http.Request, peerID string) {
+	var body SendDirectMessageJSONBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	peerIDParsed, err := p2p.ParsePeerID(peerID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid peer ID: %v", err))
+		return
+	}
+
+	err = p2p.DirectMessagePeer(context.Background(), *GetNode(), peerIDParsed, []byte(body.Message))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to send direct message: %v", err))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Message sent successfully"))
+}
+
+func (s *Server) GetP2PStatus(w http.ResponseWriter, r *http.Request) {
+	node := GetNode()
+	if node == nil {
+		writeError(w, http.StatusInternalServerError, "P2P node not initialized")
+		return
+	}
+
+	addrs := make([]string, 0, len((*node).Addrs()))
+	for _, addr := range (*node).Addrs() {
+		addrs = append(addrs, addr.String())
+	}
+
+	status := P2PStatus{
+		Id:             (*node).ID().String(),
+		Addresses:      addrs,
+		ConnectedPeers: len((*node).Network().Peers()),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(status)
+}
+
+var p2pNodeInstance *host.Host
+
+// SetP2PManager allows main to set the global PubSubManager instance
+func SetNode(node *host.Host) {
+	p2pNodeInstance = node
+}
+
+func GetNode() *host.Host {
+	return p2pNodeInstance
+}
+
+func Start(ctx context.Context, node host.Host) {
+	SetNode(&node)
 	server := NewServer()
 
 	// get an `http.Handler` that we can use
 	h := Handler(server)
 
-	// generate random number between 01 and 99
-	// TODO: This is a temporary solution for testing purposes.
-	// In a real application, the port should be configurable.
-	min := 1
-	max := 99
-	randomNumber := rand.Intn(max-min+1) + min
-	port := fmt.Sprintf("90%02d", randomNumber)
+	// Check if port 8080 is in use. If so, increment until an open port is found.
+	var port int = 9090
+	for {
+		addr := fmt.Sprintf("0.0.0.0:%d", port)
+		conn, err := net.Listen("tcp", addr)
+		if err != nil {
+			fmt.Printf("[INFO] Port %d is in use, trying next...\n", port)
+			port++
+			continue
+		}
+		conn.Close()
+		break
+	}
 
-	// In a real app, you'd likely get this from config.
-	// Matching the port from the OpenAPI spec example.
-	addr := "0.0.0.0:" + port
+	addr := fmt.Sprintf("0.0.0.0:%d", port)
 	s := &http.Server{
 		Handler: h,
 		Addr:    addr,
