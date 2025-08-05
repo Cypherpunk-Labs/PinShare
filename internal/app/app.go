@@ -3,7 +3,10 @@ package app
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"syscall"
 	"time"
@@ -67,6 +70,9 @@ func Start() {
 	var LoadedMetaData bool = false
 
 	appconf, _ := config.LoadConfig()
+	if !checkDependanciesAndEnableSecurityPath(appconf) {
+		os.Exit(1)
+	}
 	p2p.SetAppConfig(appconf)
 
 	sigCh := make(chan os.Signal, 1)
@@ -269,4 +275,127 @@ func createFolders(appconf *config.AppConfig) {
 	if err := os.MkdirAll(appconf.RejectFolder, 0755); err != nil {
 		fmt.Fprintf(os.Stderr, "[ERROR] Error creating reject directory '%s': %v\n", appconf.RejectFolder, err)
 	}
+}
+
+func checkDependanciesAndEnableSecurityPath(appconf *config.AppConfig) bool {
+	//>> security Path 4
+	// 		psfs.ChromedpTest() >tests> Chromium Browser & ChromeDP
+	// 		ping VirusTotal.com Public Website
+
+	//>> security Path 3
+	// 		clamd clamdscan freshclam
+	// whereis freshclam
+	// if pgrep -x clamd >/dev/null; then
+	//     echo "clamd is running"
+	// else
+	//     echo "clamd is not running"
+	// fi
+
+	//>> security path 2
+	// 		ping VirusTotal.com
+	// 		loadEnv VT_TOKEN and validate not "" or REDACTED
+
+	//>> security path 1
+	//		ping localhost:P2PSecScanPort
+
+	//>> IPFS + CMD Line
+	// whereis ipfs
+	// ping localhost:5001
+	var requirementsMet bool = true
+	if commandExists("ipfs") {
+		fmt.Println("[CHECK] ipfs cmd found")
+	} else {
+		fmt.Println("[ERROR] ipfs cmd Missing")
+		requirementsMet = false
+	}
+	if checkPort("localhost", 5001) {
+		fmt.Println("[CHECK] ipfs daemon running")
+	} else {
+		fmt.Println("[ERROR] ipfs daemon not running")
+		requirementsMet = false
+	}
+
+	if checkPort("localhost", 36939) {
+		fmt.Println("[CHECK] P2P-Sec running")
+		appconf.SecurityCapability = 1
+		fmt.Println("[INFO] Security Capability set to 1")
+	} else {
+		fmt.Println("[WARNING] P2P-Sec not running")
+		vtwebup := checkWebsite("https://www.virustotal.com")
+		if checkVTEnv() {
+			fmt.Println("[CHECK] VT_TOKEN found")
+			if vtwebup {
+				fmt.Println("[CHECK] VirusTotal.com Online")
+				appconf.SecurityCapability = 2
+				fmt.Println("[INFO] Security Capability set to 2")
+			} else {
+				fmt.Println("[ERROR] VirusTotal.com not Online")
+				fmt.Println("[PANIC] Security Capability is 0")
+				return false
+			}
+		} else {
+			if commandExists("clamscan") {
+				fmt.Println("[CHECK] clamscan cmd found")
+				appconf.SecurityCapability = 3
+				fmt.Println("[INFO] Security Capability set to 3")
+				psfs.FreshclamUpdate()
+			} else {
+				fmt.Println("[WARNING] clamscan cmd Missing")
+				if vtwebup {
+					fmt.Println("[CHECK] VirusTotal.com Online")
+					err := psfs.ChromedpTest()
+					if err == nil {
+						appconf.SecurityCapability = 4
+						fmt.Println("[INFO] Security Capability set to 4")
+					} else {
+						fmt.Println("[ERROR] Missing Chromium Browser")
+					}
+
+				} else {
+					fmt.Println("[ERROR] VirusTotal.com not Online")
+					fmt.Println("[PANIC] Security Capability is 0")
+					return false
+				}
+			}
+		}
+	}
+	if appconf.SecurityCapability == 0 {
+		requirementsMet = false
+	}
+	return requirementsMet
+}
+
+func commandExists(cmd string) bool {
+	// fmt.Println("[INFO] Checking if command " + cmd + " exists.")
+	_, err := exec.LookPath(cmd)
+	return err == nil
+}
+
+func checkPort(host string, port int) bool {
+	address := fmt.Sprintf("%s:%d", host, port)
+	conn, err := net.DialTimeout("tcp", address, 5*time.Second)
+	if err != nil {
+		return false
+	}
+	conn.Close()
+	return true
+}
+
+func checkWebsite(url string) bool {
+	response, err := http.Get(url)
+	if err != nil {
+		return false
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return false
+	}
+	return true
+}
+
+func checkVTEnv() bool {
+	if os.Getenv("VT_TOKEN") == "" || os.Getenv("VT_TOKEN") == "REDACTED" {
+		return false
+	}
+	return true
 }

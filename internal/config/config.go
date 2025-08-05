@@ -34,6 +34,7 @@ const (
 
 // AppConfig holds all configuration for the application.
 type AppConfig struct {
+	SecurityCapability        int
 	UploadFolder              string
 	CacheFolder               string
 	RejectFolder              string
@@ -58,6 +59,7 @@ type AppConfig struct {
 // variables are set but have invalid formats.
 func LoadConfig() (*AppConfig, error) {
 	conf := &AppConfig{
+		SecurityCapability:        0,
 		UploadFolder:              defaultUploadFolder,
 		CacheFolder:               defaultCacheFolder,
 		RejectFolder:              defaultRejectFolder,

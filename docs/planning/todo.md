@@ -7,6 +7,7 @@
     [] Change from SHA256 to CID driven model.
     [] Cleanup comments
     [] Cleanup test func and redundant code
+    [x] On startup check for all dependencies (similar task for security)
     [x] integrate IPFS node
         [x] add file
         [x] get cid/file
@@ -38,6 +39,7 @@
         [x] test store Tag VoteUp
         [x] test store Tag VoteDown
         [x] test store Ban
+        [] test dependancy check
     [] API:
         [x] Create OpenAPI Spec
         [x] Generate code from spec
@@ -61,7 +63,8 @@
         [x] Validate filetype 
         [x] VT Pub WS Lookup (Brittle)
         [x] VT Pub WS Submit (Brittle)
-        [] Local Engine (clamAV) see https://gist.github.com/DerFichtl/d041785294d42259fa2b6ee4831c9a55
+        [x] Local Engine (clamAV) see https://gist.github.com/DerFichtl/d041785294d42259fa2b6ee4831c9a55
+        [x] On startup test for capability log results and enable code-path preference.
         [] VT API Lookup Path
         [] VT API Submit Path
         [] P2P Malware/Hashset Service
@@ -82,9 +85,10 @@
         [x] create dockerfile
         [x] integrate ipfs node
         [x] integrate chromedp and chrome
-        [x] test docker builds v0.1.1
-        [] fix workdir
-        [] add clamav
+        [x] test docker build v0.1.1
+        [x] fix workdir '/opt/pinshare/data'
+        [x] add clamav
+        [x] test docker build v0.1.2
 [] Documentation:
     [x] Readme.md Overview and Usage Guide
 [] Testing:
@@ -104,6 +108,6 @@ Stage 1 (Preview):
         [x] Allowed file types
         [x] Filetype validation
         [x] VT-WS (chromeDP) last resort
-        [] Local Scan Engine (clamAV)
+        [x] Local Scan Engine (clamAV)
 
 

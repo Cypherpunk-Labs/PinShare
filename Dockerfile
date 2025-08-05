@@ -15,7 +15,7 @@ RUN set -eux; \
 	apt-get update; \
 	apt-get install -y \
 		tini \
-        chromium \
+    chromium \
     # Using gosu (~2MB) instead of su-exec (~20KB) because it's easier to
     # install on Debian. Useful links:
     # - https://github.com/ncopa/su-exec#why-reinvent-gosu
@@ -24,6 +24,7 @@ RUN set -eux; \
     # This installs fusermount which we later copy over to the target image.
     fuse \
     ca-certificates \
+    clamav clamav-daemon clamav-freshclam clamdscan \
 	; \
 	rm -rf /var/lib/apt/lists/*
 
@@ -31,9 +32,9 @@ RUN mkdir -p /opt/pinshare/bin
 COPY entrypoint.sh /opt/pinshare/bin/entrypoint.sh
 COPY --from=builder /build/pinshare /opt/pinshare/bin/pinshare
 
-### Test our chromium headless browser works performantly.
-RUN date && cd /opt/pinshare/bin && ./pinshare testcdp none && date
-RUN date && cd /opt/pinshare/bin && ./pinshare testsl 3df79d34abbca99308e79cb94461c1893582604d68329a41fd4bec1885e6adb4 && date
+# ### Test our chromium headless browser works performantly.
+# RUN date && cd /opt/pinshare/bin && ./pinshare testcdp none && date
+# RUN date && cd /opt/pinshare/bin && ./pinshare testsl 3df79d34abbca99308e79cb94461c1893582604d68329a41fd4bec1885e6adb4 && date
 
 ### ref:https://github.com/ipfs/kubo/blob/master/Dockerfile
 COPY --from=ipfs /sbin/gosu /sbin/gosu
@@ -78,17 +79,22 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 ENTRYPOINT ["/sbin/tini", "--", "sh"]
 CMD [ "/opt/pinshare/bin/entrypoint.sh" ]
 
+RUN mkdir -p /opt/pinshare/bin
+WORKDIR /opt/pinshare/data
+
 ENV PATH /opt/pinshare/bin:$PATH
 
 ENV VT_TOKEN=REDACTED
 ENV GITHUB_TIMELINE_ACCESS_TOKEN=REDACTED
+
+ENV PINSHARE-VERSION=0.1.2
 
 ENV PORT-IPFS=5001
 ENV PORT-API=9090
 ENV PORT-ADMIN-API=10000
 
 ENV PS_ORGNAME=CypherPunk
-ENV PS_GROUPNAME=LabRat250710
+ENV PS_GROUPNAME=LabRat250805
 
 ENV PS_FF_MOVE_UPLOAD=false 
 ENV PS_FF_SENDFILE_VT=false 

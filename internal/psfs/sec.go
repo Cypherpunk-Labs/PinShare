@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -155,9 +156,35 @@ func GetSHA256(path string) (string, error) {
 	return hashString, nil
 }
 
+func FreshclamUpdate() {
+	fmt.Println("[INFO] Freshclam update started")
+	out, err := exec.Command("freshclam").Output()
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(string(out))
+}
+
+func ClamScanFileClean(path string) (bool, error) {
+	absPath, err1 := filepath.Abs(path)
+	if err1 != nil {
+		fmt.Println(err1)
+	}
+	fmt.Println("[INFO] Running ClamAv Scan of File " + absPath)
+	_, err := exec.Command("clamscan", "--no-summary", "--quiet", absPath).Output()
+	// return 0 ok return 1 = malware
+	if err != nil {
+		fmt.Println(err)
+		return false, err
+	}
+	// fmt.Println(strings.TrimSpace(string(out)))
+	return true, nil
+	//strings.TrimSpace(string(out))
+}
+
 // container error
 // 2025/07/02 10:53:39 page load error net::ERR_CONNECTION_TIMED_OUT
-func GetVirusTotalVerdictByHash(hash string) (bool, error) {
+func GetVirusTotalWSVerdictByHash(hash string) (bool, error) {
 	// safe == true
 	// unsafe == false
 	baseurl := "https://www.virustotal.com"
@@ -245,7 +272,7 @@ func GetVirusTotalVerdictByHash(hash string) (bool, error) {
 	// BUG: After some hours some other response is received, somehow leading to a true response that accepts file into metadata and filesystem on both sides.
 }
 
-func SendFileToVirusTotal(inputfilepath string) (bool, error) {
+func SendFileToVirusTotalWS(inputfilepath string) (bool, error) {
 	baseurl := "https://www.virustotal.com"
 	uri := "/gui/home/upload"
 	url := baseurl + uri
@@ -387,4 +414,44 @@ func SendFileToVirusTotal(inputfilepath string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+func ChromedpTest() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	options := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.DisableGPU,
+		chromedp.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"),
+		chromedp.Flag("headless", true),
+	)
+	ctx, cancel = chromedp.NewExecAllocator(ctx, options...)
+	defer cancel()
+
+	ctx, cancel = chromedp.NewContext(
+		ctx,
+		// chromedp.WithDebugf(log.Printf),
+	)
+	defer cancel()
+
+	var version string
+	err := chromedp.Run(ctx,
+		chromedp.Navigate("chrome://settings/help"),
+		// chromedp.GetVersion(&version)); err != nil { 		log.Fatal(err) 	 } // Thanks for the AI Trip...
+		chromedp.Evaluate(`
+		(function() {
+		const selector = document.querySelector("body > settings-ui").shadowRoot.querySelector("#main").shadowRoot.querySelector("settings-about-page").shadowRoot.querySelector("settings-section:nth-child(8) > div:nth-child(2) > div.flex.cr-padded-text > div.secondary");
+		if (!selector) return "selector not found";
+		return selector.innerHTML;
+			})()
+		`, &version),
+	)
+	chromedp.Cancel(ctx)
+	if version != "" {
+		fmt.Println("[INFO] Chrome version:", version)
+	}
+	if err != nil {
+		return err
+	}
+	return nil
 }

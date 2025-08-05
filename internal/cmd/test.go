@@ -16,7 +16,7 @@ var testslCmd = &cobra.Command{
 		fmt.Println("[DEBUG] CMD testsl called")
 		fileSHA256 := args[0]
 
-		verdict, err := psfs.GetVirusTotalVerdictByHash(fileSHA256)
+		verdict, err := psfs.GetVirusTotalWSVerdictByHash(fileSHA256)
 
 		if err != nil {
 			return err
@@ -37,7 +37,7 @@ var testssCmd = &cobra.Command{
 		fmt.Println("[DEBUG] CMD testss called")
 		filepath := args[0]
 
-		verdict, err := psfs.SendFileToVirusTotal(filepath)
+		verdict, err := psfs.SendFileToVirusTotalWS(filepath)
 
 		if err != nil {
 			return err

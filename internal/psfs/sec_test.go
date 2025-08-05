@@ -36,7 +36,7 @@ func Test_getVirusTotalReportByHash(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetVirusTotalVerdictByHash(tt.args.hash)
+			got, err := GetVirusTotalWSVerdictByHash(tt.args.hash)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getVirusTotalReportByHash() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -145,13 +145,47 @@ func Test_sendFileToVirusTotal(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := SendFileToVirusTotal(tt.args.filepath)
+			got, err := SendFileToVirusTotalWS(tt.args.filepath)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("sendFileToVirusTotal() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
 				t.Errorf("sendFileToVirusTotal() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestClamScanFileClean(t *testing.T) {
+	type args struct {
+		path string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		// TODO: Add test cases.
+		{
+			name: "test01",
+			args: args{
+				path: "../../test/test01/test01.pdf",
+			},
+			want: true,
+		},
+		{
+			name: "test02",
+			args: args{
+				path: "../../test/testmal/eicar.com",
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ClamScanFileClean(tt.args.path); got != tt.want {
+				t.Errorf("ClamScanFileClean() = %v, want %v", got, tt.want)
 			}
 		})
 	}

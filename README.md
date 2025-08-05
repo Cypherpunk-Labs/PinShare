@@ -33,6 +33,8 @@ The lifecycle of a file in PinShare follows these steps:
 
 ### Quickstart
 
+- Preview Release is v0.1.2
+
 - The docker image contains all dependancies required to run PinShare. 
 - `docker run -it -v $(pwd):/opt/pinshare/data ghcr.io/cypherpunk-labs/pinshare:latest`
 
