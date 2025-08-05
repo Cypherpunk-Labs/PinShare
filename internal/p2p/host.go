@@ -3,23 +3,43 @@ package p2p
 import (
 	"context"
 	"fmt"
+	"io"
+	"net"
 	"sync"
 
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	// "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	// "[github.com/libp2p/go-libp2p/p2p/discovery/mdns](https://github.com/libp2p/go-libp2p/p2p/discovery/mdns)" // Optional: for local discovery
 )
 
+const DirectMessageProtocolID = "/pinshare/dm/1.0.0"
+
 // NewHost creates a new libp2p host with DHT and attempts to bootstrap.
 func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, error) {
-	listenAddr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port)
+	// Check if port 50001 is in use. If so, increment until an open port is found.
+	var dynport int = port
+	fmt.Printf("[P2P-INFO] Testing if Port %d is in use. \n", port)
+	for {
+		addr := fmt.Sprintf("0.0.0.0:%d", dynport)
+		conn, err := net.Listen("tcp", addr) // TODO: does not seem to conflict even if in use. no real value here.
+		if err != nil {
+			fmt.Printf("[P2P-INFO] Port %d is in use, trying next...\n", port)
+			dynport++
+			continue
+		}
+		conn.Close()
+		break
+	}
+
+	listenAddr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", dynport)
 	// For QUIC (UDP), you might use:
-	listenAddrUDP := fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1", port)
+	listenAddrUDP := fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1", dynport)
 
 	h, err := libp2p.New(
 		libp2p.Identity(privKey),
@@ -139,4 +159,48 @@ func connectToDefaultBootstrapPeers(ctx context.Context, h host.Host) {
 	}
 	wg.Wait()
 	fmt.Println("[INFO] Finished attempting to connect to bootstrap peers.")
+}
+
+func ParsePeerID(peerID string) (peer.ID, error) {
+	return peer.Decode(peerID)
+}
+
+func DirectMessagePeer(ctx context.Context, h host.Host, peerID peer.ID, message []byte) error {
+	s, err := h.NewStream(ctx, peerID, DirectMessageProtocolID)
+	if err != nil {
+		return fmt.Errorf("[DM ERROR] failed to open stream to peer %s: %w", peerID, err)
+	}
+	defer s.Close()
+
+	_, err = s.Write(message)
+	if err != nil {
+		s.Reset() // Reset the stream on error
+		return fmt.Errorf("[DM ERROR] failed to write to stream for peer %s: %w", peerID, err)
+	}
+	return nil
+}
+
+func SetDirectMessageHandler(h host.Host) {
+	// The handler function for incoming streams.
+	streamHandler := func(s network.Stream) {
+		fmt.Printf("[DM] Received new direct message from %s\n", s.Conn().RemotePeer())
+		defer s.Close()
+
+		buf, err := io.ReadAll(s)
+		if err != nil {
+			fmt.Printf("[DM ERROR] Failed to read from direct message stream: %v\n", err)
+			s.Reset()
+			return
+		}
+
+		fmt.Printf("[DM] Message content: %s\n", string(buf)) //BUG // TODO: message is empty???
+
+		_, err = s.Write([]byte("Message received!"))
+		if err != nil {
+			fmt.Printf("[DM ERROR] Failed to write response: %v\n", err) //TODO: BUG seems to hit here!
+			s.Reset()
+		}
+	}
+	h.SetStreamHandler(DirectMessageProtocolID, streamHandler)
+	fmt.Printf("[INFO] Direct message handler registered for protocol: %s\n", DirectMessageProtocolID)
 }

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"pinshare/internal/p2p" // Import for SetP2PManager
 
 	"github.com/spf13/cobra"
@@ -10,15 +11,15 @@ import (
 var p2pManagerInstance *p2p.PubSubManager
 
 var rootCmd = &cobra.Command{
-	Use:   "metadata-manager",
+	Use:   "pinshare",
 	Short: "A CLI tool to manage decentralized file metadata",
-	Long: `Metadata Manager CLI is a proof-of-concept tool to interact with
+	Long: `PinShare is a proof-of-concept tool to interact with
 a local metadata store, designed for a decentralized file sharing system.
 It also initializes a libp2p host for peer-to-peer interactions.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		// This function can be used to initialize things before any command runs.
 		// For example, ensuring the libp2p host is ready if commands need it.
-		// fmt.Println("[DEBUG] PersistentPreRun called")
+		fmt.Println("[DEBUG] CMD PersistentPreRun called")
 	},
 }
 

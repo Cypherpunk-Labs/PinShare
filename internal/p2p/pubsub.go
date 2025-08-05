@@ -20,14 +20,12 @@ import (
 	discovery_routing "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 )
 
-const MetadataTopicID = "/orgname/groupname/metadata-sync/1.0.0"   // TODO: params this out
-const FilteringTopicID = "/orgname/groupname/filtering-sync/1.0.0" // TODO: params this out
-
 type PubSubConfig struct {
 	TopicAdvertiseInterval  time.Duration // Interval for finding peers
 	AutoTopicDiscovery      bool
 	EnablePeriodicPublish   bool
 	PeriodicPublishInterval time.Duration
+	TopicID                 string
 }
 
 type PubSubManager struct {
@@ -39,6 +37,7 @@ type PubSubManager struct {
 	metadataStore    *store.MetadataStore
 	dataFile         string
 	routingDiscovery *discovery_routing.RoutingDiscovery
+	psc              *PubSubConfig
 }
 
 func NewPubSubManager(ctx context.Context, h host.Host, kadDHT *dht.IpfsDHT, storeInstance *store.MetadataStore, dataFilePath string, config PubSubConfig) (*PubSubManager, error) {
@@ -47,15 +46,15 @@ func NewPubSubManager(ctx context.Context, h host.Host, kadDHT *dht.IpfsDHT, sto
 		return nil, fmt.Errorf("failed to create pubsub service: %w", err)
 	}
 
-	topic, err := ps.Join(MetadataTopicID)
+	topic, err := ps.Join(config.TopicID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to join topic %s: %w", MetadataTopicID, err)
+		return nil, fmt.Errorf("failed to join topic %s: %w", config.TopicID, err)
 	}
 
 	sub, err := topic.Subscribe()
 	if err != nil {
 		topic.Close() // Clean up topic if subscription fails
-		return nil, fmt.Errorf("failed to subscribe to topic %s: %w", MetadataTopicID, err)
+		return nil, fmt.Errorf("failed to subscribe to topic %s: %w", config.TopicID, err)
 	}
 
 	manager := &PubSubManager{
@@ -67,6 +66,7 @@ func NewPubSubManager(ctx context.Context, h host.Host, kadDHT *dht.IpfsDHT, sto
 		metadataStore:    storeInstance,
 		dataFile:         dataFilePath,
 		routingDiscovery: discovery_routing.NewRoutingDiscovery(kadDHT),
+		psc:              &config,
 	}
 
 	go manager.handleIncomingMessages()
@@ -78,7 +78,7 @@ func NewPubSubManager(ctx context.Context, h host.Host, kadDHT *dht.IpfsDHT, sto
 			discoveryInterval = 1 * time.Minute // Default peer discovery interval
 		}
 		go manager.DiscoverPeers(manager.ctx, discoveryInterval)
-		fmt.Printf("[INFO] Automatic topic discovery initiated for %s with interval %v.\n", MetadataTopicID, discoveryInterval)
+		fmt.Printf("[INFO] Automatic topic discovery initiated for %s with interval %v.\n", config.TopicID, discoveryInterval)
 	}
 
 	if config.EnablePeriodicPublish && config.PeriodicPublishInterval > 0 {
@@ -90,7 +90,7 @@ func NewPubSubManager(ctx context.Context, h host.Host, kadDHT *dht.IpfsDHT, sto
 }
 
 func (d *PubSubManager) DiscoverPeers(ctx context.Context, findPeersInterval time.Duration) {
-	fmt.Printf("[PUBSUB] Starting discovery process for topic: %s\n", MetadataTopicID)
+	fmt.Printf("[PUBSUB] Starting discovery process for topic: %s\n", d.psc.TopicID)
 
 	// // Advertise our presence on the topic via the DHT
 	// fmt.Printf("[PUBSUB] Advertising presence for topic %s on DHT\n", MetadataTopicID)
@@ -110,14 +110,14 @@ func (d *PubSubManager) DiscoverPeers(ctx context.Context, findPeersInterval tim
 
 	for i := 0; i < maxAdvertiseRetries; i++ {
 		if ctx.Err() != nil {
-			fmt.Printf("[PUBSUB] Context cancelled, aborting advertise for topic %s\n", MetadataTopicID)
+			fmt.Printf("[PUBSUB] Context cancelled, aborting advertise for topic %s\n", d.psc.TopicID)
 			return
 		}
 
-		fmt.Printf("[PUBSUB] Attempting to advertise topic %s (attempt %d/%d)\n", MetadataTopicID, i+1, maxAdvertiseRetries)
-		advertiseTTL, err := d.routingDiscovery.Advertise(ctx, MetadataTopicID)
+		fmt.Printf("[PUBSUB] Attempting to advertise topic %s (attempt %d/%d)\n", d.psc.TopicID, i+1, maxAdvertiseRetries)
+		advertiseTTL, err := d.routingDiscovery.Advertise(ctx, d.psc.TopicID)
 		if err == nil {
-			fmt.Printf("[PUBSUB] Successfully advertised topic %s on DHT. TTL: %s.\n", MetadataTopicID, advertiseTTL)
+			fmt.Printf("[PUBSUB] Successfully advertised topic %s on DHT. TTL: %s.\n", d.psc.TopicID, advertiseTTL)
 			advertiseErr = nil // Clear any previous error
 			break              // Success
 		}
@@ -128,26 +128,26 @@ func (d *PubSubManager) DiscoverPeers(ctx context.Context, findPeersInterval tim
 		if strings.Contains(err.Error(), "failed to find any peer in table") ||
 			strings.Contains(err.Error(), "no peers to announce to") ||
 			strings.Contains(err.Error(), "no route to peer") { // Adding another common variant
-			fmt.Printf("[PUBSUB WARN] Failed to advertise topic %s (attempt %d/%d): %v. Retrying in %v...\n", MetadataTopicID, i+1, maxAdvertiseRetries, err, advertiseRetryDelay)
+			fmt.Printf("[PUBSUB WARN] Failed to advertise topic %s (attempt %d/%d): %v. Retrying in %v...\n", d.psc.TopicID, i+1, maxAdvertiseRetries, err, advertiseRetryDelay)
 			if i == maxAdvertiseRetries-1 {
-				fmt.Printf("[PUBSUB ERROR] Failed to advertise topic %s after %d attempts: %v\n", MetadataTopicID, maxAdvertiseRetries, err)
+				fmt.Printf("[PUBSUB ERROR] Failed to advertise topic %s after %d attempts: %v\n", d.psc.TopicID, maxAdvertiseRetries, err)
 			}
 			select {
 			case <-time.After(advertiseRetryDelay):
 				// Continue to next retry
 			case <-ctx.Done():
-				fmt.Printf("[PUBSUB] Context cancelled during advertise retry delay for topic %s\n", MetadataTopicID)
+				fmt.Printf("[PUBSUB] Context cancelled during advertise retry delay for topic %s\n", d.psc.TopicID)
 				return
 			}
 		} else {
-			fmt.Printf("[PUBSUB ERROR] Failed to advertise topic %s due to an unexpected error: %v\n", MetadataTopicID, err)
+			fmt.Printf("[PUBSUB ERROR] Failed to advertise topic %s due to an unexpected error: %v\n", d.psc.TopicID, err)
 			break // Don't retry for other types of errors
 		}
 	}
 	if advertiseErr != nil {
-		fmt.Printf("[PUBSUB] Finished advertising attempts for topic %s with error: %v\n", MetadataTopicID, advertiseErr)
+		fmt.Printf("[PUBSUB] Finished advertising attempts for topic %s with error: %v\n", d.psc.TopicID, advertiseErr)
 	} else {
-		fmt.Printf("[PUBSUB] Finished initial advertising process for topic %s\n", MetadataTopicID)
+		fmt.Printf("[PUBSUB] Finished initial advertising process for topic %s\n", d.psc.TopicID)
 	}
 
 	// Loop to continuously find new peers for the topic
@@ -157,13 +157,13 @@ func (d *PubSubManager) DiscoverPeers(ctx context.Context, findPeersInterval tim
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Printf("[PUBSUB] Stopping peer discovery for topic %s\n", MetadataTopicID)
+			fmt.Printf("[PUBSUB] Stopping peer discovery for topic %s\n", d.psc.TopicID)
 			return
 		case <-ticker.C:
-			fmt.Printf("[PUBSUB] Finding peers for topic: %s\n", MetadataTopicID)
-			peerChan, err := d.routingDiscovery.FindPeers(ctx, MetadataTopicID)
+			fmt.Printf("[PUBSUB] Finding peers for topic: %s\n", d.psc.TopicID)
+			peerChan, err := d.routingDiscovery.FindPeers(ctx, d.psc.TopicID)
 			if err != nil {
-				fmt.Printf("[PUBSUB ERROR] Failed to find peers for topic %s: %v\n", MetadataTopicID, err)
+				fmt.Printf("[PUBSUB ERROR] Failed to find peers for topic %s: %v\n", d.psc.TopicID, err)
 				continue
 			}
 
@@ -173,21 +173,21 @@ func (d *PubSubManager) DiscoverPeers(ctx context.Context, findPeersInterval tim
 				}
 
 				if d.host.Network().Connectedness(peerInfo.ID) != network.Connected {
-					fmt.Printf("[PUBSUB] Found new peer %s for topic %s. Attempting to connect.\n     multi-addr: %s \n", peerInfo.ID.String(), MetadataTopicID, peerInfo.Addrs)
+					fmt.Printf("[PUBSUB] Found new peer %s for topic %s. Attempting to connect.\n     multi-addr: %s \n", peerInfo.ID.String(), d.psc.TopicID, peerInfo.Addrs)
 					if err := d.host.Connect(ctx, peerInfo); err != nil {
 						// fmt.Printf("[PUBSUB WARN] Failed to connect to discovered peer %s: %v\n", peerInfo.ID.String(), err)
 					} else {
-						fmt.Printf("[PUBSUB] Successfully connected to peer %s for topic %s.\n", peerInfo.ID.String(), MetadataTopicID)
+						fmt.Printf("[PUBSUB] Successfully connected to peer %s for topic %s.\n", peerInfo.ID.String(), d.psc.TopicID)
 					}
 				}
 			}
-			fmt.Printf("[PUBSUB] Finished a round of finding peers for topic %s.\n", MetadataTopicID)
+			fmt.Printf("[PUBSUB] Finished a round of finding peers for topic %s.\n", d.psc.TopicID)
 		}
 	}
 }
 
 func (psm *PubSubManager) handleIncomingMessages() {
-	fmt.Printf("[INFO] Listening for messages on PubSub topic: %s\n", MetadataTopicID)
+	fmt.Printf("[INFO] Listening for messages on PubSub topic: %s\n", psm.psc.TopicID)
 	for {
 		select {
 		case <-psm.ctx.Done():
@@ -225,8 +225,9 @@ func (psm *PubSubManager) handleIncomingMessages() {
 				continue
 			}
 
-			fmt.Printf("[PUBSUB] Received message from %s (topic: %s)\n", msg.ReceivedFrom.String(), MetadataTopicID)
+			fmt.Printf("[PUBSUB] Received message from %s (topic: %s)\n", msg.ReceivedFrom.String(), psm.psc.TopicID)
 
+			// TODO: here we could begin to handle different message types over the same topic.
 			var receivedMeta store.BaseMetadata
 			if err := json.Unmarshal(msg.Data, &receivedMeta); err != nil {
 				fmt.Printf("[ERROR] Failed to unmarshal received metadata from %s: %v\n", msg.ReceivedFrom.String(), err)
@@ -270,7 +271,7 @@ func (psm *PubSubManager) PublishMetadata(metadata store.BaseMetadata) error {
 		return fmt.Errorf("failed to marshal metadata for publishing: %w", err)
 	}
 
-	fmt.Printf("[INFO] Publishing metadata for %s (LastUpdated: %s) to topic %s\n", metadata.FileSHA256, metadata.LastUpdated, MetadataTopicID)
+	fmt.Printf("[INFO] Publishing metadata for %s (LastUpdated: %s) to topic %s\n", metadata.FileSHA256, metadata.LastUpdated, psm.psc.TopicID)
 	if psm.ctx.Err() != nil {
 		return fmt.Errorf("cannot publish: context cancelled: %w", psm.ctx.Err())
 	}
@@ -281,7 +282,7 @@ func (psm *PubSubManager) ListPeers() []peer.ID {
 	if psm.topic == nil || psm.ps == nil {
 		return nil
 	}
-	return psm.ps.ListPeers(MetadataTopicID)
+	return psm.ps.ListPeers(psm.psc.TopicID)
 }
 
 func (psm *PubSubManager) periodicPublisher(ctx context.Context, interval time.Duration) {

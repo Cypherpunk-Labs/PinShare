@@ -1,0 +1,482 @@
+openapi: 3.0.3
+info:
+  title: PinShare Metadata Store API
+  description: |-
+    This API provides access to a CRDT-based metadata store for files in the PinShare system.
+    It allows for creating, retrieving, and updating file metadata.
+    The system uses a Last-Write-Wins (LWW) strategy for simple fields and simulates
+    other CRDT types like OR-Sets for tags and PN-Counters for votes.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development server
+
+tags:
+  - name: Metadata
+    description: Operations on entire file metadata records.
+  - name: Tags
+    description: Operations for managing tags on a file (OR-Set).
+  - name: Moderation
+    description: Operations for community moderation (PN-Counter).
+  - name: P2P
+    description: Operations for interacting with the libp2p network.
+
+paths:
+  /files:
+    get:
+      summary: List all file metadata
+      operationId: listAllFiles
+      tags:
+        - Metadata
+      description: Retrieves a list of all file metadata entries currently in the store.
+      responses:
+        '200':
+          description: A list of file metadata objects.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BaseMetadata'
+  
+  /files/{fileSHA256}:
+    parameters:
+      - name: fileSHA256
+        in: path
+        required: true
+        description: The SHA256 hash of the file, serving as its unique identifier.
+        schema:
+          type: string
+          format: sha256
+          example: '12cf69c73a879930a3f473e04a4341e4a6431e7a44598285523b723924719d2b'
+    get:
+      summary: Get file metadata by SHA256
+      operationId: getFileBySHA256
+      tags:
+        - Metadata
+      description: Retrieves the complete metadata for a single file, identified by its SHA256 hash.
+      responses:
+        '200':
+          description: Successfully retrieved file metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BaseMetadata'
+        '404':
+          description: File not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      summary: Add or update file metadata (Upsert)
+      operationId: addOrUpdateFile
+      tags:
+        - Metadata
+      description: |-
+        Adds a new file metadata entry or updates an existing one. This operation is idempotent.
+        The `fileSHA256` in the path is used as the primary key.
+        Server-managed fields like `lastUpdated` and `addedAt` are set automatically.
+        For CRDT fields like `tags`, this PUT operation replaces the entire set. For partial updates to tags, use the `/tags` endpoints.
+      requestBody:
+        description: The metadata to add or update for the file.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WritableMetadata'
+      responses:
+        '200':
+          description: Metadata successfully updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BaseMetadata'
+        '201':
+          description: Metadata successfully created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BaseMetadata'
+        '400':
+          description: Invalid input.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /files/{fileSHA256}/tags:
+    post:
+      summary: Add a tag to a file
+      operationId: addTag
+      tags:
+        - Tags
+      description: Adds a tag to a file's metadata. This simulates an OR-Set 'add' operation. The operation is idempotent; adding an existing tag has no effect.
+      parameters:
+        - name: fileSHA256
+          in: path
+          required: true
+          description: The SHA256 hash of the file.
+          schema:
+            type: string
+            format: sha256
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tag:
+                  type: string
+                  description: The tag to add.
+                  example: "scientific-research"
+              required:
+                - tag
+      responses:
+        '204':
+          description: Tag added successfully.
+        '404':
+          description: File not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /files/{fileSHA256}/tags/{tagName}:
+    delete:
+      summary: Remove a tag from a file
+      operationId: removeTag
+      tags:
+        - Tags
+      description: Removes a tag from a file's metadata. This simulates an OR-Set 'remove' operation.
+      parameters:
+        - name: fileSHA256
+          in: path
+          required: true
+          description: The SHA256 hash of the file.
+          schema:
+            type: string
+            format: sha256
+        - name: tagName
+          in: path
+          required: true
+          description: The tag to remove.
+          schema:
+            type: string
+            example: "scientific-research"
+      responses:
+        '204':
+          description: Tag removed successfully.
+        '404':
+          description: File not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /files/{fileSHA256}/votes/removal:
+    post:
+      summary: Vote for file removal
+      operationId: voteForRemoval
+      tags:
+        - Moderation
+      description: Increments the moderation vote counter to flag a file for removal. This simulates a PN-Counter 'increment' operation.
+      parameters:
+        - name: fileSHA256
+          in: path
+          required: true
+          description: The SHA256 hash of the file.
+          schema:
+            type: string
+            format: sha256
+      responses:
+        '204':
+          description: Vote cast successfully.
+        '404':
+          description: File not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /p2p/status:
+    get:
+      summary: Get P2P node status
+      operationId: getP2PStatus
+      tags:
+        - P2P
+      description: Retrieves the local node's Peer ID, listening addresses, and connection status.
+      responses:
+        '200':
+          description: P2P node status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/P2PStatus'
+
+  /p2p/peers:
+    get:
+      summary: List connected peers
+      operationId: listP2PPeers
+      tags:
+        - P2P
+      description: Retrieves a list of peer IDs for all currently connected peers.
+      responses:
+        '200':
+          description: A list of peer IDs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  example: '12D3KooWHdiCg429w1v5E2s3f4g5h6j7k8l9m0n1o2p3q4r5s6t7'
+    post:
+      summary: Connect to a peer
+      operationId: connectToPeer
+      tags:
+        - P2P
+      description: Attempts to connect to a new peer using their full multiaddress.
+      requestBody:
+        description: The multiaddress of the peer to connect to.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                multiaddr:
+                  type: string
+                  description: The full multiaddress of the peer (e.g., /ip4/127.0.0.1/tcp/4001/p2p/12D3Koo...).
+                  example: '/ip4/192.168.1.10/tcp/4001/p2p/12D3KooWHdiCg429w1v5E2s3f4g5h6j7k8l9m0n1o2p3q4r5s6t7'
+              required:
+                - multiaddr
+      responses:
+        '202':
+          description: Connection attempt initiated.
+        '400':
+          description: Invalid multiaddress provided.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /p2p/peers/{peerID}/message:
+    post:
+      summary: Send a direct message to a peer
+      operationId: sendDirectMessage
+      tags:
+        - P2P
+      parameters:
+        - name: peerID
+          in: path
+          required: true
+          description: The Peer ID of the recipient.
+          schema:
+            type: string
+            example: '12D3KooWHdiCg429w1v5E2s3f4g5h6j7k8l9m0n1o2p3q4r5s6t7'
+      requestBody:
+        description: The message to send.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: The text message to send.
+                  example: "Hello from another peer!"
+              required:
+                - message
+      responses:
+        '202':
+          description: Message sent successfully.
+        '400':
+          description: Invalid Peer ID or message format.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Peer not found or not connected.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to send message.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    BaseMetadata:
+      type: object
+      description: Holds all metadata for a single file, representing the state in the CRDT store.
+      properties:
+        fileSHA256:
+          type: string
+          format: sha256
+          description: Primary key for the metadata, the SHA256 hash of the file content.
+          example: '12cf69c73a879930a3f473e04a4341e4a6431e7a44598285523b723924719d2b'
+        ipfsCID:
+          type: string
+          description: The IPFS Content Identifier (CID) for the file.
+          example: 'bafybeigvgz2q4g2l3z5y7g3z2x5c6m4b7v2w3x5y7z2a3b4c5d6e7f'
+        # title:
+        #   type: string
+        #   description: LWW-Register for the file's title.
+        #   example: "Direct Electrical Production from LENR"
+        # author:
+        #   type: string
+        #   description: LWW-Register for the file's author.
+        #   example: "Nagel, D.J."
+        fileType:
+          type: string
+          description: The MIME type of the file.
+          example: 'application/pdf'
+        # fileName:
+        #   type: string
+        #   description: LWW-Register for the original file name.
+        #   example: "Nagel IE163 Direct Electrical Production from LENR.pdf"
+        # date:
+        #   type: string
+        #   description: LWW-Register for a relevant date (e.g., publication).
+        #   example: "2010-03-15"
+        # scientificField:
+        #   type: string
+        #   description: LWW-Register for the scientific field.
+        #   example: "Low Energy Nuclear Reactions"
+        tags:
+          type: object
+          description: An OR-Set of tags. Keys are the tags, value is always true.
+          additionalProperties:
+            type: boolean
+          example:
+            "LENR": true
+            "cold-fusion": true
+        moderationVotes:
+          type: integer
+          description: A PN-Counter for community votes to remove the file.
+          example: 0
+        # communityLabels:
+        #   type: object
+        #   description: A map of community-provided labels to a PN-Counter of votes for that label.
+        #   additionalProperties:
+        #     type: integer
+        #   example:
+        #     "important-paper": 15
+        #     "disputed": 2
+        lastUpdated:
+          type: string
+          format: date-time
+          description: Timestamp for the last update to this record (LWW clock).
+          readOnly: true
+          example: '2023-10-27T10:00:00Z'
+        addedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the record was first added to the store.
+          readOnly: true
+          example: '2023-10-26T15:30:00Z'
+      required:
+        - fileSHA256
+        - ipfsCID
+        - fileType
+        - lastUpdated
+        - addedAt
+
+    P2PStatus:
+      type: object
+      description: Information about the local P2P node.
+      properties:
+        id:
+          type: string
+          description: The Peer ID of the local node.
+          example: '12D3KooWABCdeFgHiJkLmNoPqRsTuVwXyZ1234567890aBcDeF'
+        addresses:
+          type: array
+          items:
+            type: string
+          description: The listening multiaddresses of the local node.
+          example:
+            - "/ip4/127.0.0.1/tcp/4001/p2p/12D3KooWABCdeFgHiJkLmNoPqRsTuVwXyZ1234567890aBcDeF"
+            - "/ip4/192.168.1.5/tcp/4001/p2p/12D3KooWABCdeFgHiJkLmNoPqRsTuVwXyZ1234567890aBcDeF"
+        connectedPeers:
+          type: integer
+          description: The number of currently connected peers.
+          example: 5
+      required:
+        - id
+        - addresses
+        - connectedPeers
+
+    WritableMetadata:
+      type: object
+      description: The set of fields that can be written by a client when adding or updating a file's metadata.
+      properties:
+        ipfsCID:
+          type: string
+          description: The IPFS Content Identifier (CID) for the file.
+          example: 'bafybeigvgz2q4g2l3z5y7g3z2x5c6m4b7v2w3x5y7z2a3b4c5d6e7f'
+        # title:
+        #   type: string
+        #   description: LWW-Register for the file's title.
+        #   example: "Direct Electrical Production from LENR"
+        # author:
+        #   type: string
+        #   description: LWW-Register for the file's author.
+        #   example: "Nagel, D.J."
+        fileType:
+          type: string
+          description: The MIME type of the file.
+          example: 'application/pdf'
+        # fileName:
+        #   type: string
+        #   description: LWW-Register for the original file name.
+        #   example: "Nagel IE163 Direct Electrical Production from LENR.pdf"
+        # date:
+        #   type: string
+        #   description: LWW-Register for a relevant date (e.g., publication).
+        #   example: "2010-03-15"
+        # scientificField:
+        #   type: string
+        #   description: LWW-Register for the scientific field.
+        #   example: "Low Energy Nuclear Reactions"
+        # tags:
+        #   type: object
+        #   description: An OR-Set of tags. Keys are the tags, value is always true.
+        #   additionalProperties:
+        #     type: boolean
+        #   example:
+        #     "LENR": true
+        #     "cold-fusion": true
+        # communityLabels:
+        #   type: object
+        #   description: A map of community-provided labels to a PN-Counter of votes for that label.
+        #   additionalProperties:
+        #     type: integer
+        #   example:
+        #     "important-paper": 15
+        #     "disputed": 2
+      required:
+        - ipfsCID
+        - fileType
+
+    Error:
+      type: object
+      required:
+        - message
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: An optional application-specific error code.
+        message:
+          type: string
+          description: A human-readable error message.

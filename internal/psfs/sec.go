@@ -8,6 +8,8 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -17,8 +19,6 @@ import (
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
-	cid "github.com/ipfs/go-cid"
-	mh "github.com/multiformats/go-multihash"
 	// 	cid "github.com/ipfs/go-cid"
 	// mh "github.com/multiformats/go-multihash"
 )
@@ -91,52 +91,52 @@ import (
 // 	return finalCid.String(), nil
 // }
 
-func getCID(filePath string) (string, error) {
+// func getCID(filePath string) (string, error) {
 
-	// // TODO Block01: not correct code on small file nor large
-	// data, err := ioutil.ReadFile(filePath)
-	// if err != nil {
-	// 	fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
-	// 	os.Exit(1)
-	// }
+// 	// // TODO Block01: not correct code on small file nor large
+// 	// data, err := ioutil.ReadFile(filePath)
+// 	// if err != nil {
+// 	// 	fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
+// 	// 	os.Exit(1)
+// 	// }
 
-	// fileNode := unixfs.NewFSNode(unixfs.TFile)
-	// fileNode.AddBlockSize(uint64(len(data)))
-	// fileNode.SetData(data)
+// 	// fileNode := unixfs.NewFSNode(unixfs.TFile)
+// 	// fileNode.AddBlockSize(uint64(len(data)))
+// 	// fileNode.SetData(data)
 
-	// serialized, err := fileNode.GetBytes()
-	// if err != nil {
-	// 	return "", fmt.Errorf("error serializing UnixFS node: %v", err)
-	// }
+// 	// serialized, err := fileNode.GetBytes()
+// 	// if err != nil {
+// 	// 	return "", fmt.Errorf("error serializing UnixFS node: %v", err)
+// 	// }
 
-	// hash, err := mh.Sum(serialized, mh.SHA2_256, -1)
-	// if err != nil {
-	// 	return "", fmt.Errorf("error creating hash: %v", err)
-	// }
+// 	// hash, err := mh.Sum(serialized, mh.SHA2_256, -1)
+// 	// if err != nil {
+// 	// 	return "", fmt.Errorf("error creating hash: %v", err)
+// 	// }
 
-	// // cid := cid.NewCidV1(cid.DagProtobuf, hash)
-	// cid := cid.NewCidV1(cid.Raw, hash)
-	// fmt.Println(hash)
-	// // TODO Block01:
+// 	// // cid := cid.NewCidV1(cid.DagProtobuf, hash)
+// 	// cid := cid.NewCidV1(cid.Raw, hash)
+// 	// fmt.Println(hash)
+// 	// // TODO Block01:
 
-	// TODO Block 02: seems to work for smaller file, but not larger
-	sha256, _ := GetSHA256(filePath)
-	hxhash, _ := hex.DecodeString("1220" + sha256)
-	cid := cid.NewCidV1(cid.Raw, mh.Multihash(hxhash))
-	// TODO Block 02
+// 	// TODO Block 02: seems to work for smaller file, but not larger
+// 	sha256, _ := GetSHA256(filePath)
+// 	hxhash, _ := hex.DecodeString("1220" + sha256)
+// 	cid := cid.NewCidV1(cid.Raw, mh.Multihash(hxhash))
+// 	// TODO Block 02
 
-	fmt.Printf("CID: %s\n", cid.String())
-	return cid.String(), nil
-}
+// 	fmt.Printf("CID: %s\n", cid.String())
+// 	return cid.String(), nil
+// }
 
-func validateCID(cidString string) (bool, error) {
-	cidObj, err := cid.Decode(cidString)
-	if err != nil {
-		return false, err
-	}
-	fmt.Print(cidObj.Hash()) // 122064936ff52a67ed4c029521fd3fbaa1c66a3689f6437af929e6cd7c9897da8112
-	return true, nil
-}
+// func validateCID(cidString string) (bool, error) {
+// 	cidObj, err := cid.Decode(cidString)
+// 	if err != nil {
+// 		return false, err
+// 	}
+// 	fmt.Print(cidObj.Hash()) // 122064936ff52a67ed4c029521fd3fbaa1c66a3689f6437af929e6cd7c9897da8112
+// 	return true, nil
+// }
 
 func GetSHA256(path string) (string, error) {
 	file, err := os.Open(path)
@@ -156,29 +156,65 @@ func GetSHA256(path string) (string, error) {
 	return hashString, nil
 }
 
-func GetVirusTotalVerdictByHash(hash string) (bool, error) {
+func FreshclamUpdate() {
+	fmt.Println("[INFO] Freshclam update started")
+	out, err := exec.Command("freshclam").Output()
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(string(out))
+}
+
+func ClamScanFileClean(path string) (bool, error) {
+	absPath, err1 := filepath.Abs(path)
+	if err1 != nil {
+		fmt.Println(err1)
+	}
+	fmt.Println("[INFO] Running ClamAv Scan of File " + absPath)
+	_, err := exec.Command("clamscan", "--no-summary", "--quiet", absPath).Output()
+	// return 0 ok return 1 = malware
+	if err != nil {
+		fmt.Println(err)
+		return false, err
+	}
+	// fmt.Println(strings.TrimSpace(string(out)))
+	return true, nil
+	//strings.TrimSpace(string(out))
+}
+
+// container error
+// 2025/07/02 10:53:39 page load error net::ERR_CONNECTION_TIMED_OUT
+func GetVirusTotalWSVerdictByHash(hash string) (bool, error) {
 	// safe == true
 	// unsafe == false
 	baseurl := "https://www.virustotal.com"
 	uri := "/gui/file/"
 	url := baseurl + uri + hash
 
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
 	options := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.DisableGPU,
 		chromedp.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"),
+		chromedp.Flag("headless", true),
 	)
-	allocctx, cancel := chromedp.NewExecAllocator(context.Background(), options...)
+	ctx, cancel = chromedp.NewExecAllocator(ctx, options...)
 	defer cancel()
 
 	// var screenshotBuffer []byte
 	var htmlContent string
-	cdpctx, cancel := chromedp.NewContext(allocctx)
+	ctx, cancel = chromedp.NewContext(
+		ctx,
+		// chromedp.WithDebugf(log.Printf),
+	)
 	defer cancel()
 
-	err := chromedp.Run(cdpctx,
+	err := chromedp.Run(ctx,
 		chromedp.Navigate(url),
 		chromedp.Sleep(2*time.Second),
 
+		// TODO: Maybe externalise this due to fragility, allow users to fix when they move the scheme around.
 		chromedp.Evaluate(`
 			(function() {
 				// First shadow root (file-view)
@@ -208,7 +244,7 @@ func GetVirusTotalVerdictByHash(hash string) (bool, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	chromedp.Cancel(cdpctx)
+	chromedp.Cancel(ctx)
 
 	// err = os.WriteFile("screenshot.png", screenshotBuffer, 00644)
 	// if err != nil {
@@ -236,29 +272,41 @@ func GetVirusTotalVerdictByHash(hash string) (bool, error) {
 	// BUG: After some hours some other response is received, somehow leading to a true response that accepts file into metadata and filesystem on both sides.
 }
 
-func SendFileToVirusTotal(filepath string) (bool, error) {
+func SendFileToVirusTotalWS(inputfilepath string) (bool, error) {
 	baseurl := "https://www.virustotal.com"
 	uri := "/gui/home/upload"
 	url := baseurl + uri
 
-	options := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.DisableGPU,
-		chromedp.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"),
-		// chromedp.Flag("headless", false),
-	)
-	allocctx, cancel := chromedp.NewExecAllocator(context.Background(), options...)
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	cdpctx, cancel := chromedp.NewContext(allocctx)
+	absPath, err := filepath.Abs(inputfilepath)
+	if err != nil {
+
+	}
+
+	options := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.DisableGPU,
+		// chromedp.ExecPath(),
+		chromedp.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"),
+		chromedp.Flag("headless", true),
+	)
+	ctx, cancel = chromedp.NewExecAllocator(ctx, options...)
+	defer cancel()
+
+	ctx, cancel = chromedp.NewContext(
+		ctx,
+		// chromedp.WithDebugf(log.Printf),
+	)
 	defer cancel()
 
 	var dialogMessage string
-	chromedp.ListenTarget(cdpctx, func(ev interface{}) {
+	chromedp.ListenTarget(ctx, func(ev interface{}) {
 		switch ev := ev.(type) {
 		case *page.EventFileChooserOpened:
 			go func(backendNodeID cdp.BackendNodeID) {
-				if err := chromedp.Run(cdpctx,
-					dom.SetFileInputFiles([]string{filepath}).
+				if err := chromedp.Run(ctx,
+					dom.SetFileInputFiles([]string{absPath}).
 						WithBackendNodeID(backendNodeID),
 				); err != nil {
 					log.Fatal(err)
@@ -272,23 +320,55 @@ func SendFileToVirusTotal(filepath string) (bool, error) {
 	var ids []cdp.NodeID
 	var htmlContent string
 
-	err := chromedp.Run(cdpctx,
+	// TODO: Maybe externalise this due to fragility, allow users to fix when they move the scheme around.
+	// selector1 := `document.querySelector('home-view').shadowRoot.querySelector('vt-ui-main-upload-form').shadowRoot.querySelector('#infoIcon')`
+	selector2 := `document.querySelector("#view-container > home-view").shadowRoot.querySelector("#uploadForm").shadowRoot.querySelector("#infoIcon")`
+	err = chromedp.Run(ctx,
 		page.SetInterceptFileChooserDialog(true),
 		chromedp.Navigate(url),
 		chromedp.Sleep(2*time.Second),
-		chromedp.NodeIDs(`document.querySelector('home-view').shadowRoot.querySelector('vt-ui-main-upload-form').shadowRoot.querySelector('#infoIcon')`, &ids, chromedp.ByJSPath),
-		chromedp.ActionFunc(func(cdpctx context.Context) error {
+
+		chromedp.NodeIDs(selector2, &ids, chromedp.ByJSPath),
+		chromedp.ActionFunc(func(ctx context.Context) error {
 			if len(ids) < 1 {
 				return fmt.Errorf("[ERROR] selector %q did not return any nodes", ids)
 			}
-			err := dom.Focus().WithNodeID(ids[0]).Do(cdpctx)
+			err := dom.Focus().WithNodeID(ids[0]).Do(ctx)
 			if err != nil {
 				return err
 			}
-			chromedp.KeyEvent(kb.Enter).Do(cdpctx)
+			chromedp.KeyEvent(kb.Enter).Do(ctx)
 			return nil
 		}),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// TODO: Maybe externalise this due to fragility, allow users to fix when they move the scheme around.
+	// TODO: now have a confirm button to click.
+	selectorconfirm := `document.querySelector("#view-container > home-view").shadowRoot.querySelector("#uploadForm").shadowRoot.querySelector("#confirmUploadButton")`
+	err = chromedp.Run(ctx,
+		chromedp.NodeIDs(selectorconfirm, &ids, chromedp.ByJSPath),
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			if len(ids) < 1 {
+				return fmt.Errorf("[ERROR] selector %q did not return any nodes", ids)
+			}
+			err := dom.Focus().WithNodeID(ids[0]).Do(ctx)
+			if err != nil {
+				return err
+			}
+			chromedp.KeyEvent(kb.Enter).Do(ctx)
+			return nil
+		}),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = chromedp.Run(ctx,
 		chromedp.WaitVisible(`document.querySelector('file-view')`, chromedp.ByJSPath),
+		// TODO: Maybe externalise this due to fragility, allow users to fix when they move the scheme around.
 		chromedp.Evaluate(`
 			(function() {
 				// First shadow root (file-view)
@@ -315,10 +395,7 @@ func SendFileToVirusTotal(filepath string) (bool, error) {
 			})()
 		`, &htmlContent),
 	)
-	if err != nil {
-		log.Fatal(err)
-	}
-	chromedp.Cancel(cdpctx)
+	chromedp.Cancel(ctx)
 
 	if htmlContent != "" {
 		split := strings.Split(htmlContent, ">")
@@ -337,4 +414,44 @@ func SendFileToVirusTotal(filepath string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+func ChromedpTest() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	options := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.DisableGPU,
+		chromedp.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"),
+		chromedp.Flag("headless", true),
+	)
+	ctx, cancel = chromedp.NewExecAllocator(ctx, options...)
+	defer cancel()
+
+	ctx, cancel = chromedp.NewContext(
+		ctx,
+		// chromedp.WithDebugf(log.Printf),
+	)
+	defer cancel()
+
+	var version string
+	err := chromedp.Run(ctx,
+		chromedp.Navigate("chrome://settings/help"),
+		// chromedp.GetVersion(&version)); err != nil { 		log.Fatal(err) 	 } // Thanks for the AI Trip...
+		chromedp.Evaluate(`
+		(function() {
+		const selector = document.querySelector("body > settings-ui").shadowRoot.querySelector("#main").shadowRoot.querySelector("settings-about-page").shadowRoot.querySelector("settings-section:nth-child(8) > div:nth-child(2) > div.flex.cr-padded-text > div.secondary");
+		if (!selector) return "selector not found";
+		return selector.innerHTML;
+			})()
+		`, &version),
+	)
+	chromedp.Cancel(ctx)
+	if version != "" {
+		fmt.Println("[INFO] Chrome version:", version)
+	}
+	if err != nil {
+		return err
+	}
+	return nil
 }
