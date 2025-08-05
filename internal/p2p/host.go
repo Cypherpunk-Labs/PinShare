@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"sync"
 
 	"github.com/libp2p/go-libp2p"
@@ -21,9 +22,24 @@ const DirectMessageProtocolID = "/pinshare/dm/1.0.0"
 
 // NewHost creates a new libp2p host with DHT and attempts to bootstrap.
 func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, error) {
-	listenAddr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port)
+	// Check if port 50001 is in use. If so, increment until an open port is found.
+	var dynport int = port
+	fmt.Printf("[P2P-INFO] Testing if Port %d is in use. \n", port)
+	for {
+		addr := fmt.Sprintf("0.0.0.0:%d", dynport)
+		conn, err := net.Listen("tcp", addr) // TODO: does not seem to conflict even if in use. no real value here.
+		if err != nil {
+			fmt.Printf("[P2P-INFO] Port %d is in use, trying next...\n", port)
+			dynport++
+			continue
+		}
+		conn.Close()
+		break
+	}
+
+	listenAddr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", dynport)
 	// For QUIC (UDP), you might use:
-	listenAddrUDP := fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1", port)
+	listenAddrUDP := fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1", dynport)
 
 	h, err := libp2p.New(
 		libp2p.Identity(privKey),
@@ -177,7 +193,7 @@ func SetDirectMessageHandler(h host.Host) {
 			return
 		}
 
-		fmt.Printf("[DM] Message content: %s\n", string(buf)) // TODO: message is empty???
+		fmt.Printf("[DM] Message content: %s\n", string(buf)) //BUG // TODO: message is empty???
 
 		_, err = s.Write([]byte("Message received!"))
 		if err != nil {

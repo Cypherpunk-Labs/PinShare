@@ -162,8 +162,8 @@ require (
 
 require (
 	github.com/getkin/kin-openapi v0.132.0
+	github.com/libp2p/go-libp2p-core v0.20.1
 	github.com/oapi-codegen/runtime v1.1.2
-	github.com/onsi/gomega v1.36.3
 )
 
 require (

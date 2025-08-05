@@ -12,6 +12,9 @@ import (
 	"pinshare/internal/store"
 
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/multiformats/go-multiaddr"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Server implements the ServerInterface.
@@ -137,11 +140,62 @@ func (s *Server) VoteForRemoval(w http.ResponseWriter, r *http.Request, fileSHA2
 }
 
 func (s *Server) ListP2PPeers(w http.ResponseWriter, r *http.Request) {
-	// TODO:
+	node := GetNode()
+	if node == nil {
+		writeError(w, http.StatusInternalServerError, "P2P node not initialized")
+		return
+	}
+
+	peers := (*node).Network().Peers()
+	peerIDs := make([]string, len(peers))
+	for i, p := range peers {
+		peerIDs[i] = p.String()
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(peerIDs)
 }
 
 func (s *Server) ConnectToPeer(w http.ResponseWriter, r *http.Request) {
-	// TODO:
+	var body ConnectToPeerJSONBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	node := GetNode()
+	if node == nil {
+		writeError(w, http.StatusInternalServerError, "P2P node not initialized")
+		return
+	}
+
+	// Parse the multiaddress from the request body.
+	peerMA, err := multiaddr.NewMultiaddr(body.Multiaddr)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid multiaddress: %v", err))
+		return
+	}
+
+	// Extract peer info from the multiaddress.
+	peerInfo, err := peer.AddrInfoFromP2pAddr(peerMA)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("could not get peer info from multiaddress: %v", err))
+		return
+	}
+
+	// Run connection attempt in the background to not block the API response.
+	go func() {
+		log.Printf("[API-INFO] Attempting to connect to peer %s", peerInfo.ID.String())
+		if err := (*node).Connect(context.Background(), *peerInfo); err != nil {
+			log.Printf("[API-WARN] Failed to connect to peer %s: %v", peerInfo.ID.String(), err)
+		} else {
+			log.Printf("[API-INFO] Successfully connected to peer %s", peerInfo.ID.String())
+		}
+	}()
+
+	w.WriteHeader(http.StatusAccepted)
+	_, _ = w.Write([]byte("Connection attempt initiated"))
 }
 
 func (s *Server) SendDirectMessage(w http.ResponseWriter, r *http.Request, peerID string) {
@@ -206,7 +260,12 @@ func Start(ctx context.Context, node host.Host) {
 	server := NewServer()
 
 	// get an `http.Handler` that we can use
-	h := Handler(server)
+	apiHandler := Handler(server)
+
+	// Create a new ServeMux to combine the API handler and metrics handler
+	mux := http.NewServeMux()
+	mux.Handle("/", apiHandler)
+	mux.Handle("/metrics", promhttp.Handler())
 
 	// Check if port 8080 is in use. If so, increment until an open port is found.
 	var port int = 9090
@@ -224,7 +283,7 @@ func Start(ctx context.Context, node host.Host) {
 
 	addr := fmt.Sprintf("0.0.0.0:%d", port)
 	s := &http.Server{
-		Handler: h,
+		Handler: mux,
 		Addr:    addr,
 	}
 

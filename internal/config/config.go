@@ -97,6 +97,18 @@ func LoadConfig() (*AppConfig, error) {
 		return nil
 	}
 
+	// Helper function to parse int environment variables
+	parseIntEnv := func(key string, target *int) error {
+		if val, ok := os.LookupEnv(key); ok {
+			b, err := strconv.ParseInt(val, 0, 64)
+			if err != nil {
+				return err
+			}
+			*target = int(b)
+		}
+		return nil
+	}
+
 	//TODO: Loadin the Org/Group names
 	if err := parseStringEnv("PS_ORGNAME", &conf.OrgName); err != nil {
 		return nil, err
@@ -107,6 +119,9 @@ func LoadConfig() (*AppConfig, error) {
 	conf.MetadataTopicID = "/" + conf.OrgName + "/" + conf.GroupName + conf.MetadataTopicID
 	conf.FilteringTopicID = "/" + conf.OrgName + "/" + conf.GroupName + conf.FilteringTopicID
 
+	if err := parseIntEnv("PS_LIBP2P_PORT", &conf.Libp2pPort); err != nil {
+		return nil, err
+	}
 	if err := parseBoolEnv("PS_FF_MOVE_UPLOAD", &conf.FFMoveUpload); err != nil {
 		return nil, err
 	}

@@ -187,6 +187,7 @@ func GetVirusTotalVerdictByHash(hash string) (bool, error) {
 		chromedp.Navigate(url),
 		chromedp.Sleep(2*time.Second),
 
+		// TODO: Maybe externalise this due to fragility, allow users to fix when they move the scheme around.
 		chromedp.Evaluate(`
 			(function() {
 				// First shadow root (file-view)
@@ -292,6 +293,7 @@ func SendFileToVirusTotal(inputfilepath string) (bool, error) {
 	var ids []cdp.NodeID
 	var htmlContent string
 
+	// TODO: Maybe externalise this due to fragility, allow users to fix when they move the scheme around.
 	// selector1 := `document.querySelector('home-view').shadowRoot.querySelector('vt-ui-main-upload-form').shadowRoot.querySelector('#infoIcon')`
 	selector2 := `document.querySelector("#view-container > home-view").shadowRoot.querySelector("#uploadForm").shadowRoot.querySelector("#infoIcon")`
 	err = chromedp.Run(ctx,
@@ -316,6 +318,7 @@ func SendFileToVirusTotal(inputfilepath string) (bool, error) {
 		log.Fatal(err)
 	}
 
+	// TODO: Maybe externalise this due to fragility, allow users to fix when they move the scheme around.
 	// TODO: now have a confirm button to click.
 	selectorconfirm := `document.querySelector("#view-container > home-view").shadowRoot.querySelector("#uploadForm").shadowRoot.querySelector("#confirmUploadButton")`
 	err = chromedp.Run(ctx,
@@ -338,6 +341,7 @@ func SendFileToVirusTotal(inputfilepath string) (bool, error) {
 
 	err = chromedp.Run(ctx,
 		chromedp.WaitVisible(`document.querySelector('file-view')`, chromedp.ByJSPath),
+		// TODO: Maybe externalise this due to fragility, allow users to fix when they move the scheme around.
 		chromedp.Evaluate(`
 			(function() {
 				// First shadow root (file-view)

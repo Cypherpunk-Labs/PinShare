@@ -1,6 +1,6 @@
 # PinShare
 
-PinShare is a Decentralised Pinning Service for IPFS, built on libp2p to assist the clustering of IPFS Content. It's a peer-to-peer application designed to securely share files by vetting them through VirusTotal before their metadata is advertised to other peers on the network.
+PinShare is a Decentralised Pinning Service for IPFS, built on libp2p to assist the clustering of IPFS Content for curators building a library or knowledge stacks and as a basis to build advanced data pipelines from. It's a peer-to-peer application designed to securely share files by vetting them through The Security Consensus before their metadata is advertised to other peers on the network. PinShare can be customised to serve different community needs or data pools as seperate libraries, simply by changing the config and running seperate instances of PinShare. 
 
 ## Core Features
 
