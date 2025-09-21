@@ -97,7 +97,7 @@
 
 # Releases
 
-Stage 1 (Preview):
+Stage 1 (Preview v0.1.2):
     [x] Bulk import folder
     [x] Only Process PDF + Text
     [x] Pubsub basemetadata
@@ -110,4 +110,6 @@ Stage 1 (Preview):
         [x] VT-WS (chromeDP) last resort
         [x] Local Scan Engine (clamAV)
 
+Stage 2 (Preview v0.1.3):
+    [x] Include cad file types
 
