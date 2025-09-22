@@ -5,10 +5,16 @@ package psfs
 var AllowedList = map[string]bool{
 	// CAD filetypes
 	"stl":    true,
+	"gcode":  true,
+	"goo":    true,
+	"obj":    true,
 	"sldprt": true,
 	"sldasm": true,
 	"dwg":    true,
 	"dxf":    true,
+	"f3d":    true,
+	"f2d":    true,
+	"fbx":    true,
 	"3dm":    true,
 	"stp":    true,
 	"step":   true,
@@ -20,8 +26,13 @@ var AllowedList = map[string]bool{
 	"pdf":  true,
 	"doc":  false,
 	"docx": false,
+	"pptx": true,
 	// multimedia
 	"avi": false,
 	"mov": false,
-	"mp4": false,
+	"mp4": true,
+	"mp3": true,
+	"png": true,
+	"jpg": true,
+	"svg": true,
 }
