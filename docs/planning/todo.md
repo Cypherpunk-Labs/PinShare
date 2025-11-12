@@ -19,7 +19,7 @@
        - [x] tagmetadata
        - [x] voting
        - [] Auth/fair voting
-        [x] banset
+       - [x] banset
    - [] Network:
        - [x] use libp2p
        - [x] Set static node id with save/load
