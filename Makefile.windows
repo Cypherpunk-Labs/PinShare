@@ -1,0 +1,197 @@
+# Makefile for building PinShare Windows distribution
+# This can be run from Linux with cross-compilation tools or from Windows
+
+.PHONY: all clean windows-backend windows-service windows-tray windows-ui download-ipfs windows-all installer help
+
+# Configuration
+GOOS := windows
+GOARCH := amd64
+CGO_ENABLED := 1
+CC := x86_64-w64-mingw32-gcc
+
+# Directories
+DIST_DIR := dist/windows
+UI_DIR := pinshare-ui
+INSTALLER_DIR := installer
+
+# IPFS version
+IPFS_VERSION := v0.31.0
+IPFS_ARCHIVE := kubo_$(IPFS_VERSION)_windows-amd64.zip
+IPFS_URL := https://dist.ipfs.tech/kubo/$(IPFS_VERSION)/$(IPFS_ARCHIVE)
+
+# Build flags
+LDFLAGS := -s -w
+BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+VERSION := 1.0.0
+
+# All targets
+all: help
+
+help:
+	@echo "PinShare Windows Build System"
+	@echo "============================="
+	@echo ""
+	@echo "Available targets:"
+	@echo "  windows-all        Build all Windows components"
+	@echo "  windows-backend    Build PinShare backend for Windows"
+	@echo "  windows-service    Build Windows service wrapper"
+	@echo "  windows-tray       Build Windows system tray application"
+	@echo "  windows-ui         Build React UI for production"
+	@echo "  download-ipfs      Download IPFS Kubo binary for Windows"
+	@echo "  installer          Build Windows MSI installer (requires WiX)"
+	@echo "  clean              Clean build artifacts"
+	@echo ""
+	@echo "Example: make -f Makefile.windows windows-all"
+	@echo ""
+
+# Create distribution directory
+$(DIST_DIR):
+	@echo "Creating distribution directory..."
+	@mkdir -p $(DIST_DIR)
+
+# Build PinShare backend for Windows
+windows-backend: $(DIST_DIR)
+	@echo "Building PinShare backend for Windows..."
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH) CC=$(CC) \
+		go build -ldflags "$(LDFLAGS) -X main.Version=$(VERSION) -X main.GitCommit=$(GIT_COMMIT) -X main.BuildDate=$(BUILD_DATE)" \
+		-o $(DIST_DIR)/pinshare.exe .
+	@echo "✓ Built: $(DIST_DIR)/pinshare.exe"
+
+# Build Windows service wrapper
+windows-service: $(DIST_DIR)
+	@echo "Building Windows service wrapper..."
+	GOOS=$(GOOS) GOARCH=$(GOARCH) \
+		go build -ldflags "$(LDFLAGS)" \
+		-o $(DIST_DIR)/pinsharesvc.exe ./cmd/pinsharesvc
+	@echo "✓ Built: $(DIST_DIR)/pinsharesvc.exe"
+
+# Build Windows system tray application
+windows-tray: $(DIST_DIR)
+	@echo "Building Windows system tray application..."
+	GOOS=$(GOOS) GOARCH=$(GOARCH) \
+		go build -ldflags "$(LDFLAGS) -H windowsgui" \
+		-o $(DIST_DIR)/pinshare-tray.exe ./cmd/pinshare-tray
+	@echo "✓ Built: $(DIST_DIR)/pinshare-tray.exe"
+
+# Build React UI
+windows-ui: $(DIST_DIR)
+	@echo "Building React UI for production..."
+	@cd $(UI_DIR) && npm install
+	@cd $(UI_DIR) && npm run build
+	@mkdir -p $(DIST_DIR)/ui
+	@cp -r $(UI_DIR)/dist/* $(DIST_DIR)/ui/
+	@echo "✓ Built: $(DIST_DIR)/ui/"
+
+# Download IPFS Kubo binary
+download-ipfs: $(DIST_DIR)
+	@echo "Downloading IPFS Kubo $(IPFS_VERSION) for Windows..."
+	@if [ ! -f "$(DIST_DIR)/ipfs.exe" ]; then \
+		echo "Fetching from $(IPFS_URL)..."; \
+		curl -L -o /tmp/$(IPFS_ARCHIVE) $(IPFS_URL); \
+		unzip -j /tmp/$(IPFS_ARCHIVE) "kubo/ipfs.exe" -d $(DIST_DIR)/; \
+		rm /tmp/$(IPFS_ARCHIVE); \
+		echo "✓ Downloaded: $(DIST_DIR)/ipfs.exe"; \
+	else \
+		echo "✓ IPFS already downloaded: $(DIST_DIR)/ipfs.exe"; \
+	fi
+
+# Build all Windows components
+windows-all: windows-backend windows-service windows-tray windows-ui download-ipfs
+	@echo ""
+	@echo "=========================================="
+	@echo "All Windows components built successfully!"
+	@echo "=========================================="
+	@echo ""
+	@echo "Distribution files:"
+	@ls -lh $(DIST_DIR)/*.exe
+	@echo ""
+	@echo "UI files:"
+	@ls -lh $(DIST_DIR)/ui/
+	@echo ""
+	@echo "Next step: Build installer with 'make -f Makefile.windows installer'"
+	@echo ""
+
+# Build Windows MSI installer (requires WiX on Windows or Wine)
+installer: windows-all
+	@echo "Building Windows installer..."
+	@if command -v candle.exe >/dev/null 2>&1; then \
+		echo "WiX detected, building MSI..."; \
+		cd $(INSTALLER_DIR) && ./build.bat; \
+	else \
+		echo ""; \
+		echo "ERROR: WiX Toolset not found!"; \
+		echo ""; \
+		echo "To build the installer:"; \
+		echo "1. Install WiX Toolset from https://wixtoolset.org/"; \
+		echo "2. On Windows, run: cd installer && build.bat"; \
+		echo "3. Or manually run WiX commands (see installer/README.md)"; \
+		echo ""; \
+		exit 1; \
+	fi
+
+# Clean build artifacts
+clean:
+	@echo "Cleaning build artifacts..."
+	@rm -rf $(DIST_DIR)
+	@rm -rf $(UI_DIR)/dist
+	@rm -rf $(UI_DIR)/node_modules
+	@rm -f $(INSTALLER_DIR)/*.wixobj
+	@rm -f $(INSTALLER_DIR)/*.wixpdb
+	@rm -f $(INSTALLER_DIR)/UIComponents.wxs
+	@rm -f dist/PinShare-Setup.msi
+	@echo "✓ Cleaned"
+
+# Test Windows binaries (requires Wine on Linux)
+test-windows: windows-all
+	@echo "Testing Windows binaries..."
+	@if command -v wine64 >/dev/null 2>&1; then \
+		echo "Testing with Wine..."; \
+		wine64 $(DIST_DIR)/pinsharesvc.exe 2>&1 | head -5; \
+	else \
+		echo "Wine not found, skipping tests"; \
+		echo "To test on Linux, install Wine: sudo apt-get install wine64"; \
+	fi
+
+# Development: Build service only (faster iteration)
+dev-service: windows-service
+	@echo "Development build complete: $(DIST_DIR)/pinsharesvc.exe"
+
+# Development: Build tray only (faster iteration)
+dev-tray: windows-tray
+	@echo "Development build complete: $(DIST_DIR)/pinshare-tray.exe"
+
+# Check dependencies
+check-deps:
+	@echo "Checking build dependencies..."
+	@echo ""
+	@echo "Go version:"
+	@go version || echo "ERROR: Go not found"
+	@echo ""
+	@echo "Cross-compilation support:"
+	@which $(CC) >/dev/null 2>&1 && echo "✓ MinGW-w64 found: $(CC)" || echo "⚠ MinGW-w64 not found (needed for SQLite/CGO)"
+	@echo ""
+	@echo "Node.js (for UI):"
+	@node --version 2>/dev/null || echo "⚠ Node.js not found"
+	@npm --version 2>/dev/null || echo "⚠ npm not found"
+	@echo ""
+	@echo "Build tools:"
+	@which unzip >/dev/null 2>&1 && echo "✓ unzip found" || echo "⚠ unzip not found"
+	@which curl >/dev/null 2>&1 && echo "✓ curl found" || echo "⚠ curl not found"
+	@echo ""
+
+# Install build dependencies (Linux only)
+install-deps:
+	@echo "Installing build dependencies for Windows cross-compilation..."
+	@if [ "$(shell uname -s)" = "Linux" ]; then \
+		echo "Detected Linux, installing packages..."; \
+		sudo apt-get update; \
+		sudo apt-get install -y gcc-mingw-w64-x86-64 wine64 unzip curl; \
+		echo "✓ Dependencies installed"; \
+	else \
+		echo "This target is for Linux only"; \
+		echo "On Windows, install:"; \
+		echo "  - Go: https://golang.org/dl/"; \
+		echo "  - Node.js: https://nodejs.org/"; \
+		echo "  - WiX Toolset: https://wixtoolset.org/"; \
+	fi
