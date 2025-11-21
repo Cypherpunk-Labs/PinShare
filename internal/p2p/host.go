@@ -5,15 +5,19 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"sync"
 
 	"github.com/libp2p/go-libp2p"
+	// "github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/multiformats/go-multiaddr"
 	// "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	// "[github.com/libp2p/go-libp2p/p2p/discovery/mdns](https://github.com/libp2p/go-libp2p/p2p/discovery/mdns)" // Optional: for local discovery
 )
@@ -22,6 +26,7 @@ const DirectMessageProtocolID = "/pinshare/dm/1.0.0"
 
 // NewHost creates a new libp2p host with DHT and attempts to bootstrap.
 func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, error) {
+	var kadDHT *dht.IpfsDHT
 	// Check if port 50001 is in use. If so, increment until an open port is found.
 	var dynport int = port
 	fmt.Printf("[P2P-INFO] Testing if Port %d is in use. \n", port)
@@ -41,7 +46,29 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 	// For QUIC (UDP), you might use:
 	listenAddrUDP := fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1", dynport)
 
+	// TODO: make a webcall to find our public IP then setup variables
+	resp, err := http.Get("https://ifconfig.me/ip")
+	if err != nil {
+		fmt.Printf("[P2P-WARN] Could not get public IP: %v. May be behind a NAT.", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("[P2P-WARN] Could not read public IP response: %v.", err)
+	}
+	publicIP := string(body)
+	publicAddr := fmt.Sprintf("/ip4/%s/tcp/%d", publicIP, dynport)
+	publicAddrUDP := fmt.Sprintf("/ip4/%s/udp/%d/quic-v1", publicIP, dynport)
+
 	h, err := libp2p.New(
+		// testing method to include public addr.
+		libp2p.AddrsFactory(func(addrs []multiaddr.Multiaddr) []multiaddr.Multiaddr {
+			return []multiaddr.Multiaddr{
+				multiaddr.StringCast(publicAddr),
+				multiaddr.StringCast(publicAddrUDP),
+			}
+		}),
+
 		libp2p.Identity(privKey),
 		libp2p.ListenAddrStrings(listenAddr),    // Listen on TCP
 		libp2p.ListenAddrStrings(listenAddrUDP), // Optionally listen on QUIC
@@ -55,6 +82,17 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 		// libp2p.EnableAutoRelay(),                // Use relays if the node is behind a NAT //BUG: deprecated
 		// libp2p.EnableAutoRelayWithPeerSource() // TODO:
 		// libp2p.EnableAutoRelayWithStaticRelays(), // TODO:
+
+		// // as per bryans suggestion
+		// libp2p.EnableAutoRelayWithPeerSource(
+		// 	func(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
+		// 		return findRelayPeers(ctx, &kadDHT, numPeers)
+		// 	},
+		// 	autorelay.WithMinCandidates(4),
+		// 	autorelay.WithMaxCandidates(8),
+		// 	autorelay.WithBootDelay(30*time.Second),
+		// 	autorelay.WithMinInterval(time.Minute),
+		// ),
 
 		// libp2p.EnableAutoRelayWithPeerSource(func(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
 		// 	peerChan := make(chan peer.AddrInfo)
@@ -90,7 +128,8 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 
 		libp2p.EnableNATService(), // Help other peers discover their public address
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
-			kadDHT, err := dht.New(ctx, h, dht.Mode(dht.ModeAutoServer)) // was dht.ModeServer
+			var err error
+			kadDHT, err = dht.New(ctx, h, dht.Mode(dht.ModeAutoServer)) // was dht.ModeServer
 			if err != nil {
 				return nil, fmt.Errorf("failed to create DHT: %w", err)
 			}
@@ -108,6 +147,54 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 	// }
 	return h, nil
 }
+
+// // TODO: test this works, it does not :(
+// func findRelayPeers(ctx context.Context, kadDHT **dht.IpfsDHT, numPeers int) <-chan peer.AddrInfo {
+// 	peerChan := make(chan peer.AddrInfo, numPeers)
+// 	go func() {
+// 		defer close(peerChan)
+
+// 		if *kadDHT == nil {
+// 			fmt.Println("[WARN] findRelayPeers called but DHT is not ready yet.")
+// 			return
+// 		}
+
+// 		routingDiscovery := discovery_routing.NewRoutingDiscovery(*kadDHT)
+
+// 		// We're looking for relays, so we advertise ourselves as needing a relay
+// 		// and look for peers who provide the relay service.
+// 		// The rendezvous point for circuit relay v2 is "/libp2p/relay"
+// 		rendezvousPoint := "/libp2p/relay"
+// 		fmt.Printf("[INFO] AutoRelay: Finding %d peers for rendezvous point %s\n", numPeers, rendezvousPoint)
+
+// 		// FindPeers will return a channel of peers who are advertising the rendezvous point.
+// 		peerInfoCh, err := discovery_util.FindPeers(ctx, routingDiscovery, rendezvousPoint)
+// 		if err != nil {
+// 			fmt.Printf("[WARN] Failed to find peers for autorelay: %v\n", err)
+// 			return
+// 		}
+
+// 		foundPeers := 0
+// 		for p := range peerInfoCh {
+// 			if p.ID == "" {
+// 				continue
+// 			}
+// 			if foundPeers >= numPeers {
+// 				break
+// 			}
+
+// 			fmt.Printf("[DEBUG] Found potential relay peer: %s with addrs: %s\n", p.ID.String(), p.Addrs)
+// 			select {
+// 			case peerChan <- p:
+// 				foundPeers++
+// 			case <-ctx.Done():
+// 				return
+// 			}
+// 		}
+// 		fmt.Printf("[INFO] AutoRelay: finished finding peers. Found %d.\n", foundPeers)
+// 	}()
+// 	return peerChan
+// }
 
 // Bootstrap connects to a set of bootstrap peers, primarily the IPFS default ones.
 func Bootstrap(ctx context.Context, h host.Host) {
