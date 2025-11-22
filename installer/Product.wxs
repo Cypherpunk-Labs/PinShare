@@ -5,7 +5,7 @@
   <?define ProductName = "PinShare" ?>
   <?define ProductVersion = "1.0.0" ?>
   <?define Manufacturer = "PinShare Contributors" ?>
-  <?define UpgradeCode = "12345678-1234-1234-1234-123456789012" ?>
+  <?define UpgradeCode = "24D1704E-0ACD-4370-BCF9-ED664A546060" ?>
 
   <Product Id="*"
            Name="$(var.ProductName)"

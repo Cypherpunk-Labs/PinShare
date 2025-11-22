@@ -103,6 +103,10 @@ func (s *pinshareService) initialize() error {
 	// Initialize process manager
 	s.processManager = NewProcessManager(s.config, s.eventLog)
 
+	// Initialize health checker before starting processes (needed for health checks during startup)
+	s.logInfo("Initializing health checker...")
+	s.healthChecker = NewHealthChecker(s.config, s.processManager, s.eventLog)
+
 	// Start IPFS daemon
 	s.logInfo("Starting IPFS daemon...")
 	if err := s.processManager.StartIPFS(s.ctx); err != nil {
@@ -141,15 +145,14 @@ func (s *pinshareService) initialize() error {
 	}()
 	s.logInfo(fmt.Sprintf("UI server started on http://localhost:%d", s.config.UIPort))
 
-	// Start health checker
-	s.logInfo("Starting health checker...")
-	s.healthChecker = NewHealthChecker(s.config, s.processManager, s.eventLog)
+	// Start health checker background monitoring
+	s.logInfo("Starting health checker background monitoring...")
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
 		s.healthChecker.Run(s.ctx)
 	}()
-	s.logInfo("Health checker started")
+	s.logInfo("Health checker monitoring started")
 
 	return nil
 }
@@ -271,10 +274,6 @@ func (s *pinshareService) logError(msg string, err error) {
 
 // openEventLog opens the Windows event log
 func openEventLog(serviceName string) (debug.Log, error) {
-	const eventLogName = ""
-	elog, err := debug.New(serviceName)
-	if err != nil {
-		return nil, err
-	}
+	elog := debug.New(serviceName)
 	return elog, nil
 }

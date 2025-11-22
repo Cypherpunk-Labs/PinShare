@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -376,8 +378,12 @@ func (c *ServiceConfig) SaveToRegistry() error {
 	return nil
 }
 
-// generateEncryptionKey generates a random 32-byte encryption key
+// generateEncryptionKey generates a cryptographically secure random 32-byte encryption key
 func generateEncryptionKey() string {
-	// For now, use a placeholder - this should be replaced with actual random generation
-	return "0123456789abcdef0123456789abcdef"
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		// If random generation fails, panic as this is a critical security requirement
+		panic(fmt.Sprintf("failed to generate encryption key: %v", err))
+	}
+	return hex.EncodeToString(bytes)
 }
