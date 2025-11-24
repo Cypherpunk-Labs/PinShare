@@ -40,3 +40,7 @@ pinshare
 */test/node*
 /test/node*
 
+# Build outputs
+dist/
+bin/
+*.msi
