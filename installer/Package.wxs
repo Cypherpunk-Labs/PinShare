@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <?define ProductName = "PinShare" ?>
+  <?define ProductVersion = "1.0.0" ?>
+  <?define Manufacturer = "PinShare Contributors" ?>
+  <?define UpgradeCode = "12345678-1234-1234-1234-123456789012" ?>
+
+  <Package Name="$(var.ProductName)"
+           Version="$(var.ProductVersion)"
+           Manufacturer="$(var.Manufacturer)"
+           UpgradeCode="$(var.UpgradeCode)"
+           Language="1033"
+           Compressed="yes"
+           InstallerVersion="500"
+           Scope="perMachine">
+
+    <SummaryInformation Description="PinShare - Decentralized IPFS Pinning Service"
+                        Comments="$(var.ProductVersion)" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+
+    <Media Id="1" Cabinet="PinShare.cab" EmbedCab="yes" />
+
+    <!-- Icons -->
+    <Icon Id="PinShareIcon" SourceFile="icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="PinShareIcon" />
+
+    <!-- UI -->
+    <UIRef Id="WixUI_Minimal" />
+    <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
+
+    <!-- Custom actions -->
+    <CustomAction Id="StartService"
+                  FileRef="PinShareSvcExe"
+                  ExeCommand="start"
+                  Execute="deferred"
+                  Return="ignore"
+                  Impersonate="no" />
+
+    <CustomAction Id="StopService"
+                  FileRef="PinShareSvcExe"
+                  ExeCommand="stop"
+                  Execute="deferred"
+                  Return="ignore"
+                  Impersonate="no" />
+
+    <CustomAction Id="InstallService"
+                  FileRef="PinShareSvcExe"
+                  ExeCommand="install"
+                  Execute="deferred"
+                  Return="check"
+                  Impersonate="no" />
+
+    <CustomAction Id="UninstallService"
+                  FileRef="PinShareSvcExe"
+                  ExeCommand="uninstall"
+                  Execute="deferred"
+                  Return="ignore"
+                  Impersonate="no" />
+
+    <InstallExecuteSequence>
+      <!-- Stop service before uninstall -->
+      <Custom Action="StopService" Before="RemoveFiles">Installed AND NOT UPGRADINGPRODUCTCODE</Custom>
+      <Custom Action="UninstallService" Before="RemoveFiles">Installed AND NOT UPGRADINGPRODUCTCODE</Custom>
+
+      <!-- Install and start service after install -->
+      <Custom Action="InstallService" After="InstallFiles">NOT Installed</Custom>
+      <Custom Action="StartService" After="InstallService">NOT Installed</Custom>
+    </InstallExecuteSequence>
+
+    <!-- Features -->
+    <Feature Id="ProductFeature"
+             Title="PinShare"
+             Level="1"
+             Description="Core PinShare application">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentGroupRef Id="UIComponents" />
+      <ComponentRef Id="RegistryEntries" />
+      <ComponentRef Id="DataDirectories" />
+      <ComponentRef Id="StartupEntry" />
+      <ComponentRef Id="Shortcuts" />
+    </Feature>
+
+    <!-- Directory structure -->
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="PinShare">
+        <Directory Id="UIFolder" Name="ui" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="DataFolder" Name="PinShare">
+        <Directory Id="LogsFolder" Name="logs" />
+        <Directory Id="IPFSDataFolder" Name="ipfs" />
+        <Directory Id="PinShareDataFolder" Name="pinshare" />
+        <Directory Id="UploadFolder" Name="upload" />
+        <Directory Id="CacheFolder" Name="cache" />
+        <Directory Id="RejectedFolder" Name="rejected" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="PinShare" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="StartupFolder" />
+
+  </Package>
+
+  <!-- Components -->
+  <Fragment>
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+
+      <!-- Main executables -->
+      <Component Id="PinShareSvc" Bitness="always64">
+        <File Id="PinShareSvcExe"
+              Name="pinsharesvc.exe"
+              Source="..\dist\windows\pinsharesvc.exe" />
+      </Component>
+
+      <Component Id="PinShareBackend" Bitness="always64">
+        <File Id="PinShareExe"
+              Name="pinshare.exe"
+              Source="..\dist\windows\pinshare.exe" />
+      </Component>
+
+      <Component Id="PinShareTray" Bitness="always64">
+        <File Id="PinShareTrayExe"
+              Name="pinshare-tray.exe"
+              Source="..\dist\windows\pinshare-tray.exe" />
+      </Component>
+
+      <Component Id="IPFS" Bitness="always64">
+        <File Id="IPFSExe"
+              Name="ipfs.exe"
+              Source="..\dist\windows\ipfs.exe" />
+      </Component>
+
+      <Component Id="Icon" Bitness="always64">
+        <File Id="IconFile"
+              Name="icon.ico"
+              Source="icon.ico" />
+      </Component>
+
+    </ComponentGroup>
+  </Fragment>
+
+  <!-- Shortcuts -->
+  <Fragment>
+    <Component Id="Shortcuts" Directory="ApplicationProgramsFolder" Bitness="always64">
+      <Shortcut Id="PinShareUIShortcut"
+                Name="Open PinShare UI"
+                Target="http://localhost:8888/"
+                Icon="PinShareIcon" />
+
+      <Shortcut Id="UninstallShortcut"
+                Name="Uninstall PinShare"
+                Target="[System64Folder]msiexec.exe"
+                Arguments="/x [ProductCode]" />
+
+      <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+
+      <RegistryValue Root="HKCU"
+                     Key="Software\PinShare"
+                     Name="installed"
+                     Type="integer"
+                     Value="1" />
+    </Component>
+  </Fragment>
+
+  <!-- UI Components (static files) - will be harvested -->
+  <Fragment>
+    <ComponentGroup Id="UIComponents" Directory="UIFolder">
+      <!-- This will be auto-generated by heat/HarvestDirectory in .wixproj -->
+    </ComponentGroup>
+  </Fragment>
+
+  <!-- Registry entries -->
+  <Fragment>
+    <Component Id="RegistryEntries" Directory="INSTALLFOLDER" Bitness="always64">
+      <RegistryKey Root="HKLM" Key="SOFTWARE\PinShare">
+        <RegistryValue Name="InstallDirectory" Type="string" Value="[INSTALLFOLDER]" />
+        <RegistryValue Name="DataDirectory" Type="string" Value="[DataFolder]" />
+        <RegistryValue Name="IPFSBinary" Type="string" Value="[INSTALLFOLDER]ipfs.exe" />
+        <RegistryValue Name="PinShareBinary" Type="string" Value="[INSTALLFOLDER]pinshare.exe" />
+
+        <!-- Ports -->
+        <RegistryValue Name="IPFSAPIPort" Type="integer" Value="5001" />
+        <RegistryValue Name="IPFSGatewayPort" Type="integer" Value="8080" />
+        <RegistryValue Name="IPFSSwarmPort" Type="integer" Value="4001" />
+        <RegistryValue Name="PinShareAPIPort" Type="integer" Value="9090" />
+        <RegistryValue Name="PinShareP2PPort" Type="integer" Value="50001" />
+        <RegistryValue Name="UIPort" Type="integer" Value="8888" />
+
+        <!-- Configuration -->
+        <RegistryValue Name="OrgName" Type="string" Value="MyOrganization" />
+        <RegistryValue Name="GroupName" Type="string" Value="MyGroup" />
+        <RegistryValue Name="SkipVirusTotal" Type="integer" Value="1" />
+        <RegistryValue Name="EnableCache" Type="integer" Value="1" />
+        <RegistryValue Name="ArchiveNode" Type="integer" Value="0" />
+        <RegistryValue Name="LogLevel" Type="string" Value="info" />
+      </RegistryKey>
+    </Component>
+  </Fragment>
+
+  <!-- Data directories -->
+  <Fragment>
+    <Component Id="DataDirectories" Directory="DataFolder" Bitness="always64">
+      <CreateFolder Directory="LogsFolder" />
+      <CreateFolder Directory="IPFSDataFolder" />
+      <CreateFolder Directory="PinShareDataFolder" />
+      <CreateFolder Directory="UploadFolder" />
+      <CreateFolder Directory="CacheFolder" />
+      <CreateFolder Directory="RejectedFolder" />
+
+      <RegistryValue Root="HKLM"
+                     Key="SOFTWARE\PinShare"
+                     Name="DataCreated"
+                     Type="integer"
+                     Value="1" />
+    </Component>
+  </Fragment>
+
+  <!-- Startup entry for tray app -->
+  <Fragment>
+    <Component Id="StartupEntry" Directory="StartupFolder" Bitness="always64">
+      <Shortcut Id="StartupShortcut"
+                Name="PinShare Tray"
+                Description="PinShare System Tray"
+                Target="[INSTALLFOLDER]pinshare-tray.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+
+      <RegistryValue Root="HKCU"
+                     Key="Software\PinShare"
+                     Name="startupentry"
+                     Type="integer"
+                     Value="1" />
+    </Component>
+  </Fragment>
+
+</Wix>

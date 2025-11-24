@@ -1,0 +1,37 @@
+<Project Sdk="WixToolset.Sdk/6.0.2">
+  <PropertyGroup>
+    <OutputName>PinShare-Setup</OutputName>
+    <OutputType>Package</OutputType>
+    <Platform>x64</Platform>
+    <ProductVersion>1.0.0</ProductVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="6.*" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="6.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Main product definition -->
+    <Compile Include="Package.wxs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Harvest UI files -->
+    <HarvestDirectory Include="$(SolutionDir)..\dist\windows\ui">
+      <ComponentGroupName>UIComponents</ComponentGroupName>
+      <DirectoryRefId>UIFolder</DirectoryRefId>
+      <PreprocessorVariable>var.UISourceDir</PreprocessorVariable>
+      <SuppressFragments>true</SuppressFragments>
+      <SuppressRegistry>true</SuppressRegistry>
+      <SuppressRootDirectory>true</SuppressRootDirectory>
+    </HarvestDirectory>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <DefineConstants>
+      UISourceDir=$(SolutionDir)..\dist\windows\ui
+    </DefineConstants>
+  </PropertyGroup>
+
+</Project>
