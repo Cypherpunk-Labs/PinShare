@@ -16,8 +16,9 @@
     <Compile Include="Package.wxs" />
   </ItemGroup>
 
+  <!-- TEMPORARILY DISABLED: UI will be added from infra/refactor branch later -->
+  <!--
   <ItemGroup>
-    <!-- Harvest UI files -->
     <HarvestDirectory Include="$(SolutionDir)..\dist\windows\ui">
       <ComponentGroupName>UIComponents</ComponentGroupName>
       <DirectoryRefId>UIFolder</DirectoryRefId>
@@ -33,5 +34,6 @@
       UISourceDir=$(SolutionDir)..\dist\windows\ui
     </DefineConstants>
   </PropertyGroup>
+  -->
 
 </Project>
