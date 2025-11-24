@@ -135,7 +135,7 @@ func (t *Tray) handleOpenUI() {
 
 // handleStartService starts the service
 func (t *Tray) handleStartService() {
-	if err := controlService(svc.Start); err != nil {
+	if err := startService(); err != nil {
 		log.Printf("Failed to start service: %v", err)
 		showMessage("Error", fmt.Sprintf("Failed to start service: %v", err))
 	} else {
@@ -170,7 +170,7 @@ func (t *Tray) handleRestartService() {
 	time.Sleep(2 * time.Second)
 
 	// Start again
-	if err := controlService(svc.Start); err != nil {
+	if err := startService(); err != nil {
 		log.Printf("Failed to start service: %v", err)
 		showMessage("Error", fmt.Sprintf("Failed to start service: %v", err))
 	} else {
@@ -307,6 +307,23 @@ func getServiceStatus() (svc.State, error) {
 	return status.State, nil
 }
 
+// startService starts the service
+func startService() error {
+	manager, err := mgr.Connect()
+	if err != nil {
+		return fmt.Errorf("failed to connect to service manager: %w", err)
+	}
+	defer manager.Disconnect()
+
+	service, err := manager.OpenService(serviceName)
+	if err != nil {
+		return fmt.Errorf("failed to open service: %w", err)
+	}
+	defer service.Close()
+
+	return service.Start()
+}
+
 // controlService sends a control command to the service
 func controlService(cmd svc.Cmd) error {
 	manager, err := mgr.Connect()
@@ -320,10 +337,6 @@ func controlService(cmd svc.Cmd) error {
 		return fmt.Errorf("failed to open service: %w", err)
 	}
 	defer service.Close()
-
-	if cmd == svc.Start {
-		return service.Start()
-	}
 
 	_, err = service.Control(cmd)
 	return err
