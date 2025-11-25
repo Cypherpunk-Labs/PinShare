@@ -101,7 +101,19 @@ if /i "%BUILD_INSTALLER%"=="Y" (
     echo.
     echo Building MSI installer...
     cd installer
+    if errorlevel 1 (
+        echo ERROR: Failed to change to installer directory
+        cd ..
+        exit /b 1
+    )
+
     call build-wix6.bat
+    if errorlevel 1 (
+        echo ERROR: Installer build failed
+        cd ..
+        exit /b 1
+    )
+
     cd ..
     echo.
     echo ==========================================
