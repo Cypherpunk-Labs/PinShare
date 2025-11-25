@@ -14,10 +14,7 @@
   </ItemGroup>
   -->
 
-  <ItemGroup>
-    <!-- Main product definition -->
-    <Compile Include="Package.wxs" />
-  </ItemGroup>
+  <!-- SDK automatically globs *.wxs files - no explicit Compile needed -->
 
   <!-- TEMPORARILY DISABLED: UI will be added from infra/refactor branch later -->
   <!--
