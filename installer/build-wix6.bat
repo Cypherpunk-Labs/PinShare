@@ -60,13 +60,15 @@ if not exist "..\dist\windows\ipfs.exe" (
     exit /b 1
 )
 
-if not exist "..\dist\windows\ui\index.html" (
-    echo ERROR: UI files not found in ..\dist\windows\ui
-    echo Please build the React UI first
-    exit /b 1
-)
+REM TEMPORARILY DISABLED: UI check removed until pinshare-ui is merged
+REM if not exist "..\dist\windows\ui\index.html" (
+REM     echo ERROR: UI files not found in ..\dist\windows\ui
+REM     echo Please build the React UI first
+REM     exit /b 1
+REM )
 
 echo All required files found!
+echo Note: UI components temporarily disabled (will be added from infra/refactor)
 echo.
 
 REM Build the MSI using dotnet build
