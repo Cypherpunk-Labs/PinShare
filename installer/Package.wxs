@@ -156,9 +156,13 @@
   <!-- Shortcuts -->
   <Fragment>
     <Component Id="Shortcuts" Directory="ApplicationProgramsFolder" Bitness="always64">
+      <!-- TEMPORARILY DISABLED: URL shortcuts require different approach -->
+      <!-- Users can access UI via system tray application -->
+      <!--
       <Shortcut Id="PinShareUIShortcut"
                 Name="Open PinShare UI"
                 Target="http://localhost:8888/" />
+      -->
 
       <Shortcut Id="UninstallShortcut"
                 Name="Uninstall PinShare"
