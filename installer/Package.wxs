@@ -62,12 +62,12 @@
 
     <InstallExecuteSequence>
       <!-- Stop service before uninstall -->
-      <Custom Action="StopService" Before="RemoveFiles">Installed AND NOT UPGRADINGPRODUCTCODE</Custom>
-      <Custom Action="UninstallService" Before="RemoveFiles">Installed AND NOT UPGRADINGPRODUCTCODE</Custom>
+      <Custom Action="StopService" Before="RemoveFiles" Condition="Installed AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="UninstallService" Before="RemoveFiles" Condition="Installed AND NOT UPGRADINGPRODUCTCODE" />
 
       <!-- Install and start service after install -->
-      <Custom Action="InstallService" After="InstallFiles">NOT Installed</Custom>
-      <Custom Action="StartService" After="InstallService">NOT Installed</Custom>
+      <Custom Action="InstallService" After="InstallFiles" Condition="NOT Installed" />
+      <Custom Action="StartService" After="InstallService" Condition="NOT Installed" />
     </InstallExecuteSequence>
 
     <!-- Features -->
