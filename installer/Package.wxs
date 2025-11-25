@@ -28,8 +28,9 @@
     <Property Id="ARPPRODUCTICON" Value="PinShareIcon" />
 
     <!-- UI -->
-    <UIRef Id="WixUI_Minimal" />
-    <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
+    <!-- TEMPORARILY DISABLED: WixUI changed in WiX 4+ -->
+    <!-- <UIRef Id="WixUI_Minimal" /> -->
+    <!-- <WixVariable Id="WixUILicenseRtf" Value="license.rtf" /> -->
 
     <!-- Custom actions -->
     <CustomAction Id="StartService"
