@@ -23,8 +23,9 @@
     <Media Id="1" Cabinet="PinShare.cab" EmbedCab="yes" />
 
     <!-- Icons -->
-    <Icon Id="PinShareIcon" SourceFile="icon.ico" />
-    <Property Id="ARPPRODUCTICON" Value="PinShareIcon" />
+    <!-- TEMPORARILY DISABLED: icon.ico file not yet created -->
+    <!-- <Icon Id="PinShareIcon" SourceFile="icon.ico" /> -->
+    <!-- <Property Id="ARPPRODUCTICON" Value="PinShareIcon" /> -->
 
     <!-- UI -->
     <!-- TEMPORARILY DISABLED: WixUI changed in WiX 4+ -->
@@ -140,11 +141,14 @@
               Source="..\dist\windows\ipfs.exe" />
       </Component>
 
+      <!-- TEMPORARILY DISABLED: icon.ico file not yet created -->
+      <!--
       <Component Id="Icon" Bitness="always64">
         <File Id="IconFile"
               Name="icon.ico"
               Source="icon.ico" />
       </Component>
+      -->
 
     </ComponentGroup>
   </Fragment>
@@ -154,8 +158,7 @@
     <Component Id="Shortcuts" Directory="ApplicationProgramsFolder" Bitness="always64">
       <Shortcut Id="PinShareUIShortcut"
                 Name="Open PinShare UI"
-                Target="http://localhost:8888/"
-                Icon="PinShareIcon" />
+                Target="http://localhost:8888/" />
 
       <Shortcut Id="UninstallShortcut"
                 Name="Uninstall PinShare"
