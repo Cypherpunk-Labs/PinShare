@@ -6,11 +6,13 @@
     <ProductVersion>1.0.0</ProductVersion>
   </PropertyGroup>
 
+  <!-- TEMPORARILY DISABLED: Extensions not needed for basic installer -->
+  <!--
   <ItemGroup>
-    <!-- TEMPORARILY DISABLED: UI extension removed since UI dialogs are disabled -->
-    <!-- <PackageReference Include="WixToolset.UI.wixext" Version="6.*" /> -->
+    <PackageReference Include="WixToolset.UI.wixext" Version="6.*" />
     <PackageReference Include="WixToolset.Util.wixext" Version="6.*" />
   </ItemGroup>
+  -->
 
   <ItemGroup>
     <!-- Main product definition -->
