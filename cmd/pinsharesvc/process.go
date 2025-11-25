@@ -182,6 +182,11 @@ func (pm *ProcessManager) StartPinShare(ctx context.Context) error {
 	// Add feature flags
 	if pm.config.SkipVirusTotal {
 		env = append(env, "PS_FF_SKIP_VT=true")
+		// Set dummy VT_TOKEN to bypass chromedp test and use VirusTotal path
+		// The application will use Security Capability 2 (VirusTotal API)
+		if pm.config.VirusTotalToken == "" {
+			env = append(env, "VT_TOKEN=SKIP_VT_FOR_SERVICE")
+		}
 	}
 	if pm.config.EnableCache {
 		env = append(env, "PS_FF_CACHE=true")
