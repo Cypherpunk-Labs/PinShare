@@ -12,9 +12,15 @@ func ProcessDownload(metadata store.BaseMetadata) (bool, error) {
 	var fresult bool
 	if appconfInstance.SecurityCapability > 0 {
 		fmt.Println("[INFO] File Security checking CID: " + metadata.IPFSCID + " with SHA256: " + metadata.FileSHA256)
-		// TODO: 				if appconfInstance.SecurityCapability [1 2 3 4]
 
-		if appconfInstance.SecurityCapability <= 3 {
+		// Skip all security scanning if FFSkipVT is enabled
+		if appconfInstance.FFSkipVT {
+			fmt.Println("[INFO] Virus scanning disabled (FFSkipVT=true), skipping security check")
+			fmt.Println("[INFO] Fetching CID: " + metadata.IPFSCID)
+			psfs.GetFileIPFS(metadata.IPFSCID, appconfInstance.CacheFolder+"/"+metadata.IPFSCID+"."+metadata.FileType)
+			fresult = true
+		} else if appconfInstance.SecurityCapability <= 3 {
+			// SecurityCapability 1, 2, 3: Use ClamAV
 			fmt.Println("[INFO] Fetching CID: " + metadata.IPFSCID)
 			// ipfs get
 			psfs.GetFileIPFS(metadata.IPFSCID, appconfInstance.CacheFolder+"/"+metadata.IPFSCID+"."+metadata.FileType)
@@ -24,22 +30,17 @@ func ProcessDownload(metadata store.BaseMetadata) (bool, error) {
 				return returnValue, err
 			}
 			fresult = result
-		}
-
-		if appconfInstance.SecurityCapability == 4 {
-			if appconfInstance.FFSkipVT {
-				fresult = true
-			} else {
-				result, err := psfs.GetVirusTotalWSVerdictByHash(metadata.FileSHA256) // true == safe
-				if err != nil {
-					return returnValue, err
-				}
-				// fmt.Println("[INFO] File Security check verdict for CID: " + metadata.IPFSCID + " with SHA256: " + metadata.FileSHA256)
-				fresult = result
-				fmt.Println("[INFO] Fetching CID: " + metadata.IPFSCID)
-				// ipfs get
-				psfs.GetFileIPFS(metadata.IPFSCID, appconfInstance.CacheFolder+"/"+metadata.IPFSCID+"."+metadata.FileType)
+		} else if appconfInstance.SecurityCapability == 4 {
+			// SecurityCapability 4: Use VirusTotal via browser
+			result, err := psfs.GetVirusTotalWSVerdictByHash(metadata.FileSHA256) // true == safe
+			if err != nil {
+				return returnValue, err
 			}
+			// fmt.Println("[INFO] File Security check verdict for CID: " + metadata.IPFSCID + " with SHA256: " + metadata.FileSHA256)
+			fresult = result
+			fmt.Println("[INFO] Fetching CID: " + metadata.IPFSCID)
+			// ipfs get
+			psfs.GetFileIPFS(metadata.IPFSCID, appconfInstance.CacheFolder+"/"+metadata.IPFSCID+"."+metadata.FileType)
 		}
 	}
 	if fresult {

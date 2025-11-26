@@ -126,7 +126,7 @@ func LoadConfig() (*AppConfig, error) {
 		return nil
 	}
 
-	//TODO: Loadin the Org/Group names
+	// Load organization and group names
 	if err := parseStringEnv("PS_ORGNAME", &conf.OrgName); err != nil {
 		return nil, err
 	}
@@ -136,7 +136,32 @@ func LoadConfig() (*AppConfig, error) {
 	conf.MetadataTopicID = "/" + conf.OrgName + "/" + conf.GroupName + conf.MetadataTopicID
 	conf.FilteringTopicID = "/" + conf.OrgName + "/" + conf.GroupName + conf.FilteringTopicID
 
+	// Load path configurations (used by Windows service)
+	if err := parseStringEnv("PS_UPLOAD_FOLDER", &conf.UploadFolder); err != nil {
+		return nil, err
+	}
+	if err := parseStringEnv("PS_CACHE_FOLDER", &conf.CacheFolder); err != nil {
+		return nil, err
+	}
+	if err := parseStringEnv("PS_REJECT_FOLDER", &conf.RejectFolder); err != nil {
+		return nil, err
+	}
+	if err := parseStringEnv("PS_METADATA_FILE", &conf.MetaDataFile); err != nil {
+		return nil, err
+	}
+	if err := parseStringEnv("PS_IDENTITY_KEY_FILE", &conf.IdentityKeyFile); err != nil {
+		return nil, err
+	}
+
 	if err := parseIntEnv("PS_LIBP2P_PORT", &conf.Libp2pPort); err != nil {
+		return nil, err
+	}
+
+	// Load feature flags
+	if err := parseBoolEnv("PS_FF_ARCHIVE_NODE", &conf.FFArchiveNode); err != nil {
+		return nil, err
+	}
+	if err := parseBoolEnv("PS_FF_CACHE", &conf.FFCache); err != nil {
 		return nil, err
 	}
 	if err := parseBoolEnv("PS_FF_MOVE_UPLOAD", &conf.FFMoveUpload); err != nil {

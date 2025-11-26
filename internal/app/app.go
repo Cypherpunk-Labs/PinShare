@@ -315,6 +315,14 @@ func checkDependanciesAndEnableSecurityPath(appconf *config.AppConfig) bool {
 		requirementsMet = false
 	}
 
+	// If virus scanning is disabled via feature flag, skip security capability checks
+	if appconf.FFSkipVT {
+		fmt.Println("[INFO] Virus scanning disabled (PS_FF_SKIP_VT=true)")
+		appconf.SecurityCapability = 2 // Set to valid capability so scanning code paths work
+		fmt.Println("[INFO] Security Capability set to 2 (scanning bypassed)")
+		return requirementsMet
+	}
+
 	if checkPort("localhost", 36939) {
 		fmt.Println("[CHECK] P2P-Sec running")
 		appconf.SecurityCapability = 1

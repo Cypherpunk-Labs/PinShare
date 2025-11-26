@@ -164,7 +164,16 @@ func (pm *ProcessManager) StartPinShare(ctx context.Context) error {
 
 	// Create environment variables for PinShare
 	dataPath := pm.config.GetPinShareDataPath()
+
+	// Get current PATH and prepend install directory so 'ipfs' command is found
+	currentPath := os.Getenv("PATH")
+	newPath := pm.config.InstallDirectory
+	if currentPath != "" {
+		newPath = pm.config.InstallDirectory + ";" + currentPath
+	}
+
 	env := append(os.Environ(),
+		fmt.Sprintf("PATH=%s", newPath),
 		fmt.Sprintf("IPFS_API=http://localhost:%d", pm.config.IPFSAPIPort),
 		fmt.Sprintf("PS_ORGNAME=%s", pm.config.OrgName),
 		fmt.Sprintf("PS_GROUPNAME=%s", pm.config.GroupName),

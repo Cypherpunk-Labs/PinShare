@@ -40,24 +40,24 @@ func ProcessUploads(folderPath string) {
 						fmt.Println("[INFO] File Security checking file: " + f + " with SHA256: " + fsha256)
 						var result bool
 						var err error
-						// TODO: 				if appconfInstance.SecurityCapability [1 2 3 4]
-						if appconfInstance.SecurityCapability <= 3 {
+
+						// Skip all security scanning if FFSkipVT is enabled
+						if appconfInstance.FFSkipVT {
+							fmt.Println("[INFO] Virus scanning disabled (FFSkipVT=true), skipping security check")
+							result = true
+						} else if appconfInstance.SecurityCapability <= 3 {
+							// SecurityCapability 1, 2, 3: Use ClamAV
 							result, err = psfs.ClamScanFileClean(folderPath + "/" + f)
 							if err != nil {
 								fmt.Println("[ERROR] (ClamScanFileClean) " + string(err.Error()))
 								return
 							}
-						}
-
-						if appconfInstance.SecurityCapability == 4 {
-							if appconfInstance.FFSkipVT {
-								result = true
-							} else {
-								result, err = psfs.GetVirusTotalWSVerdictByHash(fsha256) // true == safe
-								if err != nil {
-									fmt.Println("[ERROR] (GetVirusTotalVerdictByHash) " + string(err.Error()))
-									return
-								}
+						} else if appconfInstance.SecurityCapability == 4 {
+							// SecurityCapability 4: Use VirusTotal via browser
+							result, err = psfs.GetVirusTotalWSVerdictByHash(fsha256) // true == safe
+							if err != nil {
+								fmt.Println("[ERROR] (GetVirusTotalVerdictByHash) " + string(err.Error()))
+								return
 							}
 						}
 
