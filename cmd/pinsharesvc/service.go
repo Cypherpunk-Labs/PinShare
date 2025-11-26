@@ -177,7 +177,8 @@ func (s *pinshareService) waitForIPFS() error {
 
 // waitForPinShare waits for PinShare API to be ready
 func (s *pinshareService) waitForPinShare() error {
-	timeout := time.After(30 * time.Second)
+	// PinShare needs time to initialize libp2p, DHT, and connect to peers
+	timeout := time.After(60 * time.Second)
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 

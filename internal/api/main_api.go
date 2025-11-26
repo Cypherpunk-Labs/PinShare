@@ -264,6 +264,14 @@ func Start(ctx context.Context, node host.Host) {
 
 	// Create a new ServeMux to combine the API handler and metrics handler
 	mux := http.NewServeMux()
+
+	// Health check endpoint for service monitoring
+	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok"}`))
+	})
+
 	mux.Handle("/", apiHandler)
 	mux.Handle("/metrics", promhttp.Handler())
 
