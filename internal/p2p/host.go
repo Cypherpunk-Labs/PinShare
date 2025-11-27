@@ -22,7 +22,6 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
 
 	"github.com/libp2p/go-libp2p/core/routing"
-	"github.com/multiformats/go-multiaddr"
 	// "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	// "[github.com/libp2p/go-libp2p/p2p/discovery/mdns](https://github.com/libp2p/go-libp2p/p2p/discovery/mdns)" // Optional: for local discovery
 )
@@ -67,23 +66,26 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 
 	h, err := libp2p.New(
 		// testing method to include public addr.
-		libp2p.AddrsFactory(func(addrs []multiaddr.Multiaddr) []multiaddr.Multiaddr {
-			return []multiaddr.Multiaddr{
-				multiaddr.StringCast(publicAddr),
-				multiaddr.StringCast(publicAddrUDP),
-			}
-		}), // using this explicitly only includes these addrs, the listenAddr ones are ignored
+		// libp2p.AddrsFactory(func(addrs []multiaddr.Multiaddr) []multiaddr.Multiaddr {
+		// 	return []multiaddr.Multiaddr{
+		// 		multiaddr.StringCast(publicAddr),
+		// 		multiaddr.StringCast(publicAddrUDP),
+		// 	}
+		// }), // using this explicitly only includes these addrs, the listenAddr ones are ignored.
+		// // ok lets try adding these into the listenaddr instead
 
 		libp2p.Identity(privKey),
 		libp2p.ListenAddrStrings(listenAddr),    // Listen on TCP
 		libp2p.ListenAddrStrings(listenAddrUDP), // Optionally listen on QUIC
-		libp2p.DefaultSecurity,                  // Use default security transports (TLS, Noise)
-		libp2p.DefaultMuxers,                    // Use default stream multiplexers (mplex, yamux)
-		libp2p.NATPortMap(),                     // Attempt to open ports using uPNP for NATed environments
-		libp2p.EnableHolePunching(),             // Enable hole punching for NAT traversal
-		libp2p.EnableRelayService(),             // Enable circuit relay v2 service
-		libp2p.EnableAutoNATv2(),                // Enable automatic NAT traversal
-		libp2p.EnableRelay(),                    // Enable circuit relay v1 service
+		libp2p.ListenAddrStrings(publicAddr),
+		libp2p.ListenAddrStrings(publicAddrUDP),
+		libp2p.DefaultSecurity,      // Use default security transports (TLS, Noise)
+		libp2p.DefaultMuxers,        // Use default stream multiplexers (mplex, yamux)
+		libp2p.NATPortMap(),         // Attempt to open ports using uPNP for NATed environments
+		libp2p.EnableHolePunching(), // Enable hole punching for NAT traversal
+		libp2p.EnableRelayService(), // Enable circuit relay v2 service
+		libp2p.EnableAutoNATv2(),    // Enable automatic NAT traversal
+		libp2p.EnableRelay(),        // Enable circuit relay v1 service
 		// libp2p.EnableAutoRelay(),                // Use relays if the node is behind a NAT //BUG: deprecated
 		// libp2p.EnableAutoRelayWithPeerSource(), // TODO:
 		// libp2p.EnableAutoRelayWithStaticRelays(), // TODO:
