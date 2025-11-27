@@ -14,20 +14,40 @@ set SCRIPT_DIR=%~dp0
 set DIST_DIR=%SCRIPT_DIR%dist\windows
 
 REM Get version from git tag or use default
-for /f "tokens=*" %%i in ('git describe --tags --always 2^>nul') do set GIT_VERSION=%%i
-if not defined GIT_VERSION set GIT_VERSION=0.0.0-dev
+REM First try to get a proper version tag
+for /f "tokens=*" %%i in ('git describe --tags --match "v[0-9]*" --abbrev=0 2^>nul') do set GIT_TAG=%%i
 
-REM Clean up version string (remove 'v' prefix if present, handle commit suffix)
+if defined GIT_TAG (
+    REM We have a version tag, now get full description for commit count
+    for /f "tokens=*" %%i in ('git describe --tags --match "v[0-9]*" 2^>nul') do set GIT_VERSION=%%i
+) else (
+    REM No version tag found, use default
+    set GIT_VERSION=1.0.0
+)
+
+REM Clean up version string (remove 'v' prefix if present)
 set VERSION=%GIT_VERSION%
 if "%VERSION:~0,1%"=="v" set VERSION=%VERSION:~1%
-REM Convert git describe format (v1.0.0-5-gabcdef) to semver-compatible (1.0.0.5)
-for /f "tokens=1,2 delims=-" %%a in ("%VERSION%") do (
+
+REM Convert git describe format (1.0.0-5-gabcdef) to MSI-compatible (1.0.0.5)
+REM MSI versions must be numeric: X.Y.Z or X.Y.Z.W
+for /f "tokens=1,2,3 delims=-" %%a in ("%VERSION%") do (
     set BASE_VERSION=%%a
     set COMMITS=%%b
+    set HASH=%%c
 )
+
+REM Check if COMMITS is numeric (means we have commits after tag)
+REM If COMMITS starts with 'g', it's actually the hash (no commits after tag)
 if defined COMMITS (
-    REM Has commits after tag, append as build number
-    set VERSION=%BASE_VERSION%.%COMMITS%
+    echo %COMMITS% | findstr /r "^[0-9][0-9]*$" >nul
+    if not errorlevel 1 (
+        REM COMMITS is numeric, append as build number
+        set VERSION=%BASE_VERSION%.%COMMITS%
+    ) else (
+        REM Not numeric, just use base version
+        set VERSION=%BASE_VERSION%
+    )
 ) else (
     set VERSION=%BASE_VERSION%
 )
