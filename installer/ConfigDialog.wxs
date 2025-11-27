@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PinShare Configuration Dialog for WiX 6
+  Allows users to customize settings during installation.
+
+  Note: This dialog defines its own TextStyles to avoid dependency on WixUI extension.
+  If WixUI is enabled later, these can be replaced with WixUI_Font_Bold references.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+
+  <Fragment>
+    <!-- Define custom text styles since WixUI extension is disabled -->
+    <UI>
+      <TextStyle Id="PinShare_Font_Bold" FaceName="Tahoma" Size="8" Bold="yes" />
+      <TextStyle Id="PinShare_Font_Normal" FaceName="Tahoma" Size="8" />
+      <TextStyle Id="PinShare_Font_Title" FaceName="Tahoma" Size="12" Bold="yes" />
+
+      <!-- Configuration Dialog -->
+      <Dialog Id="PinShareConfigDlg" Width="370" Height="270" Title="[ProductName] Configuration">
+
+        <!-- Title -->
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="340" Height="20"
+                 Transparent="yes" NoPrefix="yes" Text="{\PinShare_Font_Title}Configure [ProductName]" />
+
+        <Control Id="Description" Type="Text" X="25" Y="26" Width="320" Height="20"
+                 Transparent="yes" NoPrefix="yes" Text="Customize your PinShare installation settings." />
+
+        <!-- Network Configuration Section -->
+        <Control Id="NetworkHeader" Type="Text" X="15" Y="52" Width="340" Height="12"
+                 Text="{\PinShare_Font_Bold}Network Configuration" />
+
+        <Control Id="OrgNameLabel" Type="Text" X="25" Y="68" Width="100" Height="12"
+                 Text="Organization Name:" />
+        <Control Id="OrgNameEdit" Type="Edit" X="130" Y="66" Width="150" Height="18"
+                 Property="ORGNAME" Text="{80}" />
+
+        <Control Id="GroupNameLabel" Type="Text" X="25" Y="90" Width="100" Height="12"
+                 Text="Group Name:" />
+        <Control Id="GroupNameEdit" Type="Edit" X="130" Y="88" Width="150" Height="18"
+                 Property="GROUPNAME" Text="{80}" />
+
+        <!-- Ports Section -->
+        <Control Id="PortsHeader" Type="Text" X="15" Y="116" Width="340" Height="12"
+                 Text="{\PinShare_Font_Bold}Port Configuration (Advanced)" />
+
+        <Control Id="UIPortLabel" Type="Text" X="25" Y="132" Width="100" Height="12"
+                 Text="UI Port:" />
+        <Control Id="UIPortEdit" Type="Edit" X="130" Y="130" Width="60" Height="18"
+                 Property="UIPORT" Text="{5}" />
+
+        <Control Id="APIPortLabel" Type="Text" X="200" Y="132" Width="80" Height="12"
+                 Text="API Port:" />
+        <Control Id="APIPortEdit" Type="Edit" X="280" Y="130" Width="60" Height="18"
+                 Property="APIPORT" Text="{5}" />
+
+        <!-- Features Section -->
+        <Control Id="FeaturesHeader" Type="Text" X="15" Y="158" Width="340" Height="12"
+                 Text="{\PinShare_Font_Bold}Features" />
+
+        <Control Id="SkipVirusTotalCheck" Type="CheckBox" X="25" Y="174" Width="200" Height="18"
+                 Property="SKIPVIRUSTOTAL" CheckBoxValue="1" Text="Skip VirusTotal scanning" />
+
+        <Control Id="EnableCacheCheck" Type="CheckBox" X="25" Y="192" Width="200" Height="18"
+                 Property="ENABLECACHE" CheckBoxValue="1" Text="Enable content caching" />
+
+        <!-- Startup Section -->
+        <Control Id="StartupHeader" Type="Text" X="15" Y="216" Width="340" Height="12"
+                 Text="{\PinShare_Font_Bold}Startup Options" />
+
+        <Control Id="AutoStartCheck" Type="CheckBox" X="25" Y="232" Width="200" Height="18"
+                 Property="AUTOSTART" CheckBoxValue="1" Text="Start PinShare with Windows" />
+
+        <!-- Navigation buttons -->
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="&amp;Back" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="&amp;Next" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Cancel" />
+
+        <!-- Bottom line -->
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+      </Dialog>
+
+      <!-- Property values are defined in Package.wxs -->
+      <!-- This dialog is ready for integration but not yet in the install sequence -->
+      <!-- To integrate: add this dialog to a custom UI sequence or customize WixUI -->
+    </UI>
+  </Fragment>
+
+</Wix>

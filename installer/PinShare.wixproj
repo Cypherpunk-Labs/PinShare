@@ -6,13 +6,10 @@
     <ProductVersion>1.0.0</ProductVersion>
   </PropertyGroup>
 
-  <!-- TEMPORARILY DISABLED: Extensions not needed for basic installer -->
-  <!--
+  <!-- WiX Extensions for UI support -->
   <ItemGroup>
     <PackageReference Include="WixToolset.UI.wixext" Version="6.*" />
-    <PackageReference Include="WixToolset.Util.wixext" Version="6.*" />
   </ItemGroup>
-  -->
 
   <!-- SDK automatically globs *.wxs files - no explicit Compile needed -->
 
