@@ -123,7 +123,7 @@ require (
 	github.com/pion/turn/v4 v4.0.2 // indirect
 	github.com/pion/webrtc/v4 v4.1.2 // indirect
 	github.com/polydawn/refmt v0.89.0 // indirect
-	github.com/prometheus/client_golang v1.22.0 // indirect
+	github.com/prometheus/client_golang v1.22.0
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.64.0 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
@@ -162,7 +162,6 @@ require (
 
 require (
 	github.com/getkin/kin-openapi v0.132.0
-	github.com/libp2p/go-libp2p-core v0.20.1
 	github.com/oapi-codegen/runtime v1.1.2
 )
 

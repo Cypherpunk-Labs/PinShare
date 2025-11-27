@@ -41,6 +41,20 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 	// For QUIC (UDP), you might use:
 	listenAddrUDP := fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1", dynport)
 
+	// Parse static relays (bootstrap peers) for auto-relay client
+	relays := make([]peer.AddrInfo, 0, len(dht.DefaultBootstrapPeers))
+	for _, s := range dht.DefaultBootstrapPeers {
+		pi, err := peer.AddrInfoFromP2pAddr(s)
+		if err != nil {
+			fmt.Printf("[WARN] Invalid bootstrap peer %s: %v\n", s, err)
+			continue
+		}
+		relays = append(relays, *pi)
+	}
+	if len(relays) == 0 {
+		return nil, fmt.Errorf("no valid bootstrap relays")
+	}
+
 	h, err := libp2p.New(
 		libp2p.Identity(privKey),
 		libp2p.ListenAddrStrings(listenAddr),    // Listen on TCP
@@ -52,7 +66,8 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 		libp2p.EnableRelayService(),             // Enable circuit relay v2 service
 		libp2p.EnableAutoNATv2(),                // Enable automatic NAT traversal
 		libp2p.EnableRelay(),                    // Enable circuit relay v1 service
-		// libp2p.EnableAutoRelay(),                // Use relays if the node is behind a NAT //BUG: deprecated
+		libp2p.EnableAutoRelayWithStaticRelays(relays),
+		// libp2p.EnableAutoRelay(),                // deprecated
 		// libp2p.EnableAutoRelayWithPeerSource() // TODO:
 		// libp2p.EnableAutoRelayWithStaticRelays(), // TODO:
 
