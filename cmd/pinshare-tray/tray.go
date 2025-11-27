@@ -228,12 +228,19 @@ func (t *Tray) updateStatus() {
 
 		// Check if it's a "service not found" error
 		errStr := err.Error()
-		if contains(errStr, "not found") || contains(errStr, "does not exist") || contains(errStr, "specified service") {
+		if contains(errStr, "not found") || contains(errStr, "does not exist") ||
+		   contains(errStr, "specified service") || contains(errStr, "Access is denied") ||
+		   contains(errStr, "OpenService") {
 			t.menuStatus.SetTitle("Status: Not Installed")
-			systray.SetTooltip("PinShare - Service not installed")
+			systray.SetTooltip("PinShare - Service not installed or access denied")
 		} else {
+			// Show actual error for debugging
 			t.menuStatus.SetTitle("Status: Error")
-			systray.SetTooltip("PinShare - Error checking service")
+			shortErr := errStr
+			if len(shortErr) > 50 {
+				shortErr = shortErr[:50] + "..."
+			}
+			systray.SetTooltip(fmt.Sprintf("PinShare - %s", shortErr))
 		}
 
 		t.menuIPFSStatus.SetTitle("  IPFS: -")
