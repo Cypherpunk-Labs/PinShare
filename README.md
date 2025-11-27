@@ -41,9 +41,37 @@ The lifecycle of a file in PinShare follows these steps:
 ### Prerequisites
 
 -   Go (latest version recommended)
+-   Git
 -   Docker/Podman (latest version recommended)
 -   IPFS Desktop (latest version recommended)
 -   A local installation of Google Chrome or Chromium (required for VirusTotal integration).
+-   ClamAV
+
+#### Windows
+
+- https://git-scm.com/install/windows
+    - https://github.com/git-for-windows/git/releases/download/v2.52.0.windows.1/Git-2.52.0-64-bit.exe
+- https://go.dev/dl/
+    - https://go.dev/dl/go1.25.4.windows-amd64.msi 
+- https://docs.ipfs.tech/install/ipfs-desktop/#windows
+    - https://github.com/ipfs/ipfs-desktop/releases/download/v0.46.1/ipfs-desktop-setup-0.46.1-win-x64.exe
+- https://docs.ipfs.eth.link/install/command-line/#official-distributions
+    - https://dist.ipfs.tech/kubo/v0.38.2/kubo_v0.38.2_windows-amd64.zip
+- https://www.clamav.net/downloads
+    - https://www.clamav.net/downloads/production/clamav-1.5.1.win.x64.msi
+
+set a unique group for testing or isolation 'set PS_GROUPNAME=lab21nov'
+
+#### Linux 
+
+- TODO
+
+set a unique group for testing or isolation  'export PS_GROUPNAME=lab21nov'
+
+#### Macos
+
+- TODO
+
 
 ### Installation
 
@@ -55,7 +83,7 @@ The lifecycle of a file in PinShare follows these steps:
 
 2.  Build the application:
     ```bash
-    go build -o pinshare ./cmd/pinshare
+    go build -o pinshare .
     ```
 
 ### Configuration

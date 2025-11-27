@@ -7,14 +7,19 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/libp2p/go-libp2p"
+
 	// "github.com/libp2p/go-libp2p-core/routing"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	discovery_routing "github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	discovery_util "github.com/libp2p/go-libp2p/p2p/discovery/util"
+	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
 
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/multiformats/go-multiaddr"
@@ -67,7 +72,7 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 				multiaddr.StringCast(publicAddr),
 				multiaddr.StringCast(publicAddrUDP),
 			}
-		}),
+		}), // using this explicitly only includes these addrs, the listenAddr ones are ignored
 
 		libp2p.Identity(privKey),
 		libp2p.ListenAddrStrings(listenAddr),    // Listen on TCP
@@ -80,19 +85,45 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 		libp2p.EnableAutoNATv2(),                // Enable automatic NAT traversal
 		libp2p.EnableRelay(),                    // Enable circuit relay v1 service
 		// libp2p.EnableAutoRelay(),                // Use relays if the node is behind a NAT //BUG: deprecated
-		// libp2p.EnableAutoRelayWithPeerSource() // TODO:
+		// libp2p.EnableAutoRelayWithPeerSource(), // TODO:
 		// libp2p.EnableAutoRelayWithStaticRelays(), // TODO:
 
-		// // as per bryans suggestion
+		// // as per opencode
 		// libp2p.EnableAutoRelayWithPeerSource(
 		// 	func(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
-		// 		return findRelayPeers(ctx, &kadDHT, numPeers)
+		// 		peerChan := make(chan peer.AddrInfo)
+		// 		go func() {
+		// 			defer close(peerChan)
+		// 			// Use DHT to find relay peers
+		// 			routingDiscovery := discovery_routing.NewRoutingDiscovery(kadDHT)
+		// 			relayTopic := "/libp2p/circuit/relay/0.2.0/hop"
+		// 			peerInfoCh, err := util.FindPeers(ctx, routingDiscovery, relayTopic, discovery.Limit(numPeers))
+		// 			if err != nil {
+		// 				return
+		// 			}
+		// 			for _, p := range peerInfoCh {
+		// 				select {
+		// 				case peerChan <- p:
+		// 				case <-ctx.Done():
+		// 					return
+		// 				}
+		// 			}
+		// 		}()
+		// 		return peerChan
 		// 	},
-		// 	autorelay.WithMinCandidates(4),
-		// 	autorelay.WithMaxCandidates(8),
-		// 	autorelay.WithBootDelay(30*time.Second),
-		// 	autorelay.WithMinInterval(time.Minute),
+		// 	autorelay.WithMinInterval(0),
 		// ),
+
+		// as per bryans suggestion
+		libp2p.EnableAutoRelayWithPeerSource(
+			func(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
+				return findRelayPeers(ctx, &kadDHT, numPeers)
+			},
+			autorelay.WithMinCandidates(4),
+			autorelay.WithMaxCandidates(8),
+			autorelay.WithBootDelay(30*time.Second),
+			autorelay.WithMinInterval(time.Minute),
+		),
 
 		// libp2p.EnableAutoRelayWithPeerSource(func(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
 		// 	peerChan := make(chan peer.AddrInfo)
@@ -148,53 +179,53 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 	return h, nil
 }
 
-// // TODO: test this works, it does not :(
-// func findRelayPeers(ctx context.Context, kadDHT **dht.IpfsDHT, numPeers int) <-chan peer.AddrInfo {
-// 	peerChan := make(chan peer.AddrInfo, numPeers)
-// 	go func() {
-// 		defer close(peerChan)
+// TODO: test this works, it does not :(
+func findRelayPeers(ctx context.Context, kadDHT **dht.IpfsDHT, numPeers int) <-chan peer.AddrInfo {
+	peerChan := make(chan peer.AddrInfo, numPeers)
+	go func() {
+		defer close(peerChan)
 
-// 		if *kadDHT == nil {
-// 			fmt.Println("[WARN] findRelayPeers called but DHT is not ready yet.")
-// 			return
-// 		}
+		if *kadDHT == nil {
+			fmt.Println("[WARN] findRelayPeers called but DHT is not ready yet.")
+			return
+		}
 
-// 		routingDiscovery := discovery_routing.NewRoutingDiscovery(*kadDHT)
+		routingDiscovery := discovery_routing.NewRoutingDiscovery(*kadDHT)
 
-// 		// We're looking for relays, so we advertise ourselves as needing a relay
-// 		// and look for peers who provide the relay service.
-// 		// The rendezvous point for circuit relay v2 is "/libp2p/relay"
-// 		rendezvousPoint := "/libp2p/relay"
-// 		fmt.Printf("[INFO] AutoRelay: Finding %d peers for rendezvous point %s\n", numPeers, rendezvousPoint)
+		// We're looking for relays, so we advertise ourselves as needing a relay
+		// and look for peers who provide the relay service.
+		// The rendezvous point for circuit relay v2 is "/libp2p/relay"
+		rendezvousPoint := "/libp2p/relay"
+		fmt.Printf("[INFO] AutoRelay: Finding %d peers for rendezvous point %s\n", numPeers, rendezvousPoint)
 
-// 		// FindPeers will return a channel of peers who are advertising the rendezvous point.
-// 		peerInfoCh, err := discovery_util.FindPeers(ctx, routingDiscovery, rendezvousPoint)
-// 		if err != nil {
-// 			fmt.Printf("[WARN] Failed to find peers for autorelay: %v\n", err)
-// 			return
-// 		}
+		// FindPeers will return a channel of peers who are advertising the rendezvous point.
+		peerInfoCh, err := discovery_util.FindPeers(ctx, routingDiscovery, rendezvousPoint)
+		if err != nil {
+			fmt.Printf("[WARN] Failed to find peers for autorelay: %v\n", err)
+			return
+		}
 
-// 		foundPeers := 0
-// 		for p := range peerInfoCh {
-// 			if p.ID == "" {
-// 				continue
-// 			}
-// 			if foundPeers >= numPeers {
-// 				break
-// 			}
+		foundPeers := 0
+		for _, p := range peerInfoCh {
+			if p.ID == "" {
+				continue
+			}
+			if foundPeers >= numPeers {
+				break
+			}
 
-// 			fmt.Printf("[DEBUG] Found potential relay peer: %s with addrs: %s\n", p.ID.String(), p.Addrs)
-// 			select {
-// 			case peerChan <- p:
-// 				foundPeers++
-// 			case <-ctx.Done():
-// 				return
-// 			}
-// 		}
-// 		fmt.Printf("[INFO] AutoRelay: finished finding peers. Found %d.\n", foundPeers)
-// 	}()
-// 	return peerChan
-// }
+			fmt.Printf("[DEBUG] Found potential relay peer: %s with addrs: %s\n", p.ID.String(), p.Addrs)
+			select {
+			case peerChan <- p:
+				foundPeers++
+			case <-ctx.Done():
+				return
+			}
+		}
+		fmt.Printf("[INFO] AutoRelay: finished finding peers. Found %d.\n", foundPeers)
+	}()
+	return peerChan
+}
 
 // Bootstrap connects to a set of bootstrap peers, primarily the IPFS default ones.
 func Bootstrap(ctx context.Context, h host.Host) {
