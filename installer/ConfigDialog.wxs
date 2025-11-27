@@ -6,6 +6,11 @@
   <Fragment>
     <UI Id="PinShareConfigUI">
 
+      <!-- Define text styles matching WixUI conventions -->
+      <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
+      <TextStyle Id="WixUI_Font_Bold" FaceName="Tahoma" Size="8" Bold="yes" />
+      <TextStyle Id="WixUI_Font_Title" FaceName="Tahoma" Size="9" Bold="yes" />
+
       <!-- PinShare Configuration Dialog - Expanded for better UX -->
       <Dialog Id="PinShareConfigDlg" Width="400" Height="360" Title="[ProductName] Configuration">
         <!-- Banner -->
