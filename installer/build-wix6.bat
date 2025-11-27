@@ -1,11 +1,18 @@
 @echo off
 REM Build script for PinShare Windows Installer using WiX 6
 REM Requires: .NET SDK 6+ and WiX .NET tool
+REM Usage: build-wix6.bat [version]
+REM   version: Optional version string (e.g., 1.2.3). Defaults to 1.0.0
 
 setlocal
 
+REM Get version from command line or use default
+set VERSION=%~1
+if "%VERSION%"=="" set VERSION=1.0.0
+
 echo ===============================================
 echo Building PinShare Windows Installer (WiX 6)
+echo Version: %VERSION%
 echo ===============================================
 echo.
 
@@ -71,9 +78,9 @@ echo All required files found!
 echo Note: UI components temporarily disabled (will be added from infra/refactor)
 echo.
 
-REM Build the MSI using dotnet build
+REM Build the MSI using dotnet build with version
 echo Building MSI package...
-dotnet build PinShare.wixproj -c Release
+dotnet build PinShare.wixproj -c Release -p:ProductVersion=%VERSION%
 if errorlevel 1 (
     echo ERROR: Failed to build MSI package
     exit /b 1
@@ -83,6 +90,7 @@ echo.
 echo ===============================================
 echo Build completed successfully!
 echo ===============================================
+echo Version: %VERSION%
 echo Installer: bin\Release\PinShare-Setup.msi
 echo.
 

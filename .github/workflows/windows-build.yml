@@ -1,0 +1,135 @@
+name: Build Windows Installer
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g., 1.2.3)'
+        required: false
+        default: ''
+
+env:
+  GO_VERSION: '1.21'
+  DOTNET_VERSION: '8.0'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for git describe
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install WiX Toolset
+        run: dotnet tool install --global wix
+
+      - name: Determine version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.event.inputs.version }}" -ne "") {
+            $version = "${{ github.event.inputs.version }}"
+          } elseif ("${{ github.ref_type }}" -eq "tag") {
+            $version = "${{ github.ref_name }}" -replace '^v', ''
+          } else {
+            $desc = git describe --tags --always 2>$null
+            if ($desc) {
+              $version = $desc -replace '^v', ''
+              # Convert v1.0.0-5-gabcdef to 1.0.0.5
+              if ($version -match '^(\d+\.\d+\.\d+)-(\d+)-') {
+                $version = "$($matches[1]).$($matches[2])"
+              }
+            } else {
+              $version = "0.0.0"
+            }
+          }
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          echo "Building version: $version"
+
+      - name: Create dist directory
+        run: New-Item -ItemType Directory -Force -Path dist\windows
+
+      - name: Build PinShare backend
+        env:
+          CGO_ENABLED: 1
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          go build -ldflags "-s -w -X main.Version=${{ steps.version.outputs.VERSION }}" -o dist\windows\pinshare.exe .
+          echo "Built pinshare.exe"
+
+      - name: Build Windows service wrapper
+        env:
+          CGO_ENABLED: 1
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          go build -ldflags "-s -w -X main.Version=${{ steps.version.outputs.VERSION }}" -o dist\windows\pinsharesvc.exe .\cmd\pinsharesvc
+          echo "Built pinsharesvc.exe"
+
+      - name: Build system tray application
+        env:
+          CGO_ENABLED: 1
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          go build -ldflags "-s -w -H windowsgui -X main.Version=${{ steps.version.outputs.VERSION }}" -o dist\windows\pinshare-tray.exe .\cmd\pinshare-tray
+          echo "Built pinshare-tray.exe"
+
+      - name: Download IPFS Kubo
+        shell: pwsh
+        run: |
+          $kuboVersion = "v0.31.0"
+          $url = "https://dist.ipfs.tech/kubo/$kuboVersion/kubo_${kuboVersion}_windows-amd64.zip"
+          Invoke-WebRequest -Uri $url -OutFile kubo.zip
+          Expand-Archive -Path kubo.zip -DestinationPath kubo-temp -Force
+          Copy-Item kubo-temp\kubo\ipfs.exe dist\windows\ipfs.exe
+          Remove-Item kubo.zip
+          Remove-Item kubo-temp -Recurse
+          echo "Downloaded IPFS Kubo $kuboVersion"
+
+      - name: List built binaries
+        run: Get-ChildItem -Path dist\windows\*.exe | Format-Table Name, Length
+
+      - name: Build MSI installer
+        working-directory: installer
+        run: |
+          dotnet build PinShare.wixproj -c Release -p:ProductVersion=${{ steps.version.outputs.VERSION }}
+          echo "Built MSI installer"
+
+      - name: Rename installer with version
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          Copy-Item "installer\bin\Release\PinShare-Setup.msi" "installer\bin\Release\PinShare-$version-Setup.msi"
+
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PinShare-${{ steps.version.outputs.VERSION }}-Setup
+          path: installer/bin/Release/PinShare-${{ steps.version.outputs.VERSION }}-Setup.msi
+
+      - name: Upload to Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            installer/bin/Release/PinShare-${{ steps.version.outputs.VERSION }}-Setup.msi
+          fail_on_unmatched_files: true

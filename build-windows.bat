@@ -13,6 +13,28 @@ REM Get the directory where this script is located
 set SCRIPT_DIR=%~dp0
 set DIST_DIR=%SCRIPT_DIR%dist\windows
 
+REM Get version from git tag or use default
+for /f "tokens=*" %%i in ('git describe --tags --always 2^>nul') do set GIT_VERSION=%%i
+if not defined GIT_VERSION set GIT_VERSION=0.0.0-dev
+
+REM Clean up version string (remove 'v' prefix if present, handle commit suffix)
+set VERSION=%GIT_VERSION%
+if "%VERSION:~0,1%"=="v" set VERSION=%VERSION:~1%
+REM Convert git describe format (v1.0.0-5-gabcdef) to semver-compatible (1.0.0.5)
+for /f "tokens=1,2 delims=-" %%a in ("%VERSION%") do (
+    set BASE_VERSION=%%a
+    set COMMITS=%%b
+)
+if defined COMMITS (
+    REM Has commits after tag, append as build number
+    set VERSION=%BASE_VERSION%.%COMMITS%
+) else (
+    set VERSION=%BASE_VERSION%
+)
+
+echo Version: %VERSION%
+echo.
+
 REM Create dist directory
 if not exist "%DIST_DIR%" mkdir "%DIST_DIR%"
 
@@ -117,7 +139,7 @@ if /i "%BUILD_INSTALLER%"=="Y" (
         exit /b 1
     )
 
-    call build-wix6.bat
+    call build-wix6.bat %VERSION%
     if errorlevel 1 (
         echo ERROR: Installer build failed
         popd
