@@ -27,15 +27,10 @@
     <!-- <Icon Id="PinShareIcon" SourceFile="icon.ico" /> -->
     <!-- <Property Id="ARPPRODUCTICON" Value="PinShareIcon" /> -->
 
-    <!-- UI - Using WixUI_Minimal with custom configuration dialog -->
-    <ui:WixUI Id="WixUI_Minimal" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui" />
-    <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
-
-    <!-- Default property values for configuration -->
-    <Property Id="ORGNAME" Value="MyOrganization" />
-    <Property Id="GROUPNAME" Value="MyGroup" />
-    <Property Id="SKIPVIRUSTOTAL" Value="1" />
-    <Property Id="ENABLECACHE" Value="1" />
+    <!-- UI -->
+    <!-- TEMPORARILY DISABLED: WixUI changed in WiX 4+ -->
+    <!-- <UIRef Id="WixUI_Minimal" /> -->
+    <!-- <WixVariable Id="WixUILicenseRtf" Value="license.rtf" /> -->
 
     <!-- Custom actions -->
     <CustomAction Id="StartService"
@@ -210,11 +205,11 @@
         <RegistryValue Name="PinShareP2PPort" Type="integer" Value="50001" />
         <RegistryValue Name="UIPort" Type="integer" Value="8888" />
 
-        <!-- Configuration - uses values from config dialog -->
-        <RegistryValue Name="OrgName" Type="string" Value="[ORGNAME]" />
-        <RegistryValue Name="GroupName" Type="string" Value="[GROUPNAME]" />
-        <RegistryValue Name="SkipVirusTotal" Type="integer" Value="[SKIPVIRUSTOTAL]" />
-        <RegistryValue Name="EnableCache" Type="integer" Value="[ENABLECACHE]" />
+        <!-- Configuration -->
+        <RegistryValue Name="OrgName" Type="string" Value="MyOrganization" />
+        <RegistryValue Name="GroupName" Type="string" Value="MyGroup" />
+        <RegistryValue Name="SkipVirusTotal" Type="integer" Value="1" />
+        <RegistryValue Name="EnableCache" Type="integer" Value="1" />
         <RegistryValue Name="ArchiveNode" Type="integer" Value="0" />
         <RegistryValue Name="LogLevel" Type="string" Value="info" />
       </RegistryKey>
