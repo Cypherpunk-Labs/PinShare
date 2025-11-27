@@ -41,7 +41,7 @@
     <Property Id="ARCHIVE_NODE" Value="0" Secure="yes" />
     <Property Id="LOG_LEVEL" Value="info" Secure="yes" />
     <!-- Upload directory - defaults to ProgramData\PinShare\upload -->
-    <Property Id="UPLOAD_DIR" Value="[CommonAppDataFolder]PinShare\upload" Secure="yes" />
+    <Property Id="UPLOAD_DIR" Value="C:\ProgramData\PinShare\upload" Secure="yes" />
     <!-- Startup options: 1 = yes, 0 = no -->
     <Property Id="START_SERVICE_NOW" Value="1" Secure="yes" />
     <Property Id="START_TRAY_NOW" Value="1" Secure="yes" />
