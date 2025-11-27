@@ -3,12 +3,18 @@ package main
 import (
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/getlantern/systray"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 )
+
+// contains checks if s contains substr (case-insensitive)
+func contains(s, substr string) bool {
+	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
+}
 
 const (
 	serviceName = "PinShareService"
@@ -137,9 +143,9 @@ func (t *Tray) handleOpenUI() {
 func (t *Tray) handleStartService() {
 	if err := startService(); err != nil {
 		log.Printf("Failed to start service: %v", err)
-		showMessage("Error", fmt.Sprintf("Failed to start service: %v", err))
+		showError("PinShare", fmt.Sprintf("Failed to start service:\n\n%v\n\nNote: You may need to run as Administrator.", err))
 	} else {
-		showMessage("Success", "PinShare service started")
+		showMessage("PinShare", "Service started successfully.")
 		time.Sleep(1 * time.Second)
 		t.updateStatus()
 	}
@@ -149,9 +155,9 @@ func (t *Tray) handleStartService() {
 func (t *Tray) handleStopService() {
 	if err := controlService(svc.Stop); err != nil {
 		log.Printf("Failed to stop service: %v", err)
-		showMessage("Error", fmt.Sprintf("Failed to stop service: %v", err))
+		showError("PinShare", fmt.Sprintf("Failed to stop service:\n\n%v\n\nNote: You may need to run as Administrator.", err))
 	} else {
-		showMessage("Success", "PinShare service stopped")
+		showMessage("PinShare", "Service stopped successfully.")
 		time.Sleep(1 * time.Second)
 		t.updateStatus()
 	}
@@ -162,7 +168,7 @@ func (t *Tray) handleRestartService() {
 	// Stop first
 	if err := controlService(svc.Stop); err != nil {
 		log.Printf("Failed to stop service: %v", err)
-		showMessage("Error", fmt.Sprintf("Failed to stop service: %v", err))
+		showError("PinShare", fmt.Sprintf("Failed to stop service:\n\n%v\n\nNote: You may need to run as Administrator.", err))
 		return
 	}
 
@@ -172,9 +178,9 @@ func (t *Tray) handleRestartService() {
 	// Start again
 	if err := startService(); err != nil {
 		log.Printf("Failed to start service: %v", err)
-		showMessage("Error", fmt.Sprintf("Failed to start service: %v", err))
+		showError("PinShare", fmt.Sprintf("Failed to start service:\n\n%v", err))
 	} else {
-		showMessage("Success", "PinShare service restarted")
+		showMessage("PinShare", "Service restarted successfully.")
 		time.Sleep(1 * time.Second)
 		t.updateStatus()
 	}
@@ -219,17 +225,25 @@ func (t *Tray) updateStatus() {
 	if err != nil {
 		t.lastError = err
 		t.serviceRunning = false
-		t.menuStatus.SetTitle("Status: Error")
-		t.menuIPFSStatus.SetTitle("  IPFS: Unknown")
-		t.menuPinShareStatus.SetTitle("  PinShare: Unknown")
-		t.menuPeersStatus.SetTitle("  Peers: Unknown")
 
-		// Enable start, disable stop
+		// Check if it's a "service not found" error
+		errStr := err.Error()
+		if contains(errStr, "not found") || contains(errStr, "does not exist") || contains(errStr, "specified service") {
+			t.menuStatus.SetTitle("Status: Not Installed")
+			systray.SetTooltip("PinShare - Service not installed")
+		} else {
+			t.menuStatus.SetTitle("Status: Error")
+			systray.SetTooltip("PinShare - Error checking service")
+		}
+
+		t.menuIPFSStatus.SetTitle("  IPFS: -")
+		t.menuPinShareStatus.SetTitle("  PinShare: -")
+		t.menuPeersStatus.SetTitle("  Peers: -")
+
+		// Enable start (to allow install attempt), disable stop
 		t.menuStart.Enable()
 		t.menuStop.Disable()
 		t.menuRestart.Disable()
-
-		systray.SetTooltip("PinShare - Service not running")
 		return
 	}
 

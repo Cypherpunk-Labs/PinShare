@@ -7,8 +7,22 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"syscall"
+	"unsafe"
 
 	"github.com/getlantern/systray"
+)
+
+var (
+	user32           = syscall.NewLazyDLL("user32.dll")
+	procMessageBoxW  = user32.NewProc("MessageBoxW")
+)
+
+const (
+	MB_OK              = 0x00000000
+	MB_ICONINFORMATION = 0x00000040
+	MB_ICONERROR       = 0x00000010
+	MB_ICONWARNING     = 0x00000030
 )
 
 func main() {
@@ -68,13 +82,6 @@ func loadIcon() ([]byte, error) {
 // getDefaultIcon returns a valid 16x16 blue square icon in ICO format
 func getDefaultIcon() []byte {
 	// This is a valid ICO file with a 16x16 32-bit RGBA blue icon
-	// ICO Header: 6 bytes
-	// ICO Directory Entry: 16 bytes
-	// BMP Info Header: 40 bytes
-	// Pixel Data: 16x16x4 = 1024 bytes (BGRA format, bottom-up)
-	// AND Mask: 16x2 = 64 bytes (1-bit per pixel, padded to DWORD)
-
-	// Pre-generated valid ICO file data for a blue square icon
 	iconData := make([]byte, 0, 1150)
 
 	// ICO Header (6 bytes)
@@ -112,31 +119,23 @@ func getDefaultIcon() []byte {
 	)
 
 	// Pixel data: 16x16 pixels, BGRA format, bottom-up
-	// Create a blue "P" shape on transparent background
 	for row := 0; row < 16; row++ {
 		for col := 0; col < 16; col++ {
-			// Flip row for bottom-up format
 			y := 15 - row
-
-			// Draw a simple "P" shape or filled square with border
 			isEdge := col == 0 || col == 15 || y == 0 || y == 15
 			isInner := col >= 2 && col <= 13 && y >= 2 && y <= 13
 
 			if isEdge {
-				// Dark blue border: BGRA
 				iconData = append(iconData, 0x80, 0x40, 0x00, 0xFF) // Dark blue
 			} else if isInner {
-				// Light blue fill: BGRA
 				iconData = append(iconData, 0xFF, 0x99, 0x33, 0xFF) // Bright blue
 			} else {
-				// Transparent
-				iconData = append(iconData, 0x00, 0x00, 0x00, 0x00)
+				iconData = append(iconData, 0x00, 0x00, 0x00, 0x00) // Transparent
 			}
 		}
 	}
 
-	// AND mask: 16 rows, each row is 2 bytes (16 bits) + 2 bytes padding = 4 bytes
-	// All 0s = fully opaque (when combined with 32-bit alpha)
+	// AND mask
 	for i := 0; i < 16; i++ {
 		iconData = append(iconData, 0x00, 0x00, 0x00, 0x00)
 	}
@@ -160,12 +159,26 @@ func openBrowser(url string) error {
 	return cmd.Start()
 }
 
-// showMessage shows a system notification
+// showMessage shows a Windows message box
 func showMessage(title, message string) {
-	// On Windows, we can use systray tooltips or external notification tools
-	// For now, just log it
 	log.Printf("%s: %s", title, message)
+	showMessageBox(title, message, MB_OK|MB_ICONINFORMATION)
+}
 
-	// Update tooltip temporarily
-	systray.SetTooltip(fmt.Sprintf("PinShare - %s", message))
+// showError shows a Windows error message box
+func showError(title, message string) {
+	log.Printf("ERROR - %s: %s", title, message)
+	showMessageBox(title, message, MB_OK|MB_ICONERROR)
+}
+
+// showMessageBox displays a Windows MessageBox
+func showMessageBox(title, message string, flags uint32) {
+	titlePtr, _ := syscall.UTF16PtrFromString(title)
+	messagePtr, _ := syscall.UTF16PtrFromString(message)
+	procMessageBoxW.Call(
+		0,
+		uintptr(unsafe.Pointer(messagePtr)),
+		uintptr(unsafe.Pointer(titlePtr)),
+		uintptr(flags),
+	)
 }
