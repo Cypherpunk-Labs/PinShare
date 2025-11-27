@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"sync"
 
 	"github.com/libp2p/go-libp2p"
@@ -14,11 +15,55 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
+	ma "github.com/multiformats/go-multiaddr"
 	// "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	// "[github.com/libp2p/go-libp2p/p2p/discovery/mdns](https://github.com/libp2p/go-libp2p/p2p/discovery/mdns)" // Optional: for local discovery
 )
 
 const DirectMessageProtocolID = "/pinshare/dm/1.0.0"
+
+// getDefaultRelays returns a list of default relay addresses for AutoRelay
+func getDefaultRelays() []peer.AddrInfo {
+	relayStrings := []string{
+		"/ip4/147.75.109.203/udp/4001/quic-v1/p2p/12D3KooWGuQqK9KWNngw9ufX6ecWZ6HNsY19wFeFCpxU5DZcXFRa",
+		"/ip4/147.75.109.203/tcp/4001/p2p/12D3KooWGuQqK9KWNngw9ufX6ecWZ6HNsY19wFeFCpxU5DZcXFRa",
+		"/ip4/147.75.109.205/udp/4001/quic-v1/p2p/12D3KooWNK9R8X4kJhbpDz7KJkPCXZvXnA57wnhzZucc583NBmK9",
+		"/ip4/147.75.109.205/tcp/4001/p2p/12D3KooWNK9R8X4kJhbpDz7KJkPCXZvXnA57wnhzZucc583NBmK9",
+		"/ip4/147.75.109.133/udp/4001/quic-v1/p2p/12D3KooWL9xjPVXE8XKnNq9k2MBM3isj4NtKe4E1ApX5i6N1KGt8",
+		"/ip4/147.75.109.133/tcp/4001/p2p/12D3KooWL9xjPVXE8XKnNq9k2MBM3isj4NtKe4E1ApX5i6N1KGt8",
+	}
+
+	var relays []peer.AddrInfo
+	for _, relayStr := range relayStrings {
+		addr, err := ma.NewMultiaddr(relayStr)
+		if err != nil {
+			continue
+		}
+		peerInfo, err := peer.AddrInfoFromP2pAddr(addr)
+		if err != nil {
+			continue
+		}
+		relays = append(relays, *peerInfo)
+	}
+	return relays
+}
+
+// isLocalAddress checks if a multiaddress is a local network address
+// that may not be dialable from containers
+func isLocalAddress(addr ma.Multiaddr) bool {
+	addrStr := addr.String()
+
+	// Check for localhost addresses
+	if strings.Contains(addrStr, "127.0.0.1") ||
+		strings.Contains(addrStr, "localhost") ||
+		strings.Contains(addrStr, "10.") ||
+		strings.Contains(addrStr, "192.168.") ||
+		(strings.Contains(addrStr, "172.") && len(addrStr) > 7 &&
+			addrStr[7] >= '1' && addrStr[7] <= '3') {
+		return true
+	}
+	return false
+}
 
 // NewHost creates a new libp2p host with DHT and attempts to bootstrap.
 func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, error) {
@@ -41,56 +86,35 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 	// For QUIC (UDP), you might use:
 	listenAddrUDP := fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1", dynport)
 
+	// Create the DHT first so we can reference it in AutoRelay
+	var kadDHT *dht.IpfsDHT
 	h, err := libp2p.New(
 		libp2p.Identity(privKey),
-		libp2p.ListenAddrStrings(listenAddr),    // Listen on TCP
-		libp2p.ListenAddrStrings(listenAddrUDP), // Optionally listen on QUIC
-		libp2p.DefaultSecurity,                  // Use default security transports (TLS, Noise)
-		libp2p.DefaultMuxers,                    // Use default stream multiplexers (mplex, yamux)
-		libp2p.NATPortMap(),                     // Attempt to open ports using uPNP for NATed environments
-		libp2p.EnableHolePunching(),             // Enable hole punching for NAT traversal
-		libp2p.EnableRelayService(),             // Enable circuit relay v2 service
-		libp2p.EnableAutoNATv2(),                // Enable automatic NAT traversal
-		libp2p.EnableRelay(),                    // Enable circuit relay v1 service
-		// libp2p.EnableAutoRelay(),                // Use relays if the node is behind a NAT //BUG: deprecated
-		// libp2p.EnableAutoRelayWithPeerSource() // TODO:
-		// libp2p.EnableAutoRelayWithStaticRelays(), // TODO:
-
-		// libp2p.EnableAutoRelayWithPeerSource(func(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
-		// 	peerChan := make(chan peer.AddrInfo)
-		// 	go func() {
-		// 		defer close(peerChan)
-		// 		if kadDHT == nil {
-		// 			//bug: only ever hits this section, need to pass in the DHT properly //TODO:
-		// 			fmt.Println("[WARN] AutoRelay peer source called but DHT is not ready yet.")
-		// 			return
-		// 		}
-
-		// 		routingDiscovery := discovery_routing.NewRoutingDiscovery(kadDHT)
-
-		// 		relayTopic := MetadataTopicID                                                            // "/libp2p/circuit/relay/0.2.0/hop"                                          //
-		// 		peerInfoCh, err := util.FindPeers(ctx, routingDiscovery, relayTopic, discovery.Limit(1)) //TODO: need different or no topic or use ipfs network to find relay
-		// 		if err != nil {
-		// 			fmt.Printf("[WARN] Failed to find peers for autorelay: %v\n", err)
-		// 			return
-		// 		}
-
-		// 		for p := range peerInfoCh {
-		// 			fmt.Printf("[DEBUG] Found %s peers for autorelay.\n", peerInfoCh[p].Addrs)
-		// 			select {
-		// 			case peerChan <- peerInfoCh[p]:
-		// 			case <-ctx.Done():
-		// 				return
-		// 			}
-		// 		}
-		// 	}()
-		// 	fmt.Println("[INFO] AutoRelay completed call.")
-		// 	return peerChan
-		// }),
-
-		libp2p.EnableNATService(), // Help other peers discover their public address
+		libp2p.ListenAddrStrings(listenAddr),                       // Listen on TCP
+		libp2p.ListenAddrStrings(listenAddrUDP),                    // Optionally listen on QUIC
+		libp2p.DefaultSecurity,                                     // Use default security transports (TLS, Noise)
+		libp2p.DefaultMuxers,                                       // Use default stream multiplexers (mplex, yamux)
+		libp2p.NATPortMap(),                                        // Attempt to open ports using uPNP for NATed environments
+		libp2p.EnableNATService(),                                  // Help other peers discover their public address
+		libp2p.EnableHolePunching(),                                // Enable hole punching for NAT traversal
+		libp2p.EnableRelay(),                                       // Enable circuit relay v1 client
+		libp2p.EnableRelayService(),                                // Enable circuit relay v2 service
+		libp2p.EnableAutoNATv2(),                                   // Enable automatic NAT traversal
+		libp2p.EnableAutoRelayWithStaticRelays(getDefaultRelays()), // Use default relays if the node is behind a NAT
+		libp2p.AddrsFactory(func(addrs []ma.Multiaddr) []ma.Multiaddr {
+			// Filter out local addresses that aren't dialable from containers
+			var dialableAddrs []ma.Multiaddr
+			for _, addr := range addrs {
+				// Skip localhost and local network addresses in container environments
+				if !isLocalAddress(addr) {
+					dialableAddrs = append(dialableAddrs, addr)
+				}
+			}
+			return dialableAddrs
+		}),
 		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
-			kadDHT, err := dht.New(ctx, h, dht.Mode(dht.ModeAutoServer)) // was dht.ModeServer
+			var err error
+			kadDHT, err = dht.New(ctx, h, dht.Mode(dht.ModeAutoServer))
 			if err != nil {
 				return nil, fmt.Errorf("failed to create DHT: %w", err)
 			}

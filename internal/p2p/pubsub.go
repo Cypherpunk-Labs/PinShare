@@ -18,6 +18,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	discovery_routing "github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	ma "github.com/multiformats/go-multiaddr"
 )
 
 type PubSubConfig struct {
@@ -172,12 +173,31 @@ func (d *PubSubManager) DiscoverPeers(ctx context.Context, findPeersInterval tim
 					continue
 				}
 
-				if d.host.Network().Connectedness(peerInfo.ID) != network.Connected {
-					fmt.Printf("[PUBSUB] Found new peer %s for topic %s. Attempting to connect.\n     multi-addr: %s \n", peerInfo.ID.String(), d.psc.TopicID, peerInfo.Addrs)
-					if err := d.host.Connect(ctx, peerInfo); err != nil {
-						// fmt.Printf("[PUBSUB WARN] Failed to connect to discovered peer %s: %v\n", peerInfo.ID.String(), err)
+				// Filter out local addresses that aren't dialable from containers
+				var dialableAddrs []ma.Multiaddr
+				for _, addr := range peerInfo.Addrs {
+					if !isLocalAddress(addr) {
+						dialableAddrs = append(dialableAddrs, addr)
+					}
+				}
+
+				// Skip peer if no dialable addresses remain
+				if len(dialableAddrs) == 0 {
+					continue
+				}
+
+				// Create a new peer info with only dialable addresses
+				dialablePeerInfo := peer.AddrInfo{
+					ID:    peerInfo.ID,
+					Addrs: dialableAddrs,
+				}
+
+				if d.host.Network().Connectedness(dialablePeerInfo.ID) != network.Connected {
+					fmt.Printf("[PUBSUB] Found new peer %s for topic %s. Attempting to connect.\n     multi-addr: %s \n", dialablePeerInfo.ID.String(), d.psc.TopicID, dialablePeerInfo.Addrs)
+					if err := d.host.Connect(ctx, dialablePeerInfo); err != nil {
+						fmt.Printf("[PUBSUB WARN] Failed to connect to discovered peer %s: %v\n", dialablePeerInfo.ID.String(), err)
 					} else {
-						fmt.Printf("[PUBSUB] Successfully connected to peer %s for topic %s.\n", peerInfo.ID.String(), d.psc.TopicID)
+						fmt.Printf("[PUBSUB] Successfully connected to peer %s for topic %s.\n", dialablePeerInfo.ID.String(), d.psc.TopicID)
 					}
 				}
 			}
