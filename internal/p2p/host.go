@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	ma "github.com/multiformats/go-multiaddr"
 	// "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	// "[github.com/libp2p/go-libp2p/p2p/discovery/mdns](https://github.com/libp2p/go-libp2p/p2p/discovery/mdns)" // Optional: for local discovery
@@ -42,12 +43,12 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 
 	ourlistenAddrs := []string{
 		fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", dynport),
-		fmt.Sprintf("/ip4/0.0.0.0/tcp/%d/wss", dynport),
+		fmt.Sprintf("/ip4/0.0.0.0/tcp/%d/ws", dynport),
 		fmt.Sprintf("/ip4/0.0.0.0/udp/%d/webrtc-direct", dynport),
 		fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1", dynport),
 		fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1/webtransport", dynport),
 		fmt.Sprintf("/ip6/::/tcp/%d", dynport),
-		fmt.Sprintf("/ip6/::/tcp/%d/wss", dynport),
+		fmt.Sprintf("/ip6/::/tcp/%d/ws", dynport),
 		fmt.Sprintf("/ip6/::/udp/%d/webrtc-direct", dynport),
 		fmt.Sprintf("/ip6/::/udp/%d/quic-v1", dynport),
 		fmt.Sprintf("/ip6/::/udp/%d/quic-v1/webtransport", dynport),
@@ -67,16 +68,29 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 		return nil, fmt.Errorf("no valid bootstrap relays")
 	}
 
+	// announceAddrs, err := getAnnounceAddrs()
+	// if err != nil {
+	// 	fmt.Printf("[WARN] Could not get announce addresses: %v\n", err)
+	// }
+
 	opts := []libp2p.Option{
 		libp2p.Identity(privKey),
 		libp2p.ListenAddrStrings(ourlistenAddrs...), // Listen on TCP
-		libp2p.DefaultSecurity,                      // Use default security transports (TLS, Noise)
-		libp2p.DefaultMuxers,                        // Use default stream multiplexers (mplex, yamux)
-		libp2p.NATPortMap(),                         // Attempt to open ports using uPNP for NATed environments
-		libp2p.EnableHolePunching(),                 // Enable hole punching for NAT traversal
-		libp2p.EnableRelayService(),                 // Enable circuit relay v2 service
-		libp2p.EnableAutoNATv2(),                    // Enable automatic NAT traversal
-		libp2p.EnableRelay(),                        // Enable circuit relay v1 client
+		libp2p.AddrsFactory(func(addrs []ma.Multiaddr) []ma.Multiaddr {
+			return addrs
+			// return append(addrs, announceAddrs...)
+			// return []multiaddr.Multiaddr{
+			// 	multiaddr.StringCast(publicAddr),
+			// 	multiaddr.StringCast(publicAddrUDP),
+			// }
+		}),
+		libp2p.DefaultSecurity,      // Use default security transports (TLS, Noise)
+		libp2p.DefaultMuxers,        // Use default stream multiplexers (mplex, yamux)
+		libp2p.NATPortMap(),         // Attempt to open ports using uPNP for NATed environments
+		libp2p.EnableHolePunching(), // Enable hole punching for NAT traversal
+		libp2p.EnableRelayService(), // Enable circuit relay v2 service
+		libp2p.EnableAutoNATv2(),    // Enable automatic NAT traversal
+		libp2p.EnableRelay(),        // Enable circuit relay v1 client
 		// libp2p.EnableAutoRelayWithStaticRelays(relays), //TODO add feature flag to control this option.
 		// libp2p.EnableAutoRelay(),                // deprecated
 		// libp2p.EnableAutoRelayWithPeerSource() // TODO:
@@ -111,12 +125,16 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 		// }),
 
 		libp2p.EnableNATService(), // Help other peers discover their public address
-
+		libp2p.EnableAutoRelayWithStaticRelays(relays),
+		// libp2p.Transport(websocket.New),
+		libp2p.Transport(tcp.NewTCPTransport),
+		// libp2p.Transport(libp2pquic.NewTransport),
+		// libp2p.Transport(libp2pwebrtc.New),
 	}
 
 	if isContainerEnvironment() {
 		opts = append(opts,
-			libp2p.EnableAutoRelayWithStaticRelays(relays),
+			// libp2p.EnableAutoRelayWithStaticRelays(relays),
 			libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 				kadDHT, err := dht.New(ctx, h, dht.Mode(dht.ModeClient))
 				if err != nil {
