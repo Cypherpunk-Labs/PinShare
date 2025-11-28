@@ -17,11 +17,13 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
-	discovery_routing "github.com/libp2p/go-libp2p/p2p/discovery/routing"
-	discovery_util "github.com/libp2p/go-libp2p/p2p/discovery/util"
-	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
-
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
+	libp2pquic "github.com/libp2p/go-libp2p/p2p/transport/quic"
+	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
+	libp2pwebrtc "github.com/libp2p/go-libp2p/p2p/transport/webrtc"
+	"github.com/libp2p/go-libp2p/p2p/transport/websocket"
+	// ??p2p-circuit
 	// "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	// "[github.com/libp2p/go-libp2p/p2p/discovery/mdns](https://github.com/libp2p/go-libp2p/p2p/discovery/mdns)" // Optional: for local discovery
 )
@@ -46,9 +48,26 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 		break
 	}
 
-	listenAddr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", dynport)
-	// For QUIC (UDP), you might use:
-	listenAddrUDP := fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1", dynport)
+	ourlistenAddrs := []string{
+		fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", dynport),
+		fmt.Sprintf("/ip4/0.0.0.0/udp/%d/webrtc-direct", dynport),
+		fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1", dynport),
+		fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1/webtransport", dynport),
+		// "/ip4/0.0.0.0/tcp/4001",
+		// "/ip6/::/tcp/4001",
+		// "/ip4/0.0.0.0/udp/4001/webrtc-direct",
+		// "/ip4/0.0.0.0/udp/4001/quic-v1",
+		// "/ip4/0.0.0.0/udp/4001/quic-v1/webtransport",
+		// "/ip6/::/udp/4001/webrtc-direct",
+		// "/ip6/::/udp/4001/quic-v1",
+		// "/ip6/::/udp/4001/quic-v1/webtransport",
+	}
+
+	// listenAddr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", dynport)
+	// // For QUIC (UDP), you might use:
+	// listenAddrUDP := fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1", dynport)
+	// listenAddrWebRTC := fmt.Sprintf("/ip4/0.0.0.0/udp/%d/webrtc-direct", dynport)
+	// listenAddrwebTransport := fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1/webtransport", dynport)
 
 	// TODO: make a webcall to find our public IP then setup variables
 	resp, err := http.Get("https://ifconfig.me/ip")
@@ -74,18 +93,37 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 		// }), // using this explicitly only includes these addrs, the listenAddr ones are ignored.
 		// // ok lets try adding these into the listenaddr instead
 
+		// // opencode suggested
+		// libp2p.AddrsFactory(func(addrs []multiaddr.Multiaddr) []multiaddr.Multiaddr {
+		// 	var result []multiaddr.Multiaddr
+		// 	for _, addr := range addrs {
+		// 		// Filter out private addresses in container environments
+		// 		if !isPrivateAddress(addr) {
+		// 			result = append(result, addr)
+		// 		}
+		// 	}
+		// 	// Add public announce addresses if configured
+		// 	if len(announceAddrs) > 0 {
+		// 		result = append(result, announceAddrs...)
+		// 	}
+		// 	return result
+		// }),
+
 		libp2p.Identity(privKey),
-		libp2p.ListenAddrStrings(listenAddr),    // Listen on TCP
-		libp2p.ListenAddrStrings(listenAddrUDP), // Optionally listen on QUIC
+		libp2p.ListenAddrStrings(ourlistenAddrs...),
+		// libp2p.ListenAddrStrings(listenAddrWebRTC),
+		// libp2p.ListenAddrStrings(listenAddrwebTransport),
+		// libp2p.ListenAddrStrings(listenAddr),    // Listen on TCP
+		// libp2p.ListenAddrStrings(listenAddrUDP), // Optionally listen on QUIC
 		libp2p.ListenAddrStrings(publicAddr),
 		libp2p.ListenAddrStrings(publicAddrUDP),
 		libp2p.DefaultSecurity,      // Use default security transports (TLS, Noise)
 		libp2p.DefaultMuxers,        // Use default stream multiplexers (mplex, yamux)
 		libp2p.NATPortMap(),         // Attempt to open ports using uPNP for NATed environments
 		libp2p.EnableHolePunching(), // Enable hole punching for NAT traversal
+		libp2p.EnableRelay(),        // Enable circuit relay v1 service
 		libp2p.EnableRelayService(), // Enable circuit relay v2 service
 		libp2p.EnableAutoNATv2(),    // Enable automatic NAT traversal
-		libp2p.EnableRelay(),        // Enable circuit relay v1 service
 		// libp2p.EnableAutoRelay(),                // Use relays if the node is behind a NAT //BUG: deprecated
 		// libp2p.EnableAutoRelayWithPeerSource(), // TODO:
 		// libp2p.EnableAutoRelayWithStaticRelays(), // TODO:
@@ -99,17 +137,28 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 		// 			// Use DHT to find relay peers
 		// 			routingDiscovery := discovery_routing.NewRoutingDiscovery(kadDHT)
 		// 			relayTopic := "/libp2p/circuit/relay/0.2.0/hop"
+		// 			fmt.Printf("[INFO] AutoRelay1: Finding %d peers for rendezvous point %s\n", numPeers, relayTopic)
 		// 			peerInfoCh, err := util.FindPeers(ctx, routingDiscovery, relayTopic, discovery.Limit(numPeers))
 		// 			if err != nil {
 		// 				return
 		// 			}
+		// 			foundPeers := 0
 		// 			for _, p := range peerInfoCh {
+		// 				if p.ID == "" {
+		// 					continue
+		// 				}
+		// 				if foundPeers >= numPeers {
+		// 					break
+		// 				}
+		// 				fmt.Printf("[DEBUG] AutoRelay1: Found potential relay peer: %s with addrs: %s\n", p.ID.String(), p.Addrs)
 		// 				select {
 		// 				case peerChan <- p:
+		// 					foundPeers++
 		// 				case <-ctx.Done():
 		// 					return
 		// 				}
 		// 			}
+		// 			fmt.Printf("[INFO] AutoRelay1: finished finding peers. Found %d.\n", foundPeers)
 		// 		}()
 		// 		return peerChan
 		// 	},
@@ -119,7 +168,7 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 		// as per bryans suggestion
 		libp2p.EnableAutoRelayWithPeerSource(
 			func(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
-				return findRelayPeers(ctx, &kadDHT, numPeers)
+				return findRelayPeers(ctx, kadDHT, numPeers)
 			},
 			autorelay.WithMinCandidates(4),
 			autorelay.WithMaxCandidates(8),
@@ -168,6 +217,13 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 			}
 			return kadDHT, nil
 		}),
+		libp2p.Transport(websocket.New),
+		libp2p.Transport(tcp.NewTCPTransport),
+		libp2p.Transport(libp2pquic.NewTransport),
+		// libp2p.Transport(libp2prelay.New),
+		libp2p.Transport(libp2pwebrtc.New),
+		// libp2p.ShareTCPListener(), //deprecated
+		// libp2p.Defaults,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create libp2p host: %w", err)
@@ -181,51 +237,103 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 	return h, nil
 }
 
-// TODO: test this works, it does not :(
-func findRelayPeers(ctx context.Context, kadDHT **dht.IpfsDHT, numPeers int) <-chan peer.AddrInfo {
+// // TODO: test this works, it does not :(
+// func findRelayPeers(ctx context.Context, kadDHT **dht.IpfsDHT, numPeers int) <-chan peer.AddrInfo {
+// 	peerChan := make(chan peer.AddrInfo, numPeers)
+// 	go func() {
+// 		defer close(peerChan)
+
+// 		if *kadDHT == nil {
+// 			fmt.Println("[WARN] findRelayPeers called but DHT is not ready yet.")
+// 			return
+// 		}
+
+// 		routingDiscovery := discovery_routing.NewRoutingDiscovery(*kadDHT)
+
+// 		// We're looking for relays, so we advertise ourselves as needing a relay
+// 		// and look for peers who provide the relay service.
+// 		// The rendezvous point for circuit relay v2 is "/libp2p/relay"
+// 		rendezvousPoint := "/libp2p/relay"
+// 		fmt.Printf("[INFO] AutoRelay: Finding %d peers for rendezvous point %s\n", numPeers, rendezvousPoint)
+
+// 		// FindPeers will return a channel of peers who are advertising the rendezvous point.
+// 		peerInfoCh, err := discovery_util.FindPeers(ctx, routingDiscovery, rendezvousPoint)
+// 		if err != nil {
+// 			fmt.Printf("[WARN] Failed to find peers for autorelay: %v\n", err)
+// 			return
+// 		}
+
+// 		foundPeers := 0
+// 		for _, p := range peerInfoCh {
+// 			if p.ID == "" {
+// 				continue
+// 			}
+// 			if foundPeers >= numPeers {
+// 				break
+// 			}
+
+// 			fmt.Printf("[DEBUG] AutoRelay: Found potential relay peer: %s with addrs: %s\n", p.ID.String(), p.Addrs)
+// 			select {
+// 			case peerChan <- p:
+// 				foundPeers++
+// 			case <-ctx.Done():
+// 				return
+// 			}
+// 		}
+// 		fmt.Printf("[INFO] AutoRelay: finished finding peers. Found %d.\n", foundPeers)
+// 	}()
+// 	return peerChan
+// }
+
+// bryans version
+func findRelayPeers(ctx context.Context, kadDHT *dht.IpfsDHT, numPeers int) <-chan peer.AddrInfo {
 	peerChan := make(chan peer.AddrInfo, numPeers)
+
 	go func() {
 		defer close(peerChan)
 
-		if *kadDHT == nil {
-			fmt.Println("[WARN] findRelayPeers called but DHT is not ready yet.")
-			return
-		}
-
-		routingDiscovery := discovery_routing.NewRoutingDiscovery(*kadDHT)
-
-		// We're looking for relays, so we advertise ourselves as needing a relay
-		// and look for peers who provide the relay service.
-		// The rendezvous point for circuit relay v2 is "/libp2p/relay"
-		rendezvousPoint := "/libp2p/relay"
-		fmt.Printf("[INFO] AutoRelay: Finding %d peers for rendezvous point %s\n", numPeers, rendezvousPoint)
-
-		// FindPeers will return a channel of peers who are advertising the rendezvous point.
-		peerInfoCh, err := discovery_util.FindPeers(ctx, routingDiscovery, rendezvousPoint)
-		if err != nil {
-			fmt.Printf("[WARN] Failed to find peers for autorelay: %v\n", err)
-			return
-		}
-
-		foundPeers := 0
-		for _, p := range peerInfoCh {
-			if p.ID == "" {
-				continue
-			}
-			if foundPeers >= numPeers {
-				break
-			}
-
-			fmt.Printf("[DEBUG] Found potential relay peer: %s with addrs: %s\n", p.ID.String(), p.Addrs)
-			select {
-			case peerChan <- p:
-				foundPeers++
-			case <-ctx.Done():
+		// Wait for DHT to be ready
+		if kadDHT == nil {
+			fmt.Println("[RELAY] DHT not initialized yet, waiting...")
+			time.Sleep(5 * time.Second)
+			if kadDHT == nil {
+				fmt.Println("[RELAY] DHT still not ready, aborting relay peer discovery")
 				return
 			}
 		}
-		fmt.Printf("[INFO] AutoRelay: finished finding peers. Found %d.\n", foundPeers)
+
+		fmt.Printf("[RELAY] Looking for %d relay candidates from DHT...\n", numPeers)
+
+		// Get connected peers from the DHT routing table
+		peers := kadDHT.RoutingTable().ListPeers()
+		found := 0
+
+		for _, p := range peers {
+			if found >= numPeers {
+				break
+			}
+
+			// Get peer's addresses from peerstore
+			addrs := kadDHT.Host().Peerstore().Addrs(p)
+			if len(addrs) > 0 {
+				peerInfo := peer.AddrInfo{
+					ID:    p,
+					Addrs: addrs,
+				}
+
+				select {
+				case peerChan <- peerInfo:
+					found++
+					fmt.Printf("[RELAY] Found relay candidate: %s\n", p.String())
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+
+		fmt.Printf("[RELAY] Relay peer discovery complete: found %d candidates\n", found)
 	}()
+
 	return peerChan
 }
 
