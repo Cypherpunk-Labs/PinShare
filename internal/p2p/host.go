@@ -16,7 +16,10 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
+	libp2pquic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
+	libp2pwebrtc "github.com/libp2p/go-libp2p/p2p/transport/webrtc"
+	"github.com/libp2p/go-libp2p/p2p/transport/websocket"
 	ma "github.com/multiformats/go-multiaddr"
 	// "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	// "[github.com/libp2p/go-libp2p/p2p/discovery/mdns](https://github.com/libp2p/go-libp2p/p2p/discovery/mdns)" // Optional: for local discovery
@@ -68,7 +71,7 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 		return nil, fmt.Errorf("no valid bootstrap relays")
 	}
 
-	// announceAddrs, err := getAnnounceAddrs()
+	// announceAddrs, err := getAnnounceAddrs() // why did it bother to suggest placeholder shiz
 	// if err != nil {
 	// 	fmt.Printf("[WARN] Could not get announce addresses: %v\n", err)
 	// }
@@ -125,16 +128,27 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 		// }),
 
 		libp2p.EnableNATService(), // Help other peers discover their public address
-		libp2p.EnableAutoRelayWithStaticRelays(relays),
-		// libp2p.Transport(websocket.New),
-		libp2p.Transport(tcp.NewTCPTransport),
-		// libp2p.Transport(libp2pquic.NewTransport),
-		// libp2p.Transport(libp2pwebrtc.New),
+	}
+
+	if appconfInstance.FFTransportWS {
+		opts = append(opts, libp2p.Transport(websocket.New))
+	}
+	if appconfInstance.FFTransportTCP {
+		opts = append(opts, libp2p.Transport(tcp.NewTCPTransport))
+	}
+	if appconfInstance.FFTransportQUIC {
+		opts = append(opts, libp2p.Transport(libp2pquic.NewTransport))
+	}
+	if appconfInstance.FFTransportWEBRTC {
+		opts = append(opts, libp2p.Transport(libp2pwebrtc.New))
+	}
+
+	if appconfInstance.FFP2Pcircuit {
+		opts = append(opts, libp2p.EnableAutoRelayWithStaticRelays(relays))
 	}
 
 	if isContainerEnvironment() {
 		opts = append(opts,
-			// libp2p.EnableAutoRelayWithStaticRelays(relays),
 			libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
 				kadDHT, err := dht.New(ctx, h, dht.Mode(dht.ModeClient))
 				if err != nil {

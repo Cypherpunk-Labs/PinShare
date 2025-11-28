@@ -30,6 +30,11 @@ const (
 	defaultFFSendFileVT              = false // PS_FF_SENDFILE_VT
 	defaultFFSkipVT                  = false // PS_FF_SKIP_VT
 	defaultFFIgnoreUploadsInMetadata = true  // PS_FF_IGNORE_UPLOADS_IN_METADATA
+	defaultFFP2Pcircuit              = true  // PS_FF_P2PCIRCUIT
+	defaultFFTransportWS             = true  // PS_FF_TRNSPT_WS
+	defaultFFTransportTCP            = true  // PS_FF_TRNSPT_TCP
+	defaultFFTransportQUIC           = true  // PS_FF_TRNSPT_QUIC
+	defaultFFTransportWEBRTC         = true  // PS_FF_TRNSPT_WEBRTC
 )
 
 // AppConfig holds all configuration for the application.
@@ -52,6 +57,11 @@ type AppConfig struct {
 	FFSendFileVT              bool
 	FFSkipVT                  bool
 	FFIgnoreUploadsInMetadata bool
+	FFP2Pcircuit              bool
+	FFTransportWS             bool
+	FFTransportTCP            bool
+	FFTransportQUIC           bool
+	FFTransportWEBRTC         bool
 }
 
 // LoadConfig loads configuration from environment variables, falling back to defaults.
@@ -77,6 +87,11 @@ func LoadConfig() (*AppConfig, error) {
 		FFSendFileVT:              defaultFFSendFileVT,
 		FFSkipVT:                  defaultFFSkipVT,
 		FFIgnoreUploadsInMetadata: defaultFFIgnoreUploadsInMetadata,
+		FFP2Pcircuit:              defaultFFP2Pcircuit,
+		FFTransportWS:             defaultFFTransportWS,
+		FFTransportTCP:            defaultFFTransportTCP,
+		FFTransportQUIC:           defaultFFTransportQUIC,
+		FFTransportWEBRTC:         defaultFFTransportWEBRTC,
 	}
 
 	// Helper function to parse boolean environment variables
@@ -134,6 +149,21 @@ func LoadConfig() (*AppConfig, error) {
 		return nil, err
 	}
 	if err := parseBoolEnv("PS_FF_IGNORE_UPLOADS_IN_METADATA", &conf.FFIgnoreUploadsInMetadata); err != nil {
+		return nil, err
+	}
+	if err := parseBoolEnv("PS_FF_P2PCIRCUIT", &conf.FFP2Pcircuit); err != nil {
+		return nil, err
+	}
+	if err := parseBoolEnv("PS_FF_TRNSPT_WS", &conf.FFTransportWS); err != nil {
+		return nil, err
+	}
+	if err := parseBoolEnv("PS_FF_TRNSPT_TCP", &conf.FFTransportTCP); err != nil {
+		return nil, err
+	}
+	if err := parseBoolEnv("PS_FF_TRNSPT_QUIC", &conf.FFTransportQUIC); err != nil {
+		return nil, err
+	}
+	if err := parseBoolEnv("PS_FF_TRNSPT_WEBRTC", &conf.FFTransportWEBRTC); err != nil {
 		return nil, err
 	}
 
