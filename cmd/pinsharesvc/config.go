@@ -129,20 +129,35 @@ func loadFromRegistry() (*ServiceConfig, error) {
 		config.UIPort = int(uiPort)
 	}
 
-	// Read boolean values (stored as integers 0/1)
+	// Read boolean values (stored as integers 0/1, with fallback to string for backwards compatibility)
 	skipVT, _, err := key.GetIntegerValue("SkipVirusTotal")
 	if err == nil {
 		config.SkipVirusTotal = skipVT != 0
+	} else {
+		// Fallback: try reading as string (for old installs that used REG_SZ)
+		if strVal, _, strErr := key.GetStringValue("SkipVirusTotal"); strErr == nil && strVal != "" {
+			config.SkipVirusTotal = strVal == "1" || strVal == "true"
+		}
 	}
 
 	enableCache, _, err := key.GetIntegerValue("EnableCache")
 	if err == nil {
 		config.EnableCache = enableCache != 0
+	} else {
+		// Fallback: try reading as string (for old installs that used REG_SZ)
+		if strVal, _, strErr := key.GetStringValue("EnableCache"); strErr == nil && strVal != "" {
+			config.EnableCache = strVal == "1" || strVal == "true"
+		}
 	}
 
 	archiveNode, _, err := key.GetIntegerValue("ArchiveNode")
 	if err == nil {
 		config.ArchiveNode = archiveNode != 0
+	} else {
+		// Fallback: try reading as string (for old installs that used REG_SZ)
+		if strVal, _, strErr := key.GetStringValue("ArchiveNode"); strErr == nil && strVal != "" {
+			config.ArchiveNode = strVal == "1" || strVal == "true"
+		}
 	}
 
 	// Apply defaults for missing values
@@ -205,7 +220,7 @@ func getDefaultConfig() (*ServiceConfig, error) {
 		OrgName:   "MyOrganization",
 		GroupName: "MyGroup",
 
-		SkipVirusTotal: true,
+		SkipVirusTotal: false, // Default to enabled; note: without VT_TOKEN, scanning is auto-skipped in service context
 		EnableCache:    true,
 		ArchiveNode:    false,
 

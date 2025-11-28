@@ -189,22 +189,25 @@ func (pm *ProcessManager) StartPinShare(ctx context.Context) error {
 	)
 
 	// Add feature flags
-	if pm.config.SkipVirusTotal {
-		env = append(env, "PS_FF_SKIP_VT=true")
-		// Set dummy VT_TOKEN to bypass chromedp test and use VirusTotal path
-		// The application will use Security Capability 2 (VirusTotal API)
-		if pm.config.VirusTotalToken == "" {
-			env = append(env, "VT_TOKEN=SKIP_VT_FOR_SERVICE")
+	// When running as a Windows service, chromedp cannot work (no desktop in Session 0).
+	// If no real VT_TOKEN is provided, we MUST skip VirusTotal scanning to avoid chromedp deadlock.
+	// Users who want VirusTotal scanning must provide a valid VT_TOKEN in the config.
+	if pm.config.VirusTotalToken != "" {
+		// Real VT token provided - use VirusTotal API scanning
+		env = append(env, fmt.Sprintf("VT_TOKEN=%s", pm.config.VirusTotalToken))
+		if pm.config.SkipVirusTotal {
+			env = append(env, "PS_FF_SKIP_VT=true")
 		}
+	} else {
+		// No VT token - must skip VT to avoid chromedp deadlock in service context
+		env = append(env, "PS_FF_SKIP_VT=true")
+		pm.logInfo("No VirusTotal token configured - virus scanning disabled (chromedp cannot run in service context)")
 	}
 	if pm.config.EnableCache {
 		env = append(env, "PS_FF_CACHE=true")
 	}
 	if pm.config.ArchiveNode {
 		env = append(env, "PS_FF_ARCHIVE_NODE=true")
-	}
-	if pm.config.VirusTotalToken != "" {
-		env = append(env, fmt.Sprintf("VT_TOKEN=%s", pm.config.VirusTotalToken))
 	}
 
 	// Create command
@@ -261,13 +264,16 @@ func (pm *ProcessManager) StopIPFS() error {
 	}
 
 	pm.logInfo("Stopping IPFS daemon...")
+	pid := pm.ipfsCmd.Process.Pid
 
-	// Send interrupt signal
-	if err := pm.ipfsCmd.Process.Signal(os.Interrupt); err != nil {
-		// If interrupt fails, try kill
-		pm.logError("Failed to send interrupt to IPFS, forcing kill", err)
+	// On Windows, use taskkill to properly terminate the process tree
+	// os.Interrupt doesn't work reliably for processes created with CREATE_NEW_PROCESS_GROUP
+	killCmd := exec.Command("taskkill", "/F", "/T", "/PID", fmt.Sprintf("%d", pid))
+	if output, err := killCmd.CombinedOutput(); err != nil {
+		pm.logError(fmt.Sprintf("taskkill failed for IPFS (PID %d): %s", pid, string(output)), err)
+		// Fallback to process.Kill()
 		if err := pm.ipfsCmd.Process.Kill(); err != nil {
-			return fmt.Errorf("failed to kill IPFS process: %w", err)
+			pm.logError("Failed to kill IPFS process", err)
 		}
 	}
 
@@ -280,12 +286,9 @@ func (pm *ProcessManager) StopIPFS() error {
 
 	select {
 	case <-time.After(10 * time.Second):
-		pm.logError("IPFS shutdown timeout, forcing kill", nil)
-		_ = pm.ipfsCmd.Process.Kill()
-	case err := <-done:
-		if err != nil {
-			pm.logError("IPFS process wait error", err)
-		}
+		pm.logError("IPFS shutdown timeout", nil)
+	case <-done:
+		// Process exited
 	}
 
 	// Close log file
@@ -309,13 +312,16 @@ func (pm *ProcessManager) StopPinShare() error {
 	}
 
 	pm.logInfo("Stopping PinShare backend...")
+	pid := pm.pinshareCmd.Process.Pid
 
-	// Send interrupt signal
-	if err := pm.pinshareCmd.Process.Signal(os.Interrupt); err != nil {
-		// If interrupt fails, try kill
-		pm.logError("Failed to send interrupt to PinShare, forcing kill", err)
+	// On Windows, use taskkill to properly terminate the process tree
+	// os.Interrupt doesn't work reliably for processes created with CREATE_NEW_PROCESS_GROUP
+	killCmd := exec.Command("taskkill", "/F", "/T", "/PID", fmt.Sprintf("%d", pid))
+	if output, err := killCmd.CombinedOutput(); err != nil {
+		pm.logError(fmt.Sprintf("taskkill failed for PinShare (PID %d): %s", pid, string(output)), err)
+		// Fallback to process.Kill()
 		if err := pm.pinshareCmd.Process.Kill(); err != nil {
-			return fmt.Errorf("failed to kill PinShare process: %w", err)
+			pm.logError("Failed to kill PinShare process", err)
 		}
 	}
 
@@ -328,12 +334,9 @@ func (pm *ProcessManager) StopPinShare() error {
 
 	select {
 	case <-time.After(10 * time.Second):
-		pm.logError("PinShare shutdown timeout, forcing kill", nil)
-		_ = pm.pinshareCmd.Process.Kill()
-	case err := <-done:
-		if err != nil {
-			pm.logError("PinShare process wait error", err)
-		}
+		pm.logError("PinShare shutdown timeout", nil)
+	case <-done:
+		// Process exited
 	}
 
 	// Close log file
