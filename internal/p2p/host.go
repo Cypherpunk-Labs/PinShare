@@ -283,6 +283,7 @@ func isLocalAddress(addr ma.Multiaddr) bool {
 
 	// Check for localhost addresses
 	if strings.Contains(addrStr, "127.0.0.1") ||
+		strings.Contains(addrStr, "::1") ||
 		strings.Contains(addrStr, "localhost") ||
 		strings.Contains(addrStr, "10.") ||
 		strings.Contains(addrStr, "192.168.") ||
