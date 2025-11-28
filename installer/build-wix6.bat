@@ -78,6 +78,12 @@ echo All required files found!
 echo Note: UI components temporarily disabled (will be added from infra/refactor)
 echo.
 
+REM Clean previous build artifacts to ensure fresh build
+echo Cleaning previous build artifacts...
+if exist "bin" rmdir /s /q bin
+if exist "obj" rmdir /s /q obj
+echo.
+
 REM Build the MSI using dotnet build with version
 echo Building MSI package...
 dotnet build PinShare.wixproj -c Release -p:ProductVersion=%VERSION%

@@ -28,7 +28,9 @@ func installService() error {
 	service, err := manager.OpenService(serviceName)
 	if err == nil {
 		service.Close()
-		return fmt.Errorf("service %s already exists", serviceName)
+		// Service already exists - this is fine for reinstall scenarios
+		fmt.Printf("Service %s already exists, skipping installation\n", serviceName)
+		return nil
 	}
 
 	// Create service configuration

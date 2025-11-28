@@ -58,9 +58,6 @@
         <!-- Features Section -->
         <Control Id="FeaturesHeader" Type="Text" X="15" Y="200" Width="370" Height="12" Text="{\PinShare_Font_Bold}Features" />
 
-        <!-- Skip VirusTotal checkbox -->
-        <Control Id="SkipVTCheck" Type="CheckBox" X="15" Y="216" Width="370" Height="17" Property="SKIP_VIRUSTOTAL" CheckBoxValue="1" Text="Skip VirusTotal scanning (enable for private/air-gapped networks)" />
-
         <!-- Enable Cache checkbox -->
         <Control Id="CacheCheck" Type="CheckBox" X="15" Y="234" Width="370" Height="17" Property="ENABLE_CACHE" CheckBoxValue="1" Text="Enable file caching (improves performance for frequently accessed files)" />
 

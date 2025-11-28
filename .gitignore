@@ -44,3 +44,17 @@ pinshare
 dist/
 bin/
 *.msi
+
+# WiX installer build artifacts
+installer/bin/
+installer/obj/
+installer/nul
+*.wixpdb
+*.log
+
+# Node.js
+node_modules/
+package-lock.json
+
+# Claude Code
+.claude/
