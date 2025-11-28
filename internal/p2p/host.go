@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"strings"
 	"sync"
 
@@ -41,9 +42,15 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 
 	ourlistenAddrs := []string{
 		fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", dynport),
+		fmt.Sprintf("/ip4/0.0.0.0/tcp/%d/wss", dynport),
 		fmt.Sprintf("/ip4/0.0.0.0/udp/%d/webrtc-direct", dynport),
 		fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1", dynport),
 		fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1/webtransport", dynport),
+		fmt.Sprintf("/ip6/::/tcp/%d", dynport),
+		fmt.Sprintf("/ip6/::/tcp/%d/wss", dynport),
+		fmt.Sprintf("/ip6/::/udp/%d/webrtc-direct", dynport),
+		fmt.Sprintf("/ip6/::/udp/%d/quic-v1", dynport),
+		fmt.Sprintf("/ip6/::/udp/%d/quic-v1/webtransport", dynport),
 	}
 
 	// Parse static relays (bootstrap peers) for auto-relay client
@@ -62,15 +69,15 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 
 	opts := []libp2p.Option{
 		libp2p.Identity(privKey),
-		libp2p.ListenAddrStrings(ourlistenAddrs...),    // Listen on TCP
-		libp2p.DefaultSecurity,                         // Use default security transports (TLS, Noise)
-		libp2p.DefaultMuxers,                           // Use default stream multiplexers (mplex, yamux)
-		libp2p.NATPortMap(),                            // Attempt to open ports using uPNP for NATed environments
-		libp2p.EnableHolePunching(),                    // Enable hole punching for NAT traversal
-		libp2p.EnableRelayService(),                    // Enable circuit relay v2 service
-		libp2p.EnableAutoNATv2(),                       // Enable automatic NAT traversal
-		libp2p.EnableRelay(),                           // Enable circuit relay v1 service
-		libp2p.EnableAutoRelayWithStaticRelays(relays), //TODO add feature flag to control this option.
+		libp2p.ListenAddrStrings(ourlistenAddrs...), // Listen on TCP
+		libp2p.DefaultSecurity,                      // Use default security transports (TLS, Noise)
+		libp2p.DefaultMuxers,                        // Use default stream multiplexers (mplex, yamux)
+		libp2p.NATPortMap(),                         // Attempt to open ports using uPNP for NATed environments
+		libp2p.EnableHolePunching(),                 // Enable hole punching for NAT traversal
+		libp2p.EnableRelayService(),                 // Enable circuit relay v2 service
+		libp2p.EnableAutoNATv2(),                    // Enable automatic NAT traversal
+		libp2p.EnableRelay(),                        // Enable circuit relay v1 client
+		// libp2p.EnableAutoRelayWithStaticRelays(relays), //TODO add feature flag to control this option.
 		// libp2p.EnableAutoRelay(),                // deprecated
 		// libp2p.EnableAutoRelayWithPeerSource() // TODO:
 		// libp2p.EnableAutoRelayWithStaticRelays(), // TODO:
@@ -104,13 +111,30 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 		// }),
 
 		libp2p.EnableNATService(), // Help other peers discover their public address
-		libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
-			kadDHT, err := dht.New(ctx, h, dht.Mode(dht.ModeAutoServer)) // was dht.ModeServer
-			if err != nil {
-				return nil, fmt.Errorf("failed to create DHT: %w", err)
-			}
-			return kadDHT, nil
-		}),
+
+	}
+
+	if isContainerEnvironment() {
+		opts = append(opts,
+			libp2p.EnableAutoRelayWithStaticRelays(relays),
+			libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
+				kadDHT, err := dht.New(ctx, h, dht.Mode(dht.ModeClient))
+				if err != nil {
+					return nil, fmt.Errorf("failed to create DHT: %w", err)
+				}
+				return kadDHT, nil
+			}),
+		)
+	} else {
+		opts = append(opts,
+			libp2p.Routing(func(h host.Host) (routing.PeerRouting, error) {
+				kadDHT, err := dht.New(ctx, h, dht.Mode(dht.ModeServer))
+				if err != nil {
+					return nil, fmt.Errorf("failed to create DHT: %w", err)
+				}
+				return kadDHT, nil
+			}),
+		)
 	}
 
 	h, err := libp2p.New(opts...)
@@ -232,6 +256,16 @@ func isLocalAddress(addr ma.Multiaddr) bool {
 		strings.Contains(addrStr, "192.168.") ||
 		(strings.Contains(addrStr, "172.") && len(addrStr) > 7 &&
 			addrStr[7] >= '1' && addrStr[7] <= '3') {
+		return true
+	}
+	return false
+}
+
+func isContainerEnvironment() bool {
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return true
+	}
+	if _, err := os.Stat("/run/secrets/kubernetes.io"); err == nil {
 		return true
 	}
 	return false
