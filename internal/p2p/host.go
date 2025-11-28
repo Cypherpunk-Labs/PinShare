@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"sync"
 
 	"github.com/libp2p/go-libp2p"
@@ -14,6 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
+	ma "github.com/multiformats/go-multiaddr"
 	// "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	// "[github.com/libp2p/go-libp2p/p2p/discovery/mdns](https://github.com/libp2p/go-libp2p/p2p/discovery/mdns)" // Optional: for local discovery
 )
@@ -37,9 +39,12 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 		break
 	}
 
-	listenAddr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", dynport)
-	// For QUIC (UDP), you might use:
-	listenAddrUDP := fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1", dynport)
+	ourlistenAddrs := []string{
+		fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", dynport),
+		fmt.Sprintf("/ip4/0.0.0.0/udp/%d/webrtc-direct", dynport),
+		fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1", dynport),
+		fmt.Sprintf("/ip4/0.0.0.0/udp/%d/quic-v1/webtransport", dynport),
+	}
 
 	// Parse static relays (bootstrap peers) for auto-relay client
 	relays := make([]peer.AddrInfo, 0, len(dht.DefaultBootstrapPeers))
@@ -55,22 +60,20 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 		return nil, fmt.Errorf("no valid bootstrap relays")
 	}
 
-	h, err := libp2p.New(
+	opts := []libp2p.Option{
 		libp2p.Identity(privKey),
-		libp2p.ListenAddrStrings(listenAddr),    // Listen on TCP
-		libp2p.ListenAddrStrings(listenAddrUDP), // Optionally listen on QUIC
-		libp2p.DefaultSecurity,                  // Use default security transports (TLS, Noise)
-		libp2p.DefaultMuxers,                    // Use default stream multiplexers (mplex, yamux)
-		libp2p.NATPortMap(),                     // Attempt to open ports using uPNP for NATed environments
-		libp2p.EnableHolePunching(),             // Enable hole punching for NAT traversal
-		libp2p.EnableRelayService(),             // Enable circuit relay v2 service
-		libp2p.EnableAutoNATv2(),                // Enable automatic NAT traversal
-		libp2p.EnableRelay(),                    // Enable circuit relay v1 service
-		libp2p.EnableAutoRelayWithStaticRelays(relays),
+		libp2p.ListenAddrStrings(ourlistenAddrs...),    // Listen on TCP
+		libp2p.DefaultSecurity,                         // Use default security transports (TLS, Noise)
+		libp2p.DefaultMuxers,                           // Use default stream multiplexers (mplex, yamux)
+		libp2p.NATPortMap(),                            // Attempt to open ports using uPNP for NATed environments
+		libp2p.EnableHolePunching(),                    // Enable hole punching for NAT traversal
+		libp2p.EnableRelayService(),                    // Enable circuit relay v2 service
+		libp2p.EnableAutoNATv2(),                       // Enable automatic NAT traversal
+		libp2p.EnableRelay(),                           // Enable circuit relay v1 service
+		libp2p.EnableAutoRelayWithStaticRelays(relays), //TODO add feature flag to control this option.
 		// libp2p.EnableAutoRelay(),                // deprecated
 		// libp2p.EnableAutoRelayWithPeerSource() // TODO:
 		// libp2p.EnableAutoRelayWithStaticRelays(), // TODO:
-
 		// libp2p.EnableAutoRelayWithPeerSource(func(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
 		// 	peerChan := make(chan peer.AddrInfo)
 		// 	go func() {
@@ -80,16 +83,13 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 		// 			fmt.Println("[WARN] AutoRelay peer source called but DHT is not ready yet.")
 		// 			return
 		// 		}
-
 		// 		routingDiscovery := discovery_routing.NewRoutingDiscovery(kadDHT)
-
 		// 		relayTopic := MetadataTopicID                                                            // "/libp2p/circuit/relay/0.2.0/hop"                                          //
 		// 		peerInfoCh, err := util.FindPeers(ctx, routingDiscovery, relayTopic, discovery.Limit(1)) //TODO: need different or no topic or use ipfs network to find relay
 		// 		if err != nil {
 		// 			fmt.Printf("[WARN] Failed to find peers for autorelay: %v\n", err)
 		// 			return
 		// 		}
-
 		// 		for p := range peerInfoCh {
 		// 			fmt.Printf("[DEBUG] Found %s peers for autorelay.\n", peerInfoCh[p].Addrs)
 		// 			select {
@@ -111,7 +111,9 @@ func NewHost(ctx context.Context, port int, privKey crypto.PrivKey) (host.Host, 
 			}
 			return kadDHT, nil
 		}),
-	)
+	}
+
+	h, err := libp2p.New(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create libp2p host: %w", err)
 	}
@@ -218,4 +220,19 @@ func SetDirectMessageHandler(h host.Host) {
 	}
 	h.SetStreamHandler(DirectMessageProtocolID, streamHandler)
 	fmt.Printf("[INFO] Direct message handler registered for protocol: %s\n", DirectMessageProtocolID)
+}
+
+func isLocalAddress(addr ma.Multiaddr) bool {
+	addrStr := addr.String()
+
+	// Check for localhost addresses
+	if strings.Contains(addrStr, "127.0.0.1") ||
+		strings.Contains(addrStr, "localhost") ||
+		strings.Contains(addrStr, "10.") ||
+		strings.Contains(addrStr, "192.168.") ||
+		(strings.Contains(addrStr, "172.") && len(addrStr) > 7 &&
+			addrStr[7] >= '1' && addrStr[7] <= '3') {
+		return true
+	}
+	return false
 }
