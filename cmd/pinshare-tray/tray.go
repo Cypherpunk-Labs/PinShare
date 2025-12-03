@@ -5,20 +5,17 @@ import (
 	"log"
 	"net/http"
 	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/getlantern/systray"
+	"golang.org/x/sys/windows"
 )
 
-// contains checks if s contains substr (case-insensitive)
-func contains(s, substr string) bool {
-	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
-}
 
 const (
 	serviceName = "PinShareService"
-	uiPort      = 8888 // Default UI port
+	// TODO: Re-enable when UI is ready
+	// uiPort = 8888 // Default UI port
 )
 
 // ServiceState represents the state of the Windows service
@@ -61,10 +58,11 @@ func NewTray() *Tray {
 
 // BuildMenu creates the tray menu
 func (t *Tray) BuildMenu() {
-	// Open UI
-	t.menuOpenUI = systray.AddMenuItem("Open PinShare UI", "Open the PinShare web interface")
-
-	systray.AddSeparator()
+	// TODO: Re-enable when UI is ready
+	// // Open UI
+	// t.menuOpenUI = systray.AddMenuItem("Open PinShare UI", "Open the PinShare web interface")
+	//
+	// systray.AddSeparator()
 
 	// Status
 	t.menuStatus = systray.AddMenuItem("Status: Checking...", "Service status")
@@ -113,8 +111,9 @@ func (t *Tray) BuildMenu() {
 func (t *Tray) handleMenuClicks() {
 	for {
 		select {
-		case <-t.menuOpenUI.ClickedCh:
-			t.handleOpenUI()
+		// TODO: Re-enable when UI is ready
+		// case <-t.menuOpenUI.ClickedCh:
+		// 	t.handleOpenUI()
 
 		case <-t.menuStart.ClickedCh:
 			t.handleStartService()
@@ -141,14 +140,15 @@ func (t *Tray) handleMenuClicks() {
 	}
 }
 
-// handleOpenUI opens the PinShare UI in browser
-func (t *Tray) handleOpenUI() {
-	url := fmt.Sprintf("http://localhost:%d", uiPort)
-	if err := openBrowser(url); err != nil {
-		log.Printf("Failed to open browser: %v", err)
-		showMessage("Error", "Failed to open browser")
-	}
-}
+// TODO: Re-enable when UI is ready
+// // handleOpenUI opens the PinShare UI in browser
+// func (t *Tray) handleOpenUI() {
+// 	url := fmt.Sprintf("http://localhost:%d", uiPort)
+// 	if err := openBrowser(url); err != nil {
+// 		log.Printf("Failed to open browser: %v", err)
+// 		showMessage("Error", "Failed to open browser")
+// 	}
+// }
 
 // handleStartService starts the service
 func (t *Tray) handleStartService() {
@@ -238,18 +238,17 @@ func (t *Tray) updateStatus() {
 		t.serviceRunning = false
 
 		// Check if it's a "service not installed" error
-		errStr := err.Error()
-		if contains(errStr, "not installed") {
+		if status == StateNotInstalled {
 			t.menuStatus.SetTitle("Status: Not Installed")
 			systray.SetTooltip("PinShare - Service not installed")
 		} else {
 			// Show actual error for debugging
 			t.menuStatus.SetTitle("Status: Error")
-			shortErr := errStr
-			if len(shortErr) > 50 {
-				shortErr = shortErr[:50] + "..."
+			errMsg := err.Error()
+			if len(errMsg) > 50 {
+				errMsg = errMsg[:50] + "..."
 			}
-			systray.SetTooltip(fmt.Sprintf("PinShare - %s", shortErr))
+			systray.SetTooltip(fmt.Sprintf("PinShare - %s", errMsg))
 		}
 
 		t.menuIPFSStatus.SetTitle("  IPFS: -")
@@ -344,34 +343,51 @@ func (t *Tray) updateStatus() {
 	}
 }
 
-// getServiceStatus gets the current service status using sc query (no admin required)
+// getServiceStatus gets the current service status using Windows Service Manager API (no spawned process)
+// Uses minimal permissions (SC_MANAGER_CONNECT and SERVICE_QUERY_STATUS) so no elevation is required.
 func getServiceStatus() (ServiceState, error) {
-	cmd := exec.Command("sc", "query", serviceName)
-	output, err := cmd.CombinedOutput()
-	outputStr := string(output)
-
+	// Open service control manager with minimal permissions (connect only)
+	scmHandle, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
 	if err != nil {
-		// Check for error 1060: service doesn't exist
-		if strings.Contains(outputStr, "1060") ||
-			strings.Contains(outputStr, "does not exist") ||
-			strings.Contains(outputStr, "FAILED 1060") {
-			return StateNotInstalled, fmt.Errorf("service not installed")
-		}
-		return StateStopped, fmt.Errorf("sc query failed: %w", err)
+		return StateStopped, fmt.Errorf("failed to connect to service manager: %w", err)
+	}
+	defer windows.CloseServiceHandle(scmHandle)
+
+	// Open the service with query status permission only
+	serviceNamePtr, err := windows.UTF16PtrFromString(serviceName)
+	if err != nil {
+		return StateStopped, fmt.Errorf("invalid service name: %w", err)
 	}
 
-	// Parse state from sc query output
-	if strings.Contains(outputStr, "RUNNING") {
+	svcHandle, err := windows.OpenService(scmHandle, serviceNamePtr, windows.SERVICE_QUERY_STATUS)
+	if err != nil {
+		// Service doesn't exist (ERROR_SERVICE_DOES_NOT_EXIST = 1060)
+		return StateNotInstalled, fmt.Errorf("service not installed")
+	}
+	defer windows.CloseServiceHandle(svcHandle)
+
+	// Query the service status
+	var status windows.SERVICE_STATUS
+	err = windows.QueryServiceStatus(svcHandle, &status)
+	if err != nil {
+		return StateStopped, fmt.Errorf("failed to query service: %w", err)
+	}
+
+	// Map Windows service state to our ServiceState
+	switch status.CurrentState {
+	case windows.SERVICE_RUNNING:
 		return StateRunning, nil
-	} else if strings.Contains(outputStr, "STOPPED") {
+	case windows.SERVICE_STOPPED:
 		return StateStopped, nil
-	} else if strings.Contains(outputStr, "START_PENDING") {
+	case windows.SERVICE_START_PENDING:
 		return StateStartPending, nil
-	} else if strings.Contains(outputStr, "STOP_PENDING") {
+	case windows.SERVICE_STOP_PENDING:
 		return StateStopPending, nil
+	case windows.SERVICE_PAUSED, windows.SERVICE_PAUSE_PENDING, windows.SERVICE_CONTINUE_PENDING:
+		return StateStopped, nil
+	default:
+		return StateStopped, fmt.Errorf("unknown service state: %d", status.CurrentState)
 	}
-
-	return StateStopped, fmt.Errorf("unknown service state")
 }
 
 // checkIPFSHealth checks if IPFS daemon is responding
