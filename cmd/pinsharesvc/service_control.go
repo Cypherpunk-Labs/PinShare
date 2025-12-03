@@ -88,13 +88,9 @@ func installService() error {
 		return fmt.Errorf("failed to create directories: %w", err)
 	}
 
-	// Save configuration
-	if err := config_.SaveToRegistry(); err != nil {
-		fmt.Printf("Warning: Failed to save to registry: %v\n", err)
-	}
-
+	// Save configuration to JSON file
 	if err := config_.SaveToFile(); err != nil {
-		fmt.Printf("Warning: Failed to save to file: %v\n", err)
+		return fmt.Errorf("failed to save config file: %w", err)
 	}
 
 	fmt.Printf("Service %s installed successfully\n", serviceName)

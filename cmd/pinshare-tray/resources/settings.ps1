@@ -1,6 +1,6 @@
 # PinShare Settings Dialog
 # Uses WinForms for native Windows UI
-# Handles UAC elevation internally for registry writes
+# Handles UAC elevation internally for config file writes
 
 param(
     [switch]$Save,
@@ -10,7 +10,7 @@ param(
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-$registryPath = "HKLM:\SOFTWARE\PinShare"
+$configFilePath = "C:\ProgramData\PinShare\config.json"
 
 # Check if running elevated
 function Test-Elevated {
@@ -21,37 +21,77 @@ function Test-Elevated {
 
 # If called with -Save and elevated, write config and exit
 if ($Save -and (Test-Elevated)) {
-    try {
-        $config = $ConfigJson | ConvertFrom-Json
+    $logFile = "C:\ProgramData\PinShare\logs\settings-debug.log"
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 
-        # Ensure registry key exists
-        if (-not (Test-Path $registryPath)) {
-            New-Item -Path $registryPath -Force | Out-Null
+    try {
+        Add-Content -Path $logFile -Value "[$timestamp] Save called with ConfigJson (temp file path): $ConfigJson" -ErrorAction SilentlyContinue
+
+        # ConfigJson is now a path to a temp file containing the JSON
+        if (-not (Test-Path $ConfigJson)) {
+            throw "Settings temp file not found: $ConfigJson"
         }
 
-        # Write string values
-        Set-ItemProperty -Path $registryPath -Name "OrgName" -Value $config.OrgName
-        Set-ItemProperty -Path $registryPath -Name "GroupName" -Value $config.GroupName
-        Set-ItemProperty -Path $registryPath -Name "VirusTotalToken" -Value $config.VirusTotalToken
-        Set-ItemProperty -Path $registryPath -Name "LogLevel" -Value $config.LogLevel
+        $newSettings = Get-Content $ConfigJson -Raw | ConvertFrom-Json
 
-        # Write integer values (ports)
-        Set-ItemProperty -Path $registryPath -Name "IPFSAPIPort" -Value $config.IPFSAPIPort -Type DWord
-        Set-ItemProperty -Path $registryPath -Name "IPFSGatewayPort" -Value $config.IPFSGatewayPort -Type DWord
-        Set-ItemProperty -Path $registryPath -Name "IPFSSwarmPort" -Value $config.IPFSSwarmPort -Type DWord
-        Set-ItemProperty -Path $registryPath -Name "PinShareAPIPort" -Value $config.PinShareAPIPort -Type DWord
-        Set-ItemProperty -Path $registryPath -Name "PinShareP2PPort" -Value $config.PinShareP2PPort -Type DWord
-        Set-ItemProperty -Path $registryPath -Name "UIPort" -Value $config.UIPort -Type DWord
+        # Clean up temp file
+        Remove-Item $ConfigJson -Force -ErrorAction SilentlyContinue
 
-        # Write boolean values as DWord (0/1)
-        Set-ItemProperty -Path $registryPath -Name "SkipVirusTotal" -Value ([int]$config.SkipVirusTotal) -Type DWord
-        Set-ItemProperty -Path $registryPath -Name "EnableCache" -Value ([int]$config.EnableCache) -Type DWord
-        Set-ItemProperty -Path $registryPath -Name "ArchiveNode" -Value ([int]$config.ArchiveNode) -Type DWord
+        Add-Content -Path $logFile -Value "[$timestamp] Parsed newSettings type: $($newSettings.GetType().FullName)" -ErrorAction SilentlyContinue
+        Add-Content -Path $logFile -Value "[$timestamp] IPFSAPIPort value: '$($newSettings.IPFSAPIPort)'" -ErrorAction SilentlyContinue
+        Add-Content -Path $logFile -Value "[$timestamp] OrgName value: '$($newSettings.OrgName)'" -ErrorAction SilentlyContinue
 
+        # Read existing config file and convert to ordered hashtable for reliable updates
+        $configHash = [ordered]@{}
+        if (Test-Path $configFilePath) {
+            $existingConfig = Get-Content $configFilePath -Raw | ConvertFrom-Json
+            # Convert PSCustomObject to hashtable
+            $existingConfig.PSObject.Properties | ForEach-Object {
+                $configHash[$_.Name] = $_.Value
+            }
+        } else {
+            # Create default config if file doesn't exist
+            $configHash = [ordered]@{
+                install_directory = "C:\Program Files\PinShare"
+                data_directory = "C:\ProgramData\PinShare"
+                ipfs_binary = "C:\Program Files\PinShare\ipfs.exe"
+                pinshare_binary = "C:\Program Files\PinShare\pinshare.exe"
+            }
+        }
+
+        # Update config with new settings (map UI field names to JSON field names)
+        $configHash["ipfs_api_port"] = [int]$newSettings.IPFSAPIPort
+        $configHash["ipfs_gateway_port"] = [int]$newSettings.IPFSGatewayPort
+        $configHash["ipfs_swarm_port"] = [int]$newSettings.IPFSSwarmPort
+        $configHash["pinshare_api_port"] = [int]$newSettings.PinShareAPIPort
+        $configHash["pinshare_p2p_port"] = [int]$newSettings.PinShareP2PPort
+        $configHash["ui_port"] = [int]$newSettings.UIPort
+        $configHash["org_name"] = [string]$newSettings.OrgName
+        $configHash["group_name"] = [string]$newSettings.GroupName
+        $configHash["skip_virus_total"] = [bool]$newSettings.SkipVirusTotal
+        $configHash["enable_cache"] = [bool]$newSettings.EnableCache
+        $configHash["archive_node"] = [bool]$newSettings.ArchiveNode
+        $configHash["log_level"] = [string]$newSettings.LogLevel
+
+        # Only update virus_total_token if provided (don't overwrite with empty)
+        if ($newSettings.VirusTotalToken -and $newSettings.VirusTotalToken -ne "") {
+            $configHash["virus_total_token"] = $newSettings.VirusTotalToken
+        }
+
+        Add-Content -Path $logFile -Value "[$timestamp] Final configHash: $($configHash | ConvertTo-Json -Compress)" -ErrorAction SilentlyContinue
+
+        # Write updated config back to file (UTF8 without BOM for compatibility)
+        $jsonContent = $configHash | ConvertTo-Json -Depth 10
+        [System.IO.File]::WriteAllText($configFilePath, $jsonContent, [System.Text.UTF8Encoding]::new($false))
+
+        Add-Content -Path $logFile -Value "[$timestamp] Config saved successfully" -ErrorAction SilentlyContinue
         exit 0
     } catch {
+        $errorMsg = $_.Exception.Message
+        Add-Content -Path $logFile -Value "[$timestamp] ERROR: $errorMsg" -ErrorAction SilentlyContinue
+        Add-Content -Path $logFile -Value "[$timestamp] Stack: $($_.ScriptStackTrace)" -ErrorAction SilentlyContinue
         [System.Windows.Forms.MessageBox]::Show(
-            "Failed to save settings: $($_.Exception.Message)",
+            "Failed to save settings: $errorMsg",
             "Error",
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Error)
@@ -59,9 +99,10 @@ if ($Save -and (Test-Elevated)) {
     }
 }
 
-# Read current config from registry
+# Read current config from JSON file
 function Read-Config {
-    $config = @{
+    # Default values
+    $defaults = @{
         IPFSAPIPort = 5001
         IPFSGatewayPort = 8080
         IPFSSwarmPort = 4001
@@ -79,32 +120,30 @@ function Read-Config {
         DataDirectory = "C:\ProgramData\PinShare"
     }
 
-    if (Test-Path $registryPath) {
+    $config = $defaults.Clone()
+
+    if (Test-Path $configFilePath) {
         try {
-            $key = Get-Item $registryPath -ErrorAction SilentlyContinue
-            if ($key) {
-                # Read integer values (ports)
-                foreach ($prop in @("IPFSAPIPort","IPFSGatewayPort","IPFSSwarmPort",
-                                   "PinShareAPIPort","PinShareP2PPort","UIPort")) {
-                    $val = $key.GetValue($prop)
-                    if ($null -ne $val) { $config[$prop] = [int]$val }
-                }
+            $jsonConfig = Get-Content $configFilePath -Raw | ConvertFrom-Json
 
-                # Read string values
-                foreach ($prop in @("OrgName","GroupName","VirusTotalToken","LogLevel",
-                                   "InstallDirectory","DataDirectory")) {
-                    $val = $key.GetValue($prop)
-                    if ($null -ne $val -and $val -ne "") { $config[$prop] = $val }
-                }
-
-                # Read boolean values (stored as DWord 0/1)
-                foreach ($prop in @("SkipVirusTotal","EnableCache","ArchiveNode")) {
-                    $val = $key.GetValue($prop)
-                    if ($null -ne $val) { $config[$prop] = [bool][int]$val }
-                }
-            }
+            # Map JSON field names to UI field names (only use if value is valid, not 0 or null)
+            if ($jsonConfig.ipfs_api_port -and $jsonConfig.ipfs_api_port -gt 0) { $config.IPFSAPIPort = [int]$jsonConfig.ipfs_api_port }
+            if ($jsonConfig.ipfs_gateway_port -and $jsonConfig.ipfs_gateway_port -gt 0) { $config.IPFSGatewayPort = [int]$jsonConfig.ipfs_gateway_port }
+            if ($jsonConfig.ipfs_swarm_port -and $jsonConfig.ipfs_swarm_port -gt 0) { $config.IPFSSwarmPort = [int]$jsonConfig.ipfs_swarm_port }
+            if ($jsonConfig.pinshare_api_port -and $jsonConfig.pinshare_api_port -gt 0) { $config.PinShareAPIPort = [int]$jsonConfig.pinshare_api_port }
+            if ($jsonConfig.pinshare_p2p_port -and $jsonConfig.pinshare_p2p_port -gt 0) { $config.PinShareP2PPort = [int]$jsonConfig.pinshare_p2p_port }
+            if ($jsonConfig.ui_port -and $jsonConfig.ui_port -gt 0) { $config.UIPort = [int]$jsonConfig.ui_port }
+            if ($jsonConfig.org_name -and $jsonConfig.org_name -ne "") { $config.OrgName = $jsonConfig.org_name }
+            if ($jsonConfig.group_name -and $jsonConfig.group_name -ne "") { $config.GroupName = $jsonConfig.group_name }
+            if ($null -ne $jsonConfig.skip_virus_total) { $config.SkipVirusTotal = [bool]$jsonConfig.skip_virus_total }
+            if ($null -ne $jsonConfig.enable_cache) { $config.EnableCache = [bool]$jsonConfig.enable_cache }
+            if ($null -ne $jsonConfig.archive_node) { $config.ArchiveNode = [bool]$jsonConfig.archive_node }
+            if ($jsonConfig.virus_total_token -and $jsonConfig.virus_total_token -ne "") { $config.VirusTotalToken = $jsonConfig.virus_total_token }
+            if ($jsonConfig.log_level -and $jsonConfig.log_level -ne "") { $config.LogLevel = $jsonConfig.log_level }
+            if ($jsonConfig.install_directory -and $jsonConfig.install_directory -ne "") { $config.InstallDirectory = $jsonConfig.install_directory }
+            if ($jsonConfig.data_directory -and $jsonConfig.data_directory -ne "") { $config.DataDirectory = $jsonConfig.data_directory }
         } catch {
-            # Silently use defaults if registry read fails
+            # Silently use defaults if config read fails
         }
     }
 
@@ -344,8 +383,22 @@ $txtDataDir.ReadOnly = $true
 $txtDataDir.BackColor = [System.Drawing.SystemColors]::Control
 $tabInfo.Controls.Add($txtDataDir)
 
+$lblConfigFile = New-Object System.Windows.Forms.Label
+$lblConfigFile.Location = New-Object System.Drawing.Point(10, 90)
+$lblConfigFile.Size = New-Object System.Drawing.Size(110, 20)
+$lblConfigFile.Text = "Config File:"
+$tabInfo.Controls.Add($lblConfigFile)
+
+$txtConfigFile = New-Object System.Windows.Forms.TextBox
+$txtConfigFile.Location = New-Object System.Drawing.Point(130, 87)
+$txtConfigFile.Size = New-Object System.Drawing.Size(300, 20)
+$txtConfigFile.Text = $configFilePath
+$txtConfigFile.ReadOnly = $true
+$txtConfigFile.BackColor = [System.Drawing.SystemColors]::Control
+$tabInfo.Controls.Add($txtConfigFile)
+
 $lblInfoNote = New-Object System.Windows.Forms.Label
-$lblInfoNote.Location = New-Object System.Drawing.Point(10, 100)
+$lblInfoNote.Location = New-Object System.Drawing.Point(10, 130)
 $lblInfoNote.Size = New-Object System.Drawing.Size(420, 40)
 $lblInfoNote.Text = "These paths are set during installation and cannot be changed here."
 $lblInfoNote.ForeColor = [System.Drawing.Color]::Gray
@@ -439,8 +492,17 @@ $btnSave.Add_Click({
         LogLevel = $cmbLogLevel.SelectedItem.ToString()
     }
 
-    # Convert to JSON with proper escaping
-    $json = ($newConfig | ConvertTo-Json -Compress) -replace "'", "''"
+    # Debug logging
+    $debugLog = "C:\ProgramData\PinShare\logs\settings-debug.log"
+    $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    Add-Content -Path $debugLog -Value "[$ts] UI values before JSON conversion:" -ErrorAction SilentlyContinue
+    Add-Content -Path $debugLog -Value "[$ts]   IPFSAPIPort textbox: '$($portFields["IPFSAPIPort"].Text)'" -ErrorAction SilentlyContinue
+    Add-Content -Path $debugLog -Value "[$ts]   OrgName textbox: '$($txtOrgName.Text)'" -ErrorAction SilentlyContinue
+
+    # Write settings to a temp file to avoid command-line escaping issues
+    $tempFile = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "pinshare-settings-$([guid]::NewGuid().ToString('N')).json")
+    $newConfig | ConvertTo-Json -Depth 10 | Set-Content -Path $tempFile -Encoding UTF8
+    Add-Content -Path $debugLog -Value "[$ts]   Temp file: $tempFile" -ErrorAction SilentlyContinue
 
     # Get path to this script
     $scriptPath = $MyInvocation.MyCommand.Definition
@@ -448,10 +510,10 @@ $btnSave.Add_Click({
         $scriptPath = $PSCommandPath
     }
 
-    # Re-launch elevated to save
+    # Re-launch elevated to save (pass temp file path instead of JSON)
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = "powershell.exe"
-    $psi.Arguments = "-ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -File `"$scriptPath`" -Save -ConfigJson '$json'"
+    $psi.Arguments = "-ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -File `"$scriptPath`" -Save -ConfigJson `"$tempFile`""
     $psi.Verb = "runas"
     $psi.UseShellExecute = $true
 

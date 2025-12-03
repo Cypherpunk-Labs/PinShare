@@ -92,6 +92,13 @@ if errorlevel 1 (
 echo [OK] Built: %DIST_DIR%\pinshare-tray.exe
 echo.
 
+REM Copy tray application resources
+echo Copying tray application resources...
+if not exist "%DIST_DIR%\resources" mkdir "%DIST_DIR%\resources"
+xcopy /E /I /Q /Y "%SCRIPT_DIR%cmd\pinshare-tray\resources" "%DIST_DIR%\resources"
+echo [OK] Copied: %DIST_DIR%\resources\
+echo.
+
 REM Build React UI (if present)
 echo Building React UI...
 if not exist "%SCRIPT_DIR%pinshare-ui" (

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os/exec"
 	"time"
 
 	"github.com/getlantern/systray"
@@ -156,7 +155,6 @@ func (t *Tray) handleStartService() {
 		log.Printf("Failed to start service: %v", err)
 		showError("PinShare", fmt.Sprintf("Failed to start service:\n\n%v", err))
 	} else {
-		showMessage("PinShare", "Service started successfully.")
 		time.Sleep(1 * time.Second)
 		t.updateStatus()
 	}
@@ -168,7 +166,6 @@ func (t *Tray) handleStopService() {
 		log.Printf("Failed to stop service: %v", err)
 		showError("PinShare", fmt.Sprintf("Failed to stop service:\n\n%v", err))
 	} else {
-		showMessage("PinShare", "Service stopped successfully.")
 		time.Sleep(1 * time.Second)
 		t.updateStatus()
 	}
@@ -191,7 +188,6 @@ func (t *Tray) handleRestartService() {
 		log.Printf("Failed to start service: %v", err)
 		showError("PinShare", fmt.Sprintf("Failed to start service:\n\n%v", err))
 	} else {
-		showMessage("PinShare", "Service restarted successfully.")
 		time.Sleep(1 * time.Second)
 		t.updateStatus()
 	}
@@ -437,44 +433,44 @@ func checkPinShareHealth() bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-// startService starts the service using PowerShell with UAC elevation
-func startService() error {
-	log.Printf("Starting service %s with elevation...", serviceName)
+// runElevated runs a command with UAC elevation using ShellExecute
+func runElevated(executable, args string) error {
+	verbPtr, _ := windows.UTF16PtrFromString("runas")
+	exePtr, _ := windows.UTF16PtrFromString(executable)
+	argsPtr, _ := windows.UTF16PtrFromString(args)
 
-	// Use PowerShell Start-Process with -Verb RunAs for UAC elevation
-	// -WindowStyle Hidden prevents console window from appearing
-	psCmd := fmt.Sprintf(
-		"Start-Process -FilePath 'sc' -ArgumentList 'start %s' "+
-			"-Verb RunAs -Wait -WindowStyle Hidden",
-		serviceName)
-
-	cmd := exec.Command("powershell", "-Command", psCmd)
-	output, err := cmd.CombinedOutput()
+	// ShellExecute with "runas" verb triggers UAC prompt
+	err := windows.ShellExecute(0, verbPtr, exePtr, argsPtr, nil, windows.SW_HIDE)
 	if err != nil {
-		log.Printf("Failed to start service: %v, output: %s", err, string(output))
-		return fmt.Errorf("failed to start service: %w", err)
+		return err
 	}
-
-	log.Printf("Service start command completed")
 	return nil
 }
 
-// stopService stops the service using PowerShell with UAC elevation
+// startService starts the service using sc.exe with UAC elevation
+func startService() error {
+	log.Printf("Starting service %s with elevation...", serviceName)
+
+	err := runElevated("sc.exe", fmt.Sprintf("start %s", serviceName))
+	if err != nil {
+		log.Printf("Failed to start service: %v", err)
+		return fmt.Errorf("failed to start service: %w", err)
+	}
+
+	log.Printf("Service start command initiated")
+	return nil
+}
+
+// stopService stops the service using sc.exe with UAC elevation
 func stopService() error {
 	log.Printf("Stopping service %s with elevation...", serviceName)
 
-	psCmd := fmt.Sprintf(
-		"Start-Process -FilePath 'sc' -ArgumentList 'stop %s' "+
-			"-Verb RunAs -Wait -WindowStyle Hidden",
-		serviceName)
-
-	cmd := exec.Command("powershell", "-Command", psCmd)
-	output, err := cmd.CombinedOutput()
+	err := runElevated("sc.exe", fmt.Sprintf("stop %s", serviceName))
 	if err != nil {
-		log.Printf("Failed to stop service: %v, output: %s", err, string(output))
+		log.Printf("Failed to stop service: %v", err)
 		return fmt.Errorf("failed to stop service: %w", err)
 	}
 
-	log.Printf("Service stop command completed")
+	log.Printf("Service stop command initiated")
 	return nil
 }

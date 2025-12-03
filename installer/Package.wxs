@@ -101,8 +101,9 @@
       <Custom Action="StopService" Before="RemoveFiles" Condition="Installed AND NOT UPGRADINGPRODUCTCODE" />
       <Custom Action="UninstallService" Before="RemoveFiles" Condition="Installed AND NOT UPGRADINGPRODUCTCODE" />
 
-      <!-- Install service (always install, but only start if START_SERVICE_NOW=1) -->
-      <Custom Action="InstallService" After="InstallFiles" Condition="NOT Installed AND SERVICE_AUTO_START=1" />
+      <!-- Always install service on fresh install -->
+      <Custom Action="InstallService" After="InstallFiles" Condition="NOT Installed" />
+      <!-- Only start service if START_SERVICE_NOW=1 -->
       <Custom Action="StartService" After="InstallService" Condition="NOT Installed AND START_SERVICE_NOW=1" />
 
       <!-- Start tray application if START_TRAY_NOW=1 -->
@@ -252,13 +253,13 @@
         <RegistryValue Name="IPFSBinary" Type="string" Value="[INSTALLFOLDER]ipfs.exe" />
         <RegistryValue Name="PinShareBinary" Type="string" Value="[INSTALLFOLDER]pinshare.exe" />
 
-        <!-- Ports - user configurable -->
-        <RegistryValue Name="IPFSAPIPort" Type="string" Value="[IPFS_API_PORT]" />
-        <RegistryValue Name="IPFSGatewayPort" Type="string" Value="[IPFS_GATEWAY_PORT]" />
-        <RegistryValue Name="IPFSSwarmPort" Type="string" Value="[IPFS_SWARM_PORT]" />
-        <RegistryValue Name="PinShareAPIPort" Type="string" Value="[PINSHARE_API_PORT]" />
-        <RegistryValue Name="PinShareP2PPort" Type="string" Value="[PINSHARE_P2P_PORT]" />
-        <RegistryValue Name="UIPort" Type="string" Value="[UI_PORT]" />
+        <!-- Ports - user configurable (stored as DWORD integers) -->
+        <RegistryValue Name="IPFSAPIPort" Type="integer" Value="[IPFS_API_PORT]" />
+        <RegistryValue Name="IPFSGatewayPort" Type="integer" Value="[IPFS_GATEWAY_PORT]" />
+        <RegistryValue Name="IPFSSwarmPort" Type="integer" Value="[IPFS_SWARM_PORT]" />
+        <RegistryValue Name="PinShareAPIPort" Type="integer" Value="[PINSHARE_API_PORT]" />
+        <RegistryValue Name="PinShareP2PPort" Type="integer" Value="[PINSHARE_P2P_PORT]" />
+        <RegistryValue Name="UIPort" Type="integer" Value="[UI_PORT]" />
 
         <!-- Organization configuration - user configurable -->
         <RegistryValue Name="OrgName" Type="string" Value="[ORG_NAME]" />

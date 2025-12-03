@@ -38,16 +38,13 @@ func showSettingsDialog() (changed bool, err error) {
 	// Launch PowerShell with the settings script
 	// -ExecutionPolicy Bypass: Allow running the script
 	// -NoProfile: Don't load user profile (faster startup)
+	// -WindowStyle Hidden: Hide the PowerShell console window (WinForms dialog will still show)
 	// -File: Run the script file
 	cmd := exec.Command("powershell.exe",
 		"-ExecutionPolicy", "Bypass",
 		"-NoProfile",
+		"-WindowStyle", "Hidden",
 		"-File", scriptPath)
-
-	// Don't attach to console (prevents black window flash)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		HideWindow: true,
-	}
 
 	err = cmd.Run()
 	if err != nil {
