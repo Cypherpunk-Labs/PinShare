@@ -182,9 +182,45 @@ func startService() error {
 	}
 	defer service.Close()
 
+	// Check current state first
+	status, err := service.Query()
+	if err != nil {
+		return fmt.Errorf("failed to query service status: %w", err)
+	}
+
+	// If already running, nothing to do
+	if status.State == svc.Running {
+		fmt.Printf("Service %s is already running\n", serviceName)
+		return nil
+	}
+
 	// Start service
 	if err := service.Start(); err != nil {
 		return fmt.Errorf("failed to start service: %w", err)
+	}
+
+	// Wait for service to be running
+	fmt.Printf("Starting service %s...\n", serviceName)
+	timeout := time.Now().Add(60 * time.Second)
+	for {
+		status, err = service.Query()
+		if err != nil {
+			return fmt.Errorf("failed to query service status: %w", err)
+		}
+
+		if status.State == svc.Running {
+			break
+		}
+
+		if status.State == svc.Stopped {
+			return fmt.Errorf("service failed to start (stopped)")
+		}
+
+		if time.Now().After(timeout) {
+			return fmt.Errorf("timeout waiting for service to start")
+		}
+
+		time.Sleep(500 * time.Millisecond)
 	}
 
 	fmt.Printf("Service %s started successfully\n", serviceName)

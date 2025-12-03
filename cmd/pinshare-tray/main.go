@@ -3,13 +3,13 @@ package main
 import (
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"syscall"
 	"unsafe"
 
 	"github.com/getlantern/systray"
+	"golang.org/x/sys/windows"
 )
 
 var (
@@ -142,20 +142,15 @@ func getDefaultIcon() []byte {
 	return iconData
 }
 
-// openBrowser opens a URL in the default browser
+// openBrowser opens a URL or path using the Windows shell
 func openBrowser(url string) error {
-	var cmd *exec.Cmd
-
-	switch runtime.GOOS {
-	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
-	case "darwin":
-		cmd = exec.Command("open", url)
-	default:
-		cmd = exec.Command("xdg-open", url)
+	urlPtr, err := windows.UTF16PtrFromString(url)
+	if err != nil {
+		return err
 	}
 
-	return cmd.Start()
+	// ShellExecute with nil verb uses the default action (open)
+	return windows.ShellExecute(0, nil, urlPtr, nil, nil, windows.SW_SHOWNORMAL)
 }
 
 // showMessage shows a Windows message box

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
-     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
   <?define ProductName = "PinShare" ?>
   <!-- ProductVersion is passed from wixproj via DefineConstants, with fallback -->
@@ -60,20 +61,24 @@
     <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
 
     <!-- Custom actions -->
+    <!-- Use net.exe for start/stop - it waits for service to start/stop and is silent -->
+    <SetProperty Id="StartService" Value="&quot;[SystemFolder]net.exe&quot; start PinShareService" Before="StartService" Sequence="execute" />
     <CustomAction Id="StartService"
-                  FileRef="PinShareSvcExe"
-                  ExeCommand="start"
+                  DllEntry="WixQuietExec64"
+                  Impersonate="no"
+                  BinaryRef="Wix4UtilCA_X64"
                   Execute="deferred"
-                  Return="ignore"
-                  Impersonate="no" />
+                  Return="ignore" />
 
+    <SetProperty Id="StopService" Value="&quot;[SystemFolder]net.exe&quot; stop PinShareService" Before="StopService" Sequence="execute" />
     <CustomAction Id="StopService"
-                  FileRef="PinShareSvcExe"
-                  ExeCommand="stop"
+                  DllEntry="WixQuietExec64"
+                  Impersonate="no"
+                  BinaryRef="Wix4UtilCA_X64"
                   Execute="deferred"
-                  Return="ignore"
-                  Impersonate="no" />
+                  Return="ignore" />
 
+    <!-- Install/Uninstall use our exe - brief console flash is acceptable -->
     <CustomAction Id="InstallService"
                   FileRef="PinShareSvcExe"
                   ExeCommand="install"

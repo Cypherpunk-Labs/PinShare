@@ -12,9 +12,10 @@
     <DefineConstants>ProductVersion=$(ProductVersion)</DefineConstants>
   </PropertyGroup>
 
-  <!-- WiX UI Extension for installer dialogs -->
+  <!-- WiX Extensions -->
   <ItemGroup>
     <PackageReference Include="WixToolset.UI.wixext" Version="6.*" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="6.*" />
   </ItemGroup>
 
   <!-- SDK automatically globs *.wxs files - no explicit Compile needed -->
