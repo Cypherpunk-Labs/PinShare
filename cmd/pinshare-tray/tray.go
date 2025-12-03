@@ -197,10 +197,25 @@ func (t *Tray) handleRestartService() {
 	}
 }
 
-// handleSettings opens settings (placeholder)
+// handleSettings opens the settings dialog
 func (t *Tray) handleSettings() {
-	showMessage("Settings", "Settings UI not yet implemented")
-	// TODO: Implement settings dialog
+	changed, err := showSettingsDialog()
+	if err != nil {
+		log.Printf("Settings dialog error: %v", err)
+		showError("Settings Error", fmt.Sprintf("Failed to open settings:\n\n%v", err))
+		return
+	}
+
+	if changed {
+		// Ask user if they want to restart the service to apply changes
+		if showConfirmDialog(
+			"Restart Service?",
+			"Settings have been saved.\n\n"+
+				"The service must be restarted for changes to take effect.\n\n"+
+				"Restart the service now?") {
+			t.handleRestartService()
+		}
+	}
 }
 
 // handleViewLogs opens the log directory

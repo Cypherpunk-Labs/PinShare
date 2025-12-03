@@ -115,6 +115,7 @@
              Level="1"
              Description="Core PinShare application">
       <ComponentGroupRef Id="ProductComponents" />
+      <ComponentGroupRef Id="TrayResources" />
       <!-- TEMPORARILY DISABLED: UI will be added from infra/refactor branch later -->
       <!-- <ComponentGroupRef Id="UIComponents" /> -->
       <ComponentRef Id="RegistryEntries" />
@@ -128,6 +129,7 @@
       <Directory Id="INSTALLFOLDER" Name="PinShare">
         <!-- TEMPORARILY DISABLED: UI will be added from infra/refactor branch later -->
         <!-- <Directory Id="UIFolder" Name="ui" /> -->
+        <Directory Id="ResourcesFolder" Name="resources" />
       </Directory>
     </StandardDirectory>
 
@@ -188,6 +190,17 @@
       </Component>
       -->
 
+    </ComponentGroup>
+  </Fragment>
+
+  <!-- Tray application resources -->
+  <Fragment>
+    <ComponentGroup Id="TrayResources" Directory="ResourcesFolder">
+      <Component Id="SettingsScript" Bitness="always64">
+        <File Id="SettingsPS1"
+              Name="settings.ps1"
+              Source="..\dist\windows\resources\settings.ps1" />
+      </Component>
     </ComponentGroup>
   </Fragment>
 

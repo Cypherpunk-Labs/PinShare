@@ -45,6 +45,17 @@ if (-not $InstallerOnly) {
     go build -ldflags "-s -w -H windowsgui" -o "$distDir\pinshare-tray.exe" .\cmd\pinshare-tray
     if ($LASTEXITCODE -ne 0) { throw "Failed to build pinshare-tray.exe" }
     Write-Host "✓ Built: $distDir\pinshare-tray.exe" -ForegroundColor Green
+
+    # Copy tray resources (settings dialog, etc.)
+    $trayResourcesSrc = Join-Path $repoRoot "cmd\pinshare-tray\resources"
+    $trayResourcesDst = Join-Path $distDir "resources"
+    if (Test-Path $trayResourcesSrc) {
+        if (Test-Path $trayResourcesDst) {
+            Remove-Item $trayResourcesDst -Recurse -Force
+        }
+        Copy-Item -Path $trayResourcesSrc -Destination $trayResourcesDst -Recurse -Force
+        Write-Host "✓ Copied: $distDir\resources\" -ForegroundColor Green
+    }
     Write-Host ""
 
     # Build React UI
