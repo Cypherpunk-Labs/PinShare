@@ -221,7 +221,7 @@ To configure VirusTotal:
 **Common issues:**
 
 1. **Port already in use**
-   - Check if another app is using ports 8888, 9090, 5001
+   - Check if another app is using ports 9090, 5001, 4001
    - Change ports in configuration
 
 2. **IPFS failed to initialize**
@@ -375,19 +375,29 @@ net start PinShareService
 
 ### Network Configuration
 
-**Static IP / Public Access:**
+**Public P2P Ports:**
 
-If you want to access PinShare from other computers:
+For PinShare to work optimally with other peers, the following ports should be publicly accessible:
 
-1. **Change bind address** (advanced):
-   - Modify service to bind to `0.0.0.0` instead of `localhost`
-   - Add firewall rules for ports 8888, 9090
-   - ⚠️ **Security risk** - Add authentication first!
+| Port | Protocol | Purpose |
+|------|----------|---------|
+| 4001 | TCP/UDP | IPFS Swarm (file sharing) |
+| 50001 | TCP | PinShare libp2p (peer discovery) |
 
-2. **Use reverse proxy** (recommended):
-   - Install nginx/Caddy
-   - Proxy to `localhost:8888`
-   - Add HTTPS and authentication
+**Options for public access:**
+- **UPnP** - Automatically opens ports if your router supports it
+- **Port forwarding** - Manually configure your router to forward these ports
+- **NAT traversal** - PinShare uses relay servers as fallback
+
+**Testing port reachability:**
+
+```bash
+# From another machine or use online port checkers
+nc -zv your-public-ip 4001
+nc -zv your-public-ip 50001
+```
+
+**Note:** The API ports (5001, 8080, 9090) should remain bound to localhost for security.
 
 ## Building from Source
 

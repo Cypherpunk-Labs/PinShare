@@ -18,7 +18,6 @@ This document describes the architecture of PinShare when deployed on Windows.
 │  • Runs as SYSTEM account (no user login required)                  │
 │  • Manages child processes (keeps them alive)                       │
 │  • Monitors health & auto-restarts crashed processes                │
-│  • Embedded UI server on port 8888                                  │
 │                                                                      │
 │  ┌─────────────────────┐    ┌─────────────────────┐                │
 │  │   ipfs.exe          │    │   pinshare.exe      │                │
@@ -52,12 +51,8 @@ The main Windows service that orchestrates all PinShare components.
 - Registers as a Windows Service ("PinShareService")
 - Starts and monitors IPFS daemon
 - Starts and monitors PinShare backend
-- Runs embedded UI server (serves React UI)
 - Health checking with automatic restart on failure
 - Graceful shutdown of all components
-
-**Ports:**
-- 8888: UI Server (serves React frontend, proxies API requests)
 
 **Source:** `cmd/pinsharesvc/`
 
@@ -130,10 +125,8 @@ C:\Program Files\PinShare\
 ├── pinshare.exe       # Main daemon (managed by service)
 ├── pinshare-tray.exe  # User tray app (independent)
 ├── ipfs.exe           # IPFS daemon (managed by service)
-└── ui\                # React web UI (served by service)
-    ├── index.html
-    ├── assets\
-    └── ...
+└── resources\         # Tray app resources
+    └── icon.ico
 
 C:\ProgramData\PinShare\
 ├── config.json        # Configuration file
@@ -143,8 +136,7 @@ C:\ProgramData\PinShare\
 │   └── ...
 ├── pinshare\          # PinShare data
 │   ├── identity.key   # libp2p identity
-│   ├── metadata.json  # File metadata store
-│   └── pinshare.db    # SQLite database
+│   └── metadata.json  # File metadata store
 ├── upload\            # Watch folder for new files
 ├── cache\             # Downloaded/processed files
 ├── rejected\          # Files that failed security scan
@@ -154,28 +146,9 @@ C:\ProgramData\PinShare\
     └── pinshare.log
 ```
 
-## Registry Configuration
+## Configuration
 
-Configuration is stored in Windows Registry at:
-```
-HKEY_LOCAL_MACHINE\SOFTWARE\PinShare\
-```
-
-| Key | Type | Description |
-|-----|------|-------------|
-| InstallDirectory | REG_SZ | Installation path |
-| DataDirectory | REG_SZ | Data directory path |
-| IPFSAPIPort | REG_DWORD | IPFS API port (default: 5001) |
-| IPFSGatewayPort | REG_DWORD | IPFS Gateway port (default: 8080) |
-| IPFSSwarmPort | REG_DWORD | IPFS Swarm port (default: 4001) |
-| PinShareAPIPort | REG_DWORD | PinShare API port (default: 9090) |
-| PinShareP2PPort | REG_DWORD | libp2p port (default: 50001) |
-| UIPort | REG_DWORD | UI server port (default: 8888) |
-| OrgName | REG_SZ | Organization name for topic |
-| GroupName | REG_SZ | Group name for topic |
-| SkipVirusTotal | REG_DWORD | Skip virus scanning (0/1) |
-| EnableCache | REG_DWORD | Enable file caching (0/1) |
-| ArchiveNode | REG_DWORD | Run as archive node (0/1) |
+Configuration is stored in `C:\ProgramData\PinShare\config.json`. See the README for available options.
 
 ## Service Management
 
@@ -228,4 +201,4 @@ PinShare supports multiple security scanning backends:
 | 3 | ClamAV | clamscan in PATH |
 | 4 | VirusTotal via browser | Chromium installed |
 
-Set `SkipVirusTotal=1` in registry to bypass all scanning (for testing).
+Set `"skip_virus_total": true` in config.json to bypass all scanning (for testing).

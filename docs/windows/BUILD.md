@@ -68,7 +68,6 @@ brew install mingw-w64
 ```bash
 git clone https://github.com/Episk-pos/PinShare.git
 cd PinShare
-git checkout infra/refactor
 ```
 
 ### Option 1: Build Everything (Recommended)
@@ -76,12 +75,11 @@ git checkout infra/refactor
 Use the provided build script (preferred over make targets):
 
 ```bash
-# On Windows (Git Bash or cmd.exe)
+# On Windows (Git Bash)
 ./build-windows.bat
-
-# On Linux/macOS (cross-compile)
-./build-windows.sh
 ```
+
+**Note:** Cross-compilation from Linux/macOS via `build-windows.sh` requires additional testing.
 
 This will:
 1. Build PinShare backend (`pinshare.exe`)
@@ -178,62 +176,20 @@ light.exe -?
 
 ### Build Steps
 
-#### On Windows
+#### On Windows (Git Bash)
 
-```cmd
+```bash
 cd installer
-build.bat
+./build-wix6.bat [version]
 ```
 
-This will:
-1. Harvest UI files using `heat.exe`
-2. Compile WiX sources with `candle.exe`
-3. Link MSI package with `light.exe`
-4. Output: `dist/PinShare-Setup.msi`
+This uses WiX 4.x/6.x toolset (installed via `dotnet tool install`) to build the MSI installer.
 
-#### Manual Build (Windows)
+Output: `installer/bin/Release/PinShare-Setup.msi`
 
-```cmd
-cd installer
+#### Using CI/CD
 
-REM Harvest UI files
-heat.exe dir "..\dist\windows\ui" ^
-  -cg UIComponents ^
-  -dr UIFolder ^
-  -gg -g1 -sf -srd ^
-  -var var.UISourceDir ^
-  -out UIComponents.wxs
-
-REM Compile
-candle.exe ^
-  -ext WixUIExtension ^
-  -ext WixUtilExtension ^
-  -dUISourceDir="..\dist\windows\ui" ^
-  Product.wxs UIComponents.wxs
-
-REM Link
-light.exe ^
-  -ext WixUIExtension ^
-  -ext WixUtilExtension ^
-  -out PinShare-Setup.msi ^
-  Product.wixobj UIComponents.wixobj
-
-REM Move to dist
-move PinShare-Setup.msi ..\dist\
-```
-
-#### On Linux (using Wine)
-
-**Not recommended.** WiX under Wine is unreliable. Better options:
-
-1. **Build on Windows VM**
-   - Use VirtualBox/VMware
-   - Share `dist/windows` folder
-   - Run `build.bat` inside VM
-
-2. **Use CI/CD**
-   - GitHub Actions has Windows runners
-   - See `.github/workflows/build.yml` example below
+For automated builds, use GitHub Actions with Windows runners. See `.github/workflows/build.yml` for an example.
 
 ## Troubleshooting Build Issues
 
@@ -308,7 +264,7 @@ dir ..\dist\windows\*.exe
 dir ..\dist\windows\ui\index.html
 ```
 
-All required files must exist before running `build.bat`.
+All required files must exist before building the installer.
 
 ## CI/CD Integration
 
@@ -321,7 +277,7 @@ name: Build Windows
 
 on:
   push:
-    branches: [ main, infra/refactor ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
@@ -337,24 +293,9 @@ jobs:
       with:
         go-version: '1.24'
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '20'
-
-    - name: Install dependencies
-      run: |
-        choco install wix311 -y
-        refreshenv
-
     - name: Build Windows components
-      run: |
-        make -f Makefile.windows windows-all
-
-    - name: Build installer
-      run: |
-        cd installer
-        .\build.bat
+      shell: bash
+      run: ./build-windows.bat
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
@@ -362,7 +303,7 @@ jobs:
         name: pinshare-windows
         path: |
           dist/windows/*.exe
-          dist/PinShare-Setup.msi
+          installer/bin/Release/*.msi
 ```
 
 ## Advanced Build Options

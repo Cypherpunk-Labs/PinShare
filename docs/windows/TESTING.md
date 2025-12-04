@@ -18,10 +18,9 @@ Complete testing strategy for rapid feedback and iteration on Windows developmen
 ### Prerequisites
 
 - Windows 10/11 (build 19041 or later)
-- PowerShell 5.1 or later
+- Git Bash (preferred shell)
 - Administrator privileges
 - Go 1.21+ installed
-- Git for Windows
 
 ### Run All Tests
 
@@ -60,9 +59,8 @@ Main automated testing script with the following features:
 **Test Suites:**
 - `Build` - Validate build environment and compile binaries
 - `Service` - Test service installation, start, stop
-- `Health` - Verify IPFS, API, and UI server health
+- `Health` - Verify IPFS and API health
 - `API` - Test PinShare REST API endpoints
-- `UI` - Test UI server functionality
 - `Integration` - End-to-end integration tests
 - `All` - Complete test run
 - `Cleanup` - Remove service and data
@@ -143,9 +141,6 @@ Main automated testing script with the following features:
 
    # Test PinShare API
    Invoke-WebRequest http://localhost:9090/api/v1/files
-
-   # Test UI Server
-   Start-Process "http://localhost:8888"
    ```
 
 5. **Log Review**
@@ -474,7 +469,6 @@ while ($true) {
 | Process Management | 85% | Critical |
 | Health Checking | 80% | High |
 | Configuration | 75% | High |
-| UI Server | 70% | Medium |
 | Tray Application | 60% | Medium |
 
 ---
