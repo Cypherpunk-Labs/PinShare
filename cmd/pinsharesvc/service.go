@@ -133,17 +133,18 @@ func (s *pinshareService) initialize() error {
 	}
 	s.logInfo("PinShare backend is ready")
 
+	// TODO: Re-enable when UI is merged
 	// Start embedded UI server
-	s.logInfo("Starting embedded UI server...")
-	s.uiServer = NewUIServer(s.config, s.eventLog)
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		if err := s.uiServer.Start(s.ctx); err != nil {
-			s.logError("UI server error", err)
-		}
-	}()
-	s.logInfo(fmt.Sprintf("UI server started on http://localhost:%d", s.config.UIPort))
+	// s.logInfo("Starting embedded UI server...")
+	// s.uiServer = NewUIServer(s.config, s.eventLog)
+	// s.wg.Add(1)
+	// go func() {
+	// 	defer s.wg.Done()
+	// 	if err := s.uiServer.Start(s.ctx); err != nil {
+	// 		s.logError("UI server error", err)
+	// 	}
+	// }()
+	// s.logInfo(fmt.Sprintf("UI server started on http://localhost:%d", s.config.UIPort))
 
 	// Start health checker background monitoring
 	s.logInfo("Starting health checker background monitoring...")
@@ -201,11 +202,12 @@ func (s *pinshareService) shutdown() {
 	// Cancel context to signal all goroutines
 	s.cancel()
 
+	// TODO: Re-enable when UI is merged
 	// Stop UI server
-	if s.uiServer != nil {
-		s.logInfo("Stopping UI server...")
-		s.uiServer.Stop()
-	}
+	// if s.uiServer != nil {
+	// 	s.logInfo("Stopping UI server...")
+	// 	s.uiServer.Stop()
+	// }
 
 	// Stop PinShare backend
 	s.logInfo("Stopping PinShare backend...")

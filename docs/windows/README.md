@@ -44,39 +44,24 @@ Complete guide for installing and using PinShare on Windows.
 4. **First launch**
    - The PinShare service should start automatically
    - Look for the PinShare icon in your system tray (bottom-right corner)
-   - Click "Open PinShare UI" to access the web interface
 
 ## Getting Started
 
-### Accessing the UI
-
-After installation, access PinShare through:
-
-1. **System Tray**
-   - Right-click the PinShare icon
-   - Select "Open PinShare UI"
-
-2. **Browser**
-   - Navigate to: http://localhost:8888
-
-3. **Start Menu**
-   - Start Menu → PinShare → Open PinShare UI
-
 ### First-Time Setup
 
-When you first open PinShare:
+When PinShare first starts:
 
 1. The IPFS repository will be initialized automatically
 2. PinShare will generate a unique identity key
-3. You can start uploading files immediately
+3. You can start sharing files immediately
 
-### Uploading Files
+### Sharing Files
 
-1. Click "Upload" or drag files to the upload area
+1. Copy or move files to the uploads folder (default: `C:\ProgramData\PinShare\upload`)
 2. Files are automatically:
    - Scanned for malware (if configured)
    - Added to IPFS
-   - Shared with peers via libp2p
+   - File metadata is shared with peers via libp2p
 
 ## Configuration
 
@@ -86,39 +71,20 @@ PinShare uses these default settings:
 
 | Setting | Default Value | Description |
 |---------|---------------|-------------|
-| UI Port | 8888 | Web interface port |
-| API Port | 9090 | Backend API port |
-| IPFS API | 5001 | IPFS daemon API port |
-| IPFS Gateway | 8080 | IPFS HTTP gateway |
-| IPFS Swarm | 4001 | IPFS P2P port |
-| libp2p Port | 50001 | PinShare P2P port |
+| API Port | 9090 | Backend API port (localhost only) |
+| IPFS API | 5001 | IPFS daemon API port (localhost only) |
+| IPFS Gateway | 8080 | IPFS HTTP gateway (localhost only) |
+| IPFS Swarm | 4001 | IPFS P2P port (public) |
+| libp2p Port | 50001 | PinShare P2P port (public) |
+
+**Note:** The API ports (9090, 5001, 8080) are bound to localhost by default and are not exposed to the network.
 
 ### Changing Configuration
-
-#### Method 1: Registry Editor (Advanced)
-
-1. Press `Win + R`, type `regedit`, press Enter
-2. Navigate to: `HKEY_LOCAL_MACHINE\SOFTWARE\PinShare`
-3. Modify values:
-   - `UIPort` - Change web UI port
-   - `OrgName` - Your organization name
-   - `GroupName` - Your group name
-   - `SkipVirusTotal` - 1 to skip virus scanning
-   - `EnableCache` - 1 to enable caching
-
-4. Restart the service:
-   ```cmd
-   net stop PinShareService
-   net start PinShareService
-   ```
-
-#### Method 2: Configuration File
 
 Edit: `C:\ProgramData\PinShare\config.json`
 
 ```json
 {
-  "ui_port": 8888,
   "pinshare_api_port": 9090,
   "org_name": "MyOrganization",
   "group_name": "MyGroup",
@@ -127,7 +93,11 @@ Edit: `C:\ProgramData\PinShare\config.json`
 }
 ```
 
-Then restart the service.
+Then restart the service:
+```cmd
+net stop PinShareService
+net start PinShareService
+```
 
 ### Data Directories
 
@@ -142,13 +112,14 @@ C:\ProgramData\PinShare\
 │   └── pinshare.log     # Backend logs
 ├── ipfs\                # IPFS repository
 ├── pinshare\
-│   ├── pinshare.db      # SQLite database
 │   ├── metadata.json    # File metadata
-│   └── identity.key     # libp2p identity
+│   └── identity.key     # libp2p identity (keep secure)
 ├── upload\              # Upload directory
 ├── cache\               # File cache
 └── rejected\            # Rejected files
 ```
+
+**Security Note:** The `identity.key` file contains the libp2p private key. Keep this file secure and backed up.
 
 ## Using PinShare
 
@@ -157,9 +128,9 @@ C:\ProgramData\PinShare\
 The system tray application provides quick access:
 
 **Menu Options:**
-- **Open PinShare UI** - Opens web interface
 - **Status** - Shows service status
 - **Start/Stop/Restart Service** - Control the service
+- **Settings** - Configure PinShare options
 - **View Logs** - Opens log directory
 - **Exit** - Closes tray app (service continues running)
 
@@ -235,7 +206,7 @@ PinShare supports multiple virus scanning options (in priority order):
 To configure VirusTotal:
 
 1. Get API token from https://www.virustotal.com/
-2. Add to registry: `HKLM\SOFTWARE\PinShare\VirusTotalToken`
+2. Add to config.json: `"virus_total_token": "your_api_token"`
 3. Restart service
 
 ## Troubleshooting
@@ -261,21 +232,6 @@ To configure VirusTotal:
 3. **Permission denied**
    - Ensure service has write access to `C:\ProgramData\PinShare`
    - Check antivirus isn't blocking executables
-
-### UI Not Loading
-
-1. **Check service status**
-   ```cmd
-   sc query PinShareService
-   ```
-
-2. **Verify UI server is running**
-   - Open: http://localhost:8888
-   - If connection refused, check `service.log`
-
-3. **Check browser console**
-   - Press F12 in browser
-   - Look for JavaScript errors
 
 ### High CPU/Memory Usage
 
@@ -310,33 +266,33 @@ ipfs.exe --repo-dir="C:\ProgramData\PinShare\ipfs" repo gc
 
 ### Logs and Debugging
 
-**View logs:**
+**View logs (Git Bash):**
 
-```cmd
+```bash
 # Service log
-type "C:\ProgramData\PinShare\logs\service.log"
+cat "C:\ProgramData\PinShare\logs\service.log"
 
 # IPFS log
-type "C:\ProgramData\PinShare\logs\ipfs.log"
+cat "C:\ProgramData\PinShare\logs\ipfs.log"
 
 # PinShare log
-type "C:\ProgramData\PinShare\logs\pinshare.log"
+cat "C:\ProgramData\PinShare\logs\pinshare.log"
 ```
 
 **Enable debug mode:**
 
 1. Stop the service
-2. Run in console mode:
-   ```cmd
-   cd "C:\Program Files\PinShare"
-   pinsharesvc.exe debug
+2. Run in console mode (Git Bash):
+   ```bash
+   cd "/c/Program Files/PinShare"
+   ./pinsharesvc.exe debug
    ```
 3. Watch console output
 
-**Tail logs in PowerShell:**
+**Tail logs (Git Bash):**
 
-```powershell
-Get-Content "C:\ProgramData\PinShare\logs\service.log" -Wait -Tail 50
+```bash
+tail -f "C:\ProgramData\PinShare\logs\service.log"
 ```
 
 ## Uninstallation
@@ -363,10 +319,6 @@ rmdir /s "C:\Program Files\PinShare"
 
 # Remove data (WARNING: Deletes all pins and configuration)
 rmdir /s "C:\ProgramData\PinShare"
-
-# Remove registry entries
-reg delete "HKLM\SOFTWARE\PinShare" /f
-reg delete "HKCU\SOFTWARE\PinShare" /f
 ```
 
 ## Advanced Topics
@@ -441,12 +393,11 @@ If you want to access PinShare from other computers:
 
 See [BUILD.md](BUILD.md) for complete build instructions.
 
-Quick start:
+Quick start (Git Bash):
 
-```cmd
+```bash
 # Install dependencies
 # - Go 1.24+
-# - Node.js 20+
 # - MinGW-w64 (for CGO/SQLite)
 # - WiX Toolset
 
@@ -455,11 +406,7 @@ git clone https://github.com/Episk-pos/PinShare.git
 cd PinShare
 
 # Build all components
-make -f Makefile.windows windows-all
-
-# Build installer
-cd installer
-build.bat
+./build-windows.bat
 ```
 
 ## Support

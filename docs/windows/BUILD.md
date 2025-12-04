@@ -10,13 +10,10 @@ Complete guide for building PinShare Windows distribution from source.
    - Download: https://golang.org/dl/
    - Verify: `go version`
 
-2. **Node.js 20 or later**
-   - Download: https://nodejs.org/
-   - Verify: `node --version` and `npm --version`
-
-3. **Git**
+2. **Git for Windows** (includes Git Bash)
    - Download: https://git-scm.com/
    - Verify: `git --version`
+   - **Note:** Use Git Bash as the preferred shell for running build commands
 
 ### Platform-Specific Requirements
 
@@ -36,7 +33,7 @@ Complete guide for building PinShare Windows distribution from source.
   - Download: https://visualstudio.microsoft.com/downloads/
   - Install "Desktop development with C++" workload
 
-#### Cross-Compiling from Linux
+#### Cross-Compiling from Linux (Debian/Ubuntu)
 
 **Required packages:**
 ```bash
@@ -44,16 +41,13 @@ sudo apt-get update
 sudo apt-get install -y \
   gcc-mingw-w64-x86-64 \
   wine64 \
+  wine32 \
   unzip \
   curl
-```
 
-**For Debian/Ubuntu:**
-```bash
-# Add i386 architecture for Wine
+# Add i386 architecture for Wine (if not already added)
 sudo dpkg --add-architecture i386
 sudo apt-get update
-sudo apt-get install wine64 wine32
 ```
 
 #### Cross-Compiling from macOS
@@ -79,20 +73,22 @@ git checkout infra/refactor
 
 ### Option 1: Build Everything (Recommended)
 
-```bash
-# On Linux/macOS
-make -f Makefile.windows windows-all
+Use the provided build script (preferred over make targets):
 
-# On Windows
-mingw32-make -f Makefile.windows windows-all
+```bash
+# On Windows (Git Bash or cmd.exe)
+./build-windows.bat
+
+# On Linux/macOS (cross-compile)
+./build-windows.sh
 ```
 
 This will:
 1. Build PinShare backend (`pinshare.exe`)
 2. Build Windows service wrapper (`pinsharesvc.exe`)
 3. Build system tray application (`pinshare-tray.exe`)
-4. Build React UI (static files)
-5. Download IPFS Kubo binary
+4. Download IPFS Kubo binary
+5. Optionally build the MSI installer
 
 Output: `dist/windows/`
 
@@ -146,31 +142,7 @@ go build -ldflags="-H windowsgui" -o dist\windows\pinshare-tray.exe .\cmd\pinsha
 
 The `-H windowsgui` flag prevents a console window from appearing.
 
-#### 4. React UI
-
-```bash
-cd pinshare-ui
-
-# Install dependencies
-npm install
-
-# Build for production
-npm run build
-
-# Copy to distribution
-mkdir -p ../dist/windows/ui
-cp -r dist/* ../dist/windows/ui/
-```
-
-On Windows:
-```cmd
-cd pinshare-ui
-npm install
-npm run build
-xcopy /E /I dist ..\dist\windows\ui
-```
-
-#### 5. IPFS Kubo Binary
+#### 4. IPFS Kubo Binary
 
 ```bash
 # Download and extract
@@ -298,34 +270,6 @@ export CC=x86_64-w64-mingw32-gcc  # Linux
 
 # Then build without CGO
 CGO_ENABLED=0 go build ...
-```
-
-### UI Build Errors
-
-**Error:** `npm: command not found`
-
-**Solution:** Install Node.js from https://nodejs.org/
-
-**Error:** `EACCES: permission denied`
-
-**Solution:**
-```bash
-# Don't use sudo with npm
-# Fix npm permissions:
-mkdir ~/.npm-global
-npm config set prefix '~/.npm-global'
-export PATH=~/.npm-global/bin:$PATH
-```
-
-**Error:** Build fails in `pinshare-ui/`
-
-**Solution:**
-```bash
-# Clean and rebuild
-cd pinshare-ui
-rm -rf node_modules dist
-npm install
-npm run build
 ```
 
 ### IPFS Download Errors
@@ -501,11 +445,8 @@ dist/
 │   ├── pinsharesvc.exe      (~15 MB)
 │   ├── pinshare-tray.exe    (~10 MB)
 │   ├── ipfs.exe             (~85 MB)
-│   └── ui/
-│       ├── index.html
-│       ├── assets/
-│       └── ...
-└── PinShare-Setup.msi       (~150 MB)
+│   └── resources/           (tray app resources)
+└── PinShare-Setup.msi       (~100 MB)
 ```
 
 ## Next Steps

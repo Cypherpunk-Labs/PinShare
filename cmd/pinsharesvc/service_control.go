@@ -28,13 +28,16 @@ func installService() error {
 	service, err := manager.OpenService(serviceName)
 	if err == nil {
 		service.Close()
-		// Service already exists - this is fine for reinstall scenarios
+		// Service already exists - this is fine for reinstall/upgrade scenarios where
+		// the MSI installer runs the install command but the service is already registered.
+		// We skip re-registration to preserve the existing service configuration and avoid
+		// errors from attempting to create a duplicate service entry.
 		fmt.Printf("Service %s already exists, skipping installation\n", serviceName)
 		return nil
 	}
 
-	// Create service configuration
-	config := mgr.Config{
+	// Create Windows service configuration
+	winSvcConfig := mgr.Config{
 		DisplayName:  "PinShare Service",
 		Description:  "PinShare - Decentralized IPFS pinning service with libp2p",
 		StartType:    mgr.StartAutomatic,
@@ -42,7 +45,7 @@ func installService() error {
 	}
 
 	// Create service
-	service, err = manager.CreateService(serviceName, exePath, config)
+	service, err = manager.CreateService(serviceName, exePath, winSvcConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create service: %w", err)
 	}
@@ -74,28 +77,28 @@ func installService() error {
 		fmt.Printf("Warning: Failed to install event log source: %v\n", err)
 	}
 
-	// Initialize configuration
-	config_, err := getDefaultConfig()
+	// Initialize PinShare application configuration
+	pinShareConfig, err := getDefaultConfig()
 	if err != nil {
 		return fmt.Errorf("failed to get default config: %w", err)
 	}
 
 	// Get install directory from executable path
-	config_.InstallDirectory = filepath.Dir(exePath)
+	pinShareConfig.InstallDirectory = filepath.Dir(exePath)
 
 	// Ensure directories exist
-	if err := config_.EnsureDirectories(); err != nil {
+	if err := pinShareConfig.EnsureDirectories(); err != nil {
 		return fmt.Errorf("failed to create directories: %w", err)
 	}
 
 	// Save configuration to JSON file
-	if err := config_.SaveToFile(); err != nil {
+	if err := pinShareConfig.SaveToFile(); err != nil {
 		return fmt.Errorf("failed to save config file: %w", err)
 	}
 
 	fmt.Printf("Service %s installed successfully\n", serviceName)
-	fmt.Printf("Installation directory: %s\n", config_.InstallDirectory)
-	fmt.Printf("Data directory: %s\n", config_.DataDirectory)
+	fmt.Printf("Installation directory: %s\n", pinShareConfig.InstallDirectory)
+	fmt.Printf("Data directory: %s\n", pinShareConfig.DataDirectory)
 	fmt.Printf("\nTo start the service, run: %s start\n", exePath)
 
 	return nil
