@@ -261,7 +261,6 @@ set PATH=%PATH%;C:\Program Files (x86)\WiX Toolset v3.11\bin
 **Solution:** Ensure all binaries are built:
 ```cmd
 dir ..\dist\windows\*.exe
-dir ..\dist\windows\ui\index.html
 ```
 
 All required files must exist before building the installer.
@@ -358,9 +357,6 @@ msiexec /i PinShare-Setup.msi /l*v install.log
 
 REM Test service
 sc query PinShareService
-
-REM Test UI
-start http://localhost:8888
 
 REM Uninstall
 msiexec /x PinShare-Setup.msi
