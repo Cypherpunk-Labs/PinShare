@@ -75,11 +75,17 @@ cd PinShare
 Use the provided build script (preferred over make targets):
 
 ```bash
-# On Windows (Git Bash)
-./build-windows.bat
+# On any platform (macOS, Linux, Windows Git Bash)
+./build-windows.sh
+
+# On Windows (CMD or PowerShell)
+.\build-windows.bat
 ```
 
-**Note:** Cross-compilation from Linux/macOS is not yet automated. See "Option 2: Build Individual Components" below for manual cross-compilation steps.
+**Platform behavior:**
+- **Windows (Git Bash):** `build-windows.sh` delegates to `build-windows.bat` for native builds
+- **macOS/Linux:** `build-windows.sh` cross-compiles Windows binaries (CGO disabled)
+- **Windows (CMD):** Use `build-windows.bat` directly
 
 This will:
 1. Build PinShare backend (`pinshare.exe`)
@@ -176,16 +182,29 @@ light.exe -?
 
 ### Build Steps
 
-#### On Windows (Git Bash)
+#### On Windows (Git Bash or CMD)
 
 ```bash
 cd installer
-./build-wix6.bat [version]
+
+# Using shell script (works in Git Bash, delegates to .bat)
+./build-wix6.sh [version]
+
+# Or use batch file directly (CMD/PowerShell)
+.\build-wix6.bat [version]
 ```
 
 This uses WiX 4.x/6.x toolset (installed via `dotnet tool install`) to build the MSI installer.
 
 Output: `installer/bin/Release/PinShare-Setup.msi`
+
+#### On macOS/Linux
+
+WiX cannot run natively on macOS/Linux. Options:
+
+1. **CI/CD Pipeline:** Use GitHub Actions with Windows runners (recommended)
+2. **Windows VM:** Copy built binaries to Windows and run `build-wix6.bat`
+3. **Cross-compile binaries locally, build MSI in CI:** The `build-windows.sh` script creates all binaries; the MSI can be built by GitHub Actions
 
 #### Using CI/CD
 
