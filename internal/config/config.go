@@ -136,7 +136,7 @@ func LoadConfig() (*AppConfig, error) {
 	conf.MetadataTopicID = "/" + conf.OrgName + "/" + conf.GroupName + conf.MetadataTopicID
 	conf.FilteringTopicID = "/" + conf.OrgName + "/" + conf.GroupName + conf.FilteringTopicID
 
-	// Load path configurations (used by Windows service)
+	// Environment variable config overrides
 	if err := parseStringEnv("PS_UPLOAD_FOLDER", &conf.UploadFolder); err != nil {
 		return nil, err
 	}

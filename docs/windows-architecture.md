@@ -4,41 +4,28 @@ This document describes the architecture of PinShare when deployed on Windows.
 
 ## Process Hierarchy
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                     Windows Service Manager                          │
-│                    (runs at system startup)                          │
-└───────────────────────────┬─────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                    pinsharesvc.exe (Windows Service)                 │
-│                    "PinShareService"                                 │
-│                                                                      │
-│  • Runs as SYSTEM account (no user login required)                  │
-│  • Manages child processes (keeps them alive)                       │
-│  • Monitors health & auto-restarts crashed processes                │
-│                                                                      │
-│  ┌─────────────────────┐    ┌─────────────────────┐                │
-│  │   ipfs.exe          │    │   pinshare.exe      │                │
-│  │   (child process)   │    │   (child process)   │                │
-│  │                     │    │                     │                │
-│  │ • IPFS daemon       │    │ • libp2p host       │                │
-│  │ • Port 5001 (API)   │◄───│ • PubSub messaging  │                │
-│  │ • Port 4001 (swarm) │    │ • File watcher      │                │
-│  │ • Port 8080 (gw)    │    │ • API on port 9090  │                │
-│  └─────────────────────┘    └─────────────────────┘                │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph WSM["Windows Service Manager<br/>(runs at system startup)"]
+    end
 
-┌─────────────────────────────────────────────────────────────────────┐
-│                    pinshare-tray.exe (User Process)                  │
-│                    (runs at user login via Startup folder)           │
-│                                                                      │
-│  • Runs in USER context (per-user, after login)                     │
-│  • System tray icon for user interaction                            │
-│  • NOT managed by service - completely independent                  │
-│  • Talks to service via HTTP APIs                                   │
-└─────────────────────────────────────────────────────────────────────┘
+    subgraph SVC["pinsharesvc.exe (Windows Service)<br/>PinShareService"]
+        direction TB
+        SVC_DESC["• Runs as SYSTEM account (no user login required)<br/>• Manages child processes (keeps them alive)<br/>• Monitors health & auto-restarts crashed processes"]
+
+        subgraph Children[" "]
+            direction LR
+            IPFS["<b>ipfs.exe</b><br/>(child process)<br/><br/>• IPFS daemon<br/>• Port 5001 (API)<br/>• Port 4001 (swarm)<br/>• Port 8080 (gw)"]
+            PS["<b>pinshare.exe</b><br/>(child process)<br/><br/>• libp2p host<br/>• PubSub messaging<br/>• File watcher<br/>• API on port 9090"]
+        end
+    end
+
+    subgraph TRAY["pinshare-tray.exe (User Process)<br/>(runs at user login via Startup folder)"]
+        TRAY_DESC["• Runs in USER context (per-user, after login)<br/>• System tray icon for user interaction<br/>• NOT managed by service - completely independent<br/>• Talks to service via HTTP APIs"]
+    end
+
+    WSM --> SVC
+    PS -->|"connects to"| IPFS
 ```
 
 ## Components
@@ -100,21 +87,15 @@ User-facing system tray application for easy interaction.
 
 ## Data Flow
 
-```
-User clicks tray icon
-        │
-        ▼
-pinshare-tray.exe ──HTTP──► pinsharesvc.exe (port 8888)
-                                   │
-                                   ├──proxy──► pinshare.exe API (port 9090)
-                                   │                  │
-                                   │                  ▼
-                                   │           libp2p network
-                                   │                  │
-                                   └──────────► ipfs.exe (port 5001)
-                                                      │
-                                                      ▼
-                                               IPFS network
+```mermaid
+flowchart TD
+    User["User clicks tray icon"]
+    User --> Tray["pinshare-tray.exe"]
+    Tray -->|"HTTP"| SVC["pinsharesvc.exe<br/>(port 8888)"]
+    SVC -->|"proxy"| PS["pinshare.exe API<br/>(port 9090)"]
+    SVC --> IPFS["ipfs.exe<br/>(port 5001)"]
+    PS --> Libp2p["libp2p network"]
+    IPFS --> IPFSNet["IPFS network"]
 ```
 
 ## Installed Files
@@ -125,7 +106,7 @@ C:\Program Files\PinShare\
 ├── pinshare.exe       # Main daemon (managed by service)
 ├── pinshare-tray.exe  # User tray app (independent)
 ├── ipfs.exe           # IPFS daemon (managed by service)
-└── resources\         # Tray app resources
+└── resources/         # Tray app resources
     └── icon.ico
 
 C:\ProgramData\PinShare\
