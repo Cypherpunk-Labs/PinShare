@@ -119,10 +119,10 @@ cp -r "$SCRIPT_DIR/cmd/pinshare-tray/resources/"* "$DIST_DIR/resources/" 2>/dev/
 echo "[OK] Copied: $DIST_DIR/resources/"
 echo ""
 
-# Build React UI (if present)
+# Build React UI (if present and has package.json)
 echo "Building React UI..."
-if [ ! -d "$SCRIPT_DIR/pinshare-ui" ]; then
-    echo "[SKIP] pinshare-ui directory not found - UI will be added later"
+if [ ! -f "$SCRIPT_DIR/pinshare-ui/package.json" ]; then
+    echo "[SKIP] pinshare-ui/package.json not found - UI build skipped"
     echo ""
 else
     pushd "$SCRIPT_DIR/pinshare-ui" > /dev/null
