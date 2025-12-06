@@ -79,7 +79,7 @@ Use the provided build script (preferred over make targets):
 ./build-windows.bat
 ```
 
-**Note:** Cross-compilation from Linux/macOS via `build-windows.sh` requires additional testing.
+**Note:** Cross-compilation from Linux/macOS is not yet automated. See "Option 2: Build Individual Components" below for manual cross-compilation steps.
 
 This will:
 1. Build PinShare backend (`pinshare.exe`)

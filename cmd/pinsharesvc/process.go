@@ -14,13 +14,15 @@ import (
 )
 
 type ProcessManager struct {
-	config        *ServiceConfig
-	eventLog      debug.Log
-	ipfsCmd       *exec.Cmd
-	pinshareCmd   *exec.Cmd
-	ipfsLogFile   *os.File
+	config          *ServiceConfig
+	eventLog        debug.Log
+	ipfsCmd         *exec.Cmd
+	pinshareCmd     *exec.Cmd
+	ipfsLogFile     *os.File
 	pinshareLogFile *os.File
-	mu            sync.Mutex
+	ipfsExited      chan struct{} // closed when IPFS process exits
+	pinshareExited  chan struct{} // closed when PinShare process exits
+	mu              sync.Mutex
 }
 
 func NewProcessManager(config *ServiceConfig, eventLog debug.Log) *ProcessManager {
@@ -78,8 +80,9 @@ func (pm *ProcessManager) StartIPFS(ctx context.Context) error {
 
 	pm.logInfo(fmt.Sprintf("IPFS daemon started with PID %d", pm.ipfsCmd.Process.Pid))
 
-	// Monitor process in background
-	go pm.monitorProcess(ctx, pm.ipfsCmd, "IPFS")
+	// Create exit channel and monitor process in background
+	pm.ipfsExited = make(chan struct{})
+	go pm.monitorProcess(ctx, pm.ipfsCmd, "IPFS", pm.ipfsExited)
 
 	return nil
 }
@@ -230,14 +233,18 @@ func (pm *ProcessManager) StartPinShare(ctx context.Context) error {
 
 	pm.logInfo(fmt.Sprintf("PinShare backend started with PID %d", pm.pinshareCmd.Process.Pid))
 
-	// Monitor process in background
-	go pm.monitorProcess(ctx, pm.pinshareCmd, "PinShare")
+	// Create exit channel and monitor process in background
+	pm.pinshareExited = make(chan struct{})
+	go pm.monitorProcess(ctx, pm.pinshareCmd, "PinShare", pm.pinshareExited)
 
 	return nil
 }
 
-// monitorProcess monitors a process and logs when it exits
-func (pm *ProcessManager) monitorProcess(ctx context.Context, cmd *exec.Cmd, name string) {
+// monitorProcess monitors a process and logs when it exits.
+// The exited channel is closed when the process exits, allowing Stop functions to wait.
+func (pm *ProcessManager) monitorProcess(ctx context.Context, cmd *exec.Cmd, name string, exited chan struct{}) {
+	defer close(exited)
+
 	err := cmd.Wait()
 
 	select {
@@ -277,18 +284,15 @@ func (pm *ProcessManager) StopIPFS() error {
 		}
 	}
 
-	// Wait for process to exit (with timeout)
-	done := make(chan error, 1)
-	go func() {
-		_, err := pm.ipfsCmd.Process.Wait()
-		done <- err
-	}()
-
-	select {
-	case <-time.After(10 * time.Second):
-		pm.logError("IPFS shutdown timeout", nil)
-	case <-done:
-		// Process exited
+	// Wait for process to exit via the monitor goroutine (with timeout)
+	// This avoids calling Wait() twice which causes a race condition
+	if pm.ipfsExited != nil {
+		select {
+		case <-time.After(10 * time.Second):
+			pm.logError("IPFS shutdown timeout", nil)
+		case <-pm.ipfsExited:
+			// Process exited, monitor goroutine has called Wait()
+		}
 	}
 
 	// Close log file
@@ -325,18 +329,15 @@ func (pm *ProcessManager) StopPinShare() error {
 		}
 	}
 
-	// Wait for process to exit (with timeout)
-	done := make(chan error, 1)
-	go func() {
-		_, err := pm.pinshareCmd.Process.Wait()
-		done <- err
-	}()
-
-	select {
-	case <-time.After(10 * time.Second):
-		pm.logError("PinShare shutdown timeout", nil)
-	case <-done:
-		// Process exited
+	// Wait for process to exit via the monitor goroutine (with timeout)
+	// This avoids calling Wait() twice which causes a race condition
+	if pm.pinshareExited != nil {
+		select {
+		case <-time.After(10 * time.Second):
+			pm.logError("PinShare shutdown timeout", nil)
+		case <-pm.pinshareExited:
+			// Process exited, monitor goroutine has called Wait()
+		}
 	}
 
 	// Close log file

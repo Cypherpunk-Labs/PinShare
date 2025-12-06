@@ -203,6 +203,9 @@ func (t *Tray) handleSettings() {
 	}
 
 	if changed {
+		// Reload config to pick up new port settings
+		reloadConfig()
+
 		// Ask user if they want to restart the service to apply changes
 		if showConfirmDialog(
 			"Restart Service?",
@@ -403,13 +406,14 @@ func getServiceStatus() (ServiceState, error) {
 
 // checkIPFSHealth checks if IPFS daemon is responding
 func checkIPFSHealth() bool {
+	config := getConfig()
 	client := &http.Client{
 		Timeout: 2 * time.Second,
 	}
 
 	// IPFS version endpoint requires POST
-	resp, err := client.Post("http://localhost:5001/api/v0/version",
-		"application/json", nil)
+	url := fmt.Sprintf("http://localhost:%d/api/v0/version", config.IPFSAPIPort)
+	resp, err := client.Post(url, "application/json", nil)
 	if err != nil {
 		return false
 	}
@@ -420,11 +424,13 @@ func checkIPFSHealth() bool {
 
 // checkPinShareHealth checks if PinShare API is responding
 func checkPinShareHealth() bool {
+	config := getConfig()
 	client := &http.Client{
 		Timeout: 2 * time.Second,
 	}
 
-	resp, err := client.Get("http://localhost:9090/api/health")
+	url := fmt.Sprintf("http://localhost:%d/api/health", config.PinShareAPIPort)
+	resp, err := client.Get(url)
 	if err != nil {
 		return false
 	}

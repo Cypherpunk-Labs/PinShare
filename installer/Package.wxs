@@ -124,7 +124,8 @@
       <ComponentGroupRef Id="TrayResources" />
       <!-- TEMPORARILY DISABLED: UI will be added from infra/refactor branch later -->
       <!-- <ComponentGroupRef Id="UIComponents" /> -->
-      <ComponentRef Id="RegistryEntries" />
+      <!-- Registry entries removed - configuration is now handled via config.json only -->
+      <!-- <ComponentRef Id="RegistryEntries" /> -->
       <ComponentRef Id="DataDirectories" />
       <ComponentRef Id="StartupEntry" />
       <ComponentRef Id="Shortcuts" />
@@ -245,38 +246,16 @@
   </Fragment>
   -->
 
-  <!-- Registry entries - values from installer dialog properties -->
+  <!-- Registry entries removed - configuration is now handled via config.json only
+       The service creates config.json on first install via pinsharesvc.exe install
   <Fragment>
     <Component Id="RegistryEntries" Directory="INSTALLFOLDER" Bitness="always64">
       <RegistryKey Root="HKLM" Key="SOFTWARE\PinShare">
-        <!-- Installation paths -->
-        <RegistryValue Name="InstallDirectory" Type="string" Value="[INSTALLFOLDER]" />
-        <RegistryValue Name="DataDirectory" Type="string" Value="[DATA_FOLDER]" />
-        <RegistryValue Name="LogsDirectory" Type="string" Value="[LOGS_FOLDER]" />
-        <RegistryValue Name="UploadDirectory" Type="string" Value="[UPLOAD_DIR]" />
-        <RegistryValue Name="CacheDirectory" Type="string" Value="[CACHE_FOLDER]" />
-        <RegistryValue Name="IPFSBinary" Type="string" Value="[INSTALLFOLDER]ipfs.exe" />
-        <RegistryValue Name="PinShareBinary" Type="string" Value="[INSTALLFOLDER]pinshare.exe" />
-
-        <!-- Ports - user configurable (stored as DWORD integers) -->
-        <RegistryValue Name="IPFSAPIPort" Type="integer" Value="[IPFS_API_PORT]" />
-        <RegistryValue Name="IPFSGatewayPort" Type="integer" Value="[IPFS_GATEWAY_PORT]" />
-        <RegistryValue Name="IPFSSwarmPort" Type="integer" Value="[IPFS_SWARM_PORT]" />
-        <RegistryValue Name="PinShareAPIPort" Type="integer" Value="[PINSHARE_API_PORT]" />
-        <RegistryValue Name="PinShareP2PPort" Type="integer" Value="[PINSHARE_P2P_PORT]" />
-        <RegistryValue Name="UIPort" Type="integer" Value="[UI_PORT]" />
-
-        <!-- Organization configuration - user configurable -->
-        <RegistryValue Name="OrgName" Type="string" Value="[ORG_NAME]" />
-        <RegistryValue Name="GroupName" Type="string" Value="[GROUP_NAME]" />
-
-        <!-- Feature toggles - user configurable (stored as DWORD integers) -->
-        <RegistryValue Name="EnableCache" Type="integer" Value="[ENABLE_CACHE]" />
-        <RegistryValue Name="ArchiveNode" Type="integer" Value="[ARCHIVE_NODE]" />
-        <RegistryValue Name="LogLevel" Type="string" Value="[LOG_LEVEL]" />
+        ...
       </RegistryKey>
     </Component>
   </Fragment>
+  -->
 
   <!-- Data directories -->
   <Fragment>
@@ -288,11 +267,13 @@
       <CreateFolder Directory="CacheFolder" />
       <CreateFolder Directory="RejectedFolder" />
 
-      <RegistryValue Root="HKLM"
-                     Key="SOFTWARE\PinShare"
-                     Name="DataCreated"
+      <!-- Registry key used as KeyPath for WiX component tracking (required for proper uninstall) -->
+      <RegistryValue Root="HKCU"
+                     Key="Software\PinShare"
+                     Name="DataDirectoriesCreated"
                      Type="integer"
-                     Value="1" />
+                     Value="1"
+                     KeyPath="yes" />
     </Component>
   </Fragment>
 
