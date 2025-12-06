@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/getlantern/systray"
@@ -219,8 +220,11 @@ func (t *Tray) handleSettings() {
 
 // handleViewLogs opens the log directory
 func (t *Tray) handleViewLogs() {
-	// Get data directory
-	programData := "C:\\ProgramData"
+	// Get data directory from environment or default
+	programData := os.Getenv("PROGRAMDATA")
+	if programData == "" {
+		programData = "C:\\ProgramData"
+	}
 	logDir := fmt.Sprintf("%s\\PinShare\\logs", programData)
 
 	if err := openBrowser(logDir); err != nil {

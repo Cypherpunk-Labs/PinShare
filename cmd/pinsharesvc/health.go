@@ -9,6 +9,14 @@ import (
 	"golang.org/x/sys/windows/svc/debug"
 )
 
+// Health check configuration constants
+const (
+	healthCheckInterval     = 30 * time.Second
+	healthRestartDelay      = 5 * time.Second
+	healthMaxRestarts       = 3
+	healthHTTPTimeout       = 5 * time.Second
+)
+
 type HealthChecker struct {
 	config         *ServiceConfig
 	processManager *ProcessManager
@@ -27,9 +35,9 @@ func NewHealthChecker(config *ServiceConfig, pm *ProcessManager, eventLog debug.
 		config:         config,
 		processManager: pm,
 		eventLog:       eventLog,
-		checkInterval:  30 * time.Second,
-		restartDelay:   5 * time.Second,
-		maxRestarts:    3,
+		checkInterval:  healthCheckInterval,
+		restartDelay:   healthRestartDelay,
+		maxRestarts:    healthMaxRestarts,
 	}
 }
 
@@ -87,7 +95,7 @@ func (hc *HealthChecker) CheckIPFSHealth() bool {
 	url := fmt.Sprintf("http://localhost:%d/api/v0/version", hc.config.IPFSAPIPort)
 
 	client := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: healthHTTPTimeout,
 	}
 
 	resp, err := client.Post(url, "application/json", nil)
@@ -104,7 +112,7 @@ func (hc *HealthChecker) CheckPinShareHealth() bool {
 	url := fmt.Sprintf("http://localhost:%d/api/health", hc.config.PinShareAPIPort)
 
 	client := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: healthHTTPTimeout,
 	}
 
 	resp, err := client.Get(url)

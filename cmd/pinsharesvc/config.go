@@ -34,7 +34,7 @@ type ServiceConfig struct {
 	IPFSSwarmPort    int `json:"ipfs_swarm_port"`
 	PinShareAPIPort  int `json:"pinshare_api_port"`
 	PinShareP2PPort  int `json:"pinshare_p2p_port"`
-	UIPort           int `json:"ui_port"`
+	UIPort           int `json:"ui_port"` // Reserved for future web UI integration
 
 	// PinShare configuration
 	OrgName    string `json:"org_name"`

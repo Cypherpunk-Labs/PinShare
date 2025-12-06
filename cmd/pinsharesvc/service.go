@@ -237,7 +237,6 @@ func (s *pinshareService) runInteractive() error {
 	}
 
 	fmt.Println("Service started successfully!")
-	fmt.Printf("UI available at: http://localhost:%d\n", s.config.UIPort)
 	fmt.Printf("API available at: http://localhost:%d\n", s.config.PinShareAPIPort)
 	fmt.Println("\nPress Ctrl+C to stop...")
 

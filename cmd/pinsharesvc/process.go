@@ -186,7 +186,6 @@ func (pm *ProcessManager) StartPinShare(ctx context.Context) error {
 		fmt.Sprintf("PS_REJECT_FOLDER=%s", filepath.Join(pm.config.DataDirectory, "rejected")),
 		fmt.Sprintf("PS_METADATA_FILE=%s", filepath.Join(dataPath, "metadata.json")),
 		fmt.Sprintf("PS_IDENTITY_KEY_FILE=%s", filepath.Join(dataPath, "identity.key")),
-		fmt.Sprintf("PS_DATABASE_FILE=%s", filepath.Join(dataPath, "pinshare.db")),
 		fmt.Sprintf("PS_ENCRYPTION_KEY=%s", pm.config.EncryptionKey),
 		fmt.Sprintf("PORT=%d", pm.config.PinShareAPIPort),
 	)

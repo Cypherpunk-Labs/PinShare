@@ -228,11 +228,10 @@ func startService() error {
 
 	fmt.Printf("Service %s started successfully\n", serviceName)
 
-	// Load config to show UI URL
+	// Load config to show API URL
 	config, err := LoadConfig()
 	if err == nil {
-		fmt.Printf("\nPinShare UI available at: http://localhost:%d\n", config.UIPort)
-		fmt.Printf("PinShare API available at: http://localhost:%d\n", config.PinShareAPIPort)
+		fmt.Printf("\nPinShare API available at: http://localhost:%d\n", config.PinShareAPIPort)
 	}
 
 	return nil
@@ -292,14 +291,18 @@ func restartService() error {
 
 // installEventLogSource installs the event log source
 func installEventLogSource() error {
-	// This requires registry modification which needs admin privileges
-	// The event log will work without this, just won't have a custom source
-	// For now, we'll skip this and use the generic event log
+	// Custom event log source registration requires registry modification under
+	// HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\<ServiceName>
+	// which needs admin privileges. The Windows event log will work without this
+	// custom source registration - events will be logged under the generic
+	// "Application" source. Skipping for now to avoid registry dependencies.
+	fmt.Println("Note: Custom event log source registration skipped (using generic Application source)")
 	return nil
 }
 
 // removeEventLogSource removes the event log source
 func removeEventLogSource() error {
-	// Corresponding cleanup for installEventLogSource
+	// Corresponding cleanup for installEventLogSource - since we don't register
+	// a custom source, there's nothing to remove.
 	return nil
 }

@@ -21,12 +21,6 @@ This implementation provides a native Windows experience for PinShare, wrapping 
 │  │  └──────────────┘  └──────────────────────┘   │   │
 │  │                                                 │   │
 │  │  ┌─────────────────────────────────────────┐  │   │
-│  │  │ Embedded UI Server (localhost:8888)     │  │   │
-│  │  │ - Serves React static files             │  │   │
-│  │  │ - Proxies API requests to backend       │  │   │
-│  │  └─────────────────────────────────────────┘  │   │
-│  │                                                 │   │
-│  │  ┌─────────────────────────────────────────┐  │   │
 │  │  │ Health Checker (30s intervals)          │  │   │
 │  │  │ - Monitors IPFS and PinShare            │  │   │
 │  │  │ - Auto-restart on failure (3 attempts)  │  │   │
@@ -37,7 +31,6 @@ This implementation provides a native Windows experience for PinShare, wrapping 
         ┌────────────────────────────────────────┐
         │  System Tray Application (Startup)     │
         │  - Start/Stop/Restart service          │
-        │  - Open UI in browser                  │
         │  - View status and logs                │
         │  - Quick access to settings            │
         └────────────────────────────────────────┘
@@ -52,7 +45,7 @@ This implementation provides a native Windows experience for PinShare, wrapping 
 **Files:**
 - `main.go` - Entry point and CLI interface
 - `service.go` - Windows service handler implementation
-- `config.go` - Configuration management (Registry + file-based)
+- `config.go` - Configuration management (file-based)
 - `process.go` - Process management for IPFS and PinShare
 - `health.go` - Health checking and auto-restart logic
 - `ui_server.go` - Embedded UI server with reverse proxy
@@ -88,7 +81,6 @@ pinsharesvc.exe debug      # Run in console mode (debugging)
 - System tray icon with context menu
 - Service status display (Running/Stopped/Starting/etc.)
 - One-click service control (Start/Stop/Restart)
-- Open UI in default browser
 - View logs directory
 - Auto-start with Windows (via installer)
 
@@ -110,15 +102,14 @@ pinsharesvc.exe debug      # Run in console mode (debugging)
 1. Installs binaries to `C:\Program Files\PinShare\`
 2. Creates data directories in `C:\ProgramData\PinShare\`
 3. Installs and configures Windows service
-4. Sets up registry configuration
+4. Creates configuration file
 5. Adds tray app to startup
 6. Creates Start Menu shortcuts
 7. Configures service recovery options
 
 **Build Requirements:**
-- WiX Toolset 3.x or 4.x
+- WiX Toolset 3.x or 4.x (WiX 6 recommended)
 - All binaries built and in `dist/windows/`
-- UI files built and in `dist/windows/ui/`
 
 ### 4. Build System (`Makefile.windows`)
 
@@ -143,27 +134,9 @@ make -f Makefile.windows clean
 
 ## Configuration
 
-### Registry-Based (Primary)
+Configuration is managed via a JSON file.
 
-Location: `HKEY_LOCAL_MACHINE\SOFTWARE\PinShare`
-
-**Key Values:**
-- `InstallDirectory` - Installation path
-- `DataDirectory` - Data storage path
-- `IPFSBinary` - Path to ipfs.exe
-- `PinShareBinary` - Path to pinshare.exe
-- `UIPort` (DWORD) - Web UI port (default: 8888)
-- `PinShareAPIPort` (DWORD) - API port (default: 9090)
-- `IPFSAPIPort` (DWORD) - IPFS API (default: 5001)
-- `OrgName` - Organization name
-- `GroupName` - Group name
-- `SkipVirusTotal` (DWORD) - 0/1
-- `EnableCache` (DWORD) - 0/1
-- `ArchiveNode` (DWORD) - 0/1
-
-### File-Based (Fallback)
-
-Location: `C:\ProgramData\PinShare\config.json`
+**Location:** `C:\ProgramData\PinShare\config.json`
 
 ```json
 {
@@ -204,7 +177,6 @@ C:\ProgramData\PinShare\
 │   ├── datastore\
 │   └── blocks\
 ├── pinshare\            # PinShare data
-│   ├── pinshare.db      # SQLite database
 │   ├── metadata.json    # File metadata
 │   └── identity.key     # libp2p identity
 ├── upload\              # File upload directory
@@ -218,12 +190,10 @@ C:\ProgramData\PinShare\
 
 **All Platforms:**
 - Go 1.24+
-- Node.js 20+
 - Git
 
 **Windows:**
-- TDM-GCC or MinGW-w64 (for SQLite)
-- WiX Toolset 3.x or 4.x
+- WiX Toolset 3.x or 4.x (WiX 6 recommended)
 
 **Linux/macOS:**
 - MinGW-w64 cross-compiler
@@ -269,7 +239,7 @@ Output: `dist/PinShare-Setup.msi`
 3. Follow wizard prompts
 4. Service starts automatically
 5. Look for PinShare icon in system tray
-6. Right-click → "Open PinShare UI"
+6. Right-click for service controls and status
 
 ### Silent Installation (Enterprise)
 
@@ -408,12 +378,12 @@ To run multiple PinShare instances on one machine:
 ### Performance Tuning
 
 **For archive nodes (many files):**
-- Set `ArchiveNode = 1` in registry
+- Set `"archive_node": true` in config.json
 - Increase IPFS repo size limit
 - Disable automatic garbage collection
 
 **For low-resource systems:**
-- Set `EnableCache = 0`
+- Set `"enable_cache": false` in config.json
 - Reduce IPFS connection limits in IPFS config
 - Increase health check interval
 
@@ -445,14 +415,13 @@ Start-Service PinShareService
 ### Service Lifecycle
 
 1. **Startup:**
-   - Load configuration (Registry → File → Defaults)
+   - Load configuration (File → Defaults)
    - Create required directories
    - Initialize IPFS repo (if needed)
    - Start IPFS daemon
    - Wait for IPFS health check (30s timeout)
    - Start PinShare backend
    - Wait for PinShare health check (30s timeout)
-   - Start embedded UI server
    - Start health checker goroutine
    - Signal service running
 
@@ -464,7 +433,6 @@ Start-Service PinShareService
 
 3. **Shutdown:**
    - Cancel context (signals all goroutines)
-   - Stop UI server (10s graceful timeout)
    - Stop PinShare backend (SIGTERM → 10s → SIGKILL)
    - Stop IPFS daemon (SIGTERM → 10s → SIGKILL)
    - Close event log
