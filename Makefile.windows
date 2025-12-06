@@ -1,7 +1,7 @@
 # Makefile for building PinShare Windows distribution
 # This can be run from Linux with cross-compilation tools or from Windows
 
-.PHONY: all clean windows-backend windows-service windows-tray windows-ui download-ipfs windows-all installer help
+.PHONY: all clean windows-backend windows-service windows-tray copy-resources download-ipfs windows-all installer help check-deps install-deps dev-service dev-tray test-windows
 
 # Configuration
 GOOS := windows
@@ -11,7 +11,6 @@ CC := x86_64-w64-mingw32-gcc
 
 # Directories
 DIST_DIR := dist/windows
-UI_DIR := pinshare-ui
 INSTALLER_DIR := installer
 
 # IPFS version
@@ -37,9 +36,9 @@ help:
 	@echo "  windows-backend    Build PinShare backend for Windows"
 	@echo "  windows-service    Build Windows service wrapper"
 	@echo "  windows-tray       Build Windows system tray application"
-	@echo "  windows-ui         Build React UI for production"
 	@echo "  download-ipfs      Download IPFS Kubo binary for Windows"
 	@echo "  installer          Build Windows MSI installer (requires WiX)"
+	@echo "  check-deps         Check build dependencies"
 	@echo "  clean              Clean build artifacts"
 	@echo ""
 	@echo "Example: make -f Makefile.windows windows-all"
@@ -74,15 +73,6 @@ windows-tray: $(DIST_DIR)
 		-o $(DIST_DIR)/pinshare-tray.exe ./cmd/pinshare-tray
 	@echo "✓ Built: $(DIST_DIR)/pinshare-tray.exe"
 
-# Build React UI
-windows-ui: $(DIST_DIR)
-	@echo "Building React UI for production..."
-	@cd $(UI_DIR) && npm install
-	@cd $(UI_DIR) && npm run build
-	@mkdir -p $(DIST_DIR)/ui
-	@cp -r $(UI_DIR)/dist/* $(DIST_DIR)/ui/
-	@echo "✓ Built: $(DIST_DIR)/ui/"
-
 # Download IPFS Kubo binary
 download-ipfs: $(DIST_DIR)
 	@echo "Downloading IPFS Kubo $(IPFS_VERSION) for Windows..."
@@ -96,8 +86,15 @@ download-ipfs: $(DIST_DIR)
 		echo "✓ IPFS already downloaded: $(DIST_DIR)/ipfs.exe"; \
 	fi
 
+# Copy tray resources
+copy-resources: $(DIST_DIR)
+	@echo "Copying tray application resources..."
+	@mkdir -p $(DIST_DIR)/resources
+	@cp -r cmd/pinshare-tray/resources/* $(DIST_DIR)/resources/ 2>/dev/null || true
+	@echo "✓ Copied: $(DIST_DIR)/resources/"
+
 # Build all Windows components
-windows-all: windows-backend windows-service windows-tray windows-ui download-ipfs
+windows-all: windows-backend windows-service windows-tray copy-resources download-ipfs
 	@echo ""
 	@echo "=========================================="
 	@echo "All Windows components built successfully!"
@@ -105,9 +102,6 @@ windows-all: windows-backend windows-service windows-tray windows-ui download-ip
 	@echo ""
 	@echo "Distribution files:"
 	@ls -lh $(DIST_DIR)/*.exe
-	@echo ""
-	@echo "UI files:"
-	@ls -lh $(DIST_DIR)/ui/
 	@echo ""
 	@echo "Next step: Build installer with 'make -f Makefile.windows installer'"
 	@echo ""
@@ -134,11 +128,10 @@ installer: windows-all
 clean:
 	@echo "Cleaning build artifacts..."
 	@rm -rf $(DIST_DIR)
-	@rm -rf $(UI_DIR)/dist
-	@rm -rf $(UI_DIR)/node_modules
+	@rm -rf $(INSTALLER_DIR)/bin
+	@rm -rf $(INSTALLER_DIR)/obj
 	@rm -f $(INSTALLER_DIR)/*.wixobj
 	@rm -f $(INSTALLER_DIR)/*.wixpdb
-	@rm -f $(INSTALLER_DIR)/UIComponents.wxs
 	@rm -f dist/PinShare-Setup.msi
 	@echo "✓ Cleaned"
 
@@ -168,12 +161,8 @@ check-deps:
 	@echo "Go version:"
 	@go version || echo "ERROR: Go not found"
 	@echo ""
-	@echo "Cross-compilation support:"
-	@which $(CC) >/dev/null 2>&1 && echo "✓ MinGW-w64 found: $(CC)" || echo "⚠ MinGW-w64 not found (needed for SQLite/CGO)"
-	@echo ""
-	@echo "Node.js (for UI):"
-	@node --version 2>/dev/null || echo "⚠ Node.js not found"
-	@npm --version 2>/dev/null || echo "⚠ npm not found"
+	@echo "Cross-compilation support (optional, for CGO):"
+	@which $(CC) >/dev/null 2>&1 && echo "✓ MinGW-w64 found: $(CC)" || echo "⚠ MinGW-w64 not found (only needed if CGO_ENABLED=1)"
 	@echo ""
 	@echo "Build tools:"
 	@which unzip >/dev/null 2>&1 && echo "✓ unzip found" || echo "⚠ unzip not found"
@@ -192,6 +181,6 @@ install-deps:
 		echo "This target is for Linux only"; \
 		echo "On Windows, install:"; \
 		echo "  - Go: https://golang.org/dl/"; \
-		echo "  - Node.js: https://nodejs.org/"; \
-		echo "  - WiX Toolset: https://wixtoolset.org/"; \
+		echo "  - Git (includes Git Bash): https://git-scm.com/"; \
+		echo "  - WiX Toolset (for installer): https://wixtoolset.org/"; \
 	fi
