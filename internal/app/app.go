@@ -21,6 +21,7 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
+	testUPNP "github.com/milkpirate/upnp"
 	"github.com/multiformats/go-multiaddr"
 )
 
@@ -69,10 +70,13 @@ func Start() {
 	defer cancel()
 	var LoadedMetaData bool = false
 
+	checkUPNP()
+
 	appconf, _ := config.LoadConfig()
 	if !checkDependanciesAndEnableSecurityPath(appconf) {
 		os.Exit(1)
 	}
+	fmt.Println("\n[VERSION] " + appconf.Version + "\n\n")
 	p2p.SetAppConfig(appconf)
 
 	sigCh := make(chan os.Signal, 1)
@@ -398,4 +402,30 @@ func checkVTEnv() bool {
 		return false
 	}
 	return true
+}
+
+func checkUPNP() {
+	upnpMan := new(testUPNP.Upnp)
+	// test for gateway
+	err := upnpMan.SearchGateway()
+	if err != nil {
+		fmt.Println(err.Error())
+	} else {
+		fmt.Println("Local IP Address：", upnpMan.LocalHost)
+		fmt.Println("UPNP Device IP Address:", upnpMan.Gateway.Host)
+	}
+	// test for external ip
+	err2 := upnpMan.ExternalIPAddr()
+	if err2 != nil {
+		fmt.Println(err.Error())
+	} else {
+		fmt.Println("External Network IP Address:", upnpMan.GatewayOutsideIP)
+	}
+	// test mapping port (inside port, external port)
+	if err := upnpMan.AddPortMapping(50001, 53693, 0, upnpMan.LocalHost, "TCP", "single port"); err == nil {
+		fmt.Println("Port mapping succeeded.")
+		upnpMan.Reclaim()
+	} else {
+		fmt.Println("Port mapping failed.")
+	}
 }

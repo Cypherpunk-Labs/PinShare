@@ -39,6 +39,7 @@ type PubSubManager struct {
 	dataFile         string
 	routingDiscovery *discovery_routing.RoutingDiscovery
 	psc              *PubSubConfig
+	fallbackMode     bool
 }
 
 func NewPubSubManager(ctx context.Context, h host.Host, kadDHT *dht.IpfsDHT, storeInstance *store.MetadataStore, dataFilePath string, config PubSubConfig) (*PubSubManager, error) {
@@ -68,9 +69,14 @@ func NewPubSubManager(ctx context.Context, h host.Host, kadDHT *dht.IpfsDHT, sto
 		dataFile:         dataFilePath,
 		routingDiscovery: discovery_routing.NewRoutingDiscovery(kadDHT),
 		psc:              &config,
+		fallbackMode:     false,
 	}
 
 	go manager.handleIncomingMessages()
+
+	if isContainerEnvironment() {
+		go manager.monitorFallback(ctx)
+	}
 
 	if config.AutoTopicDiscovery {
 		// Use a sensible default if TopicAdvertiseInterval is not set or too short
@@ -352,4 +358,80 @@ func (psm *PubSubManager) periodicPublisher(ctx context.Context, interval time.D
 			fmt.Printf("[INFO] Finished periodic publishing cycle for %d entries.\n", len(allMetadata))
 		}
 	}
+}
+
+func (m *PubSubManager) monitorFallback(ctx context.Context) {
+	// TODO Perhaps we are starting this too soon
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	failCount := 0
+	const maxFails = 4 // ~2min
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			peers := m.ListPeers()
+			if len(peers) == 0 && isContainerEnvironment() && !m.fallbackMode {
+				failCount++
+				fmt.Printf("[FALLBACK] GossipSub no peers (%d/%d), fallback?\n", failCount, maxFails)
+				if failCount >= maxFails {
+					if err := m.switchToFloodsub(ctx); err != nil {
+						fmt.Printf("[FALLBACK WARN] FloodSub fallback failed: %v\n", err)
+					} else {
+						fmt.Println("[FALLBACK INFO] Switched to FloodSub fallback.")
+					}
+					return
+				}
+			} else {
+				failCount = 0
+			}
+		}
+	}
+}
+
+func (m *PubSubManager) switchToFloodsub(ctx context.Context) error {
+	if m.fallbackMode {
+		return fmt.Errorf("[FLOODSUB] already in fallback")
+	}
+
+	fmt.Println("[FLOODSUB INFO] Switching to FloodSub...")
+
+	if m.subscription != nil {
+		m.subscription.Cancel()
+	}
+	if m.topic != nil {
+		m.topic.Close()
+	}
+
+	floodPs, err := pubsub.NewFloodSub(ctx, m.host)
+	if err != nil {
+		return fmt.Errorf("[FLOODSUB] NewFloodSub: %w", err)
+	}
+
+	floodTopic, err := floodPs.Join(m.psc.TopicID)
+	if err != nil {
+		return fmt.Errorf("[FLOODSUB] join FloodSub topic: %w", err)
+	}
+
+	floodSub, err := floodTopic.Subscribe()
+	if err != nil {
+		floodTopic.Close()
+		return fmt.Errorf("[FLOODSUB] subscribe FloodSub: %w", err)
+	}
+
+	m.ps = floodPs
+	m.topic = floodTopic
+	m.subscription = floodSub
+	m.fallbackMode = true
+
+	go m.handleIncomingMessages()
+
+	if m.psc.EnablePeriodicPublish && m.psc.PeriodicPublishInterval > 0 {
+		go m.periodicPublisher(ctx, m.psc.PeriodicPublishInterval)
+	}
+
+	return nil
 }
