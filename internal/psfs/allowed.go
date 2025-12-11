@@ -35,4 +35,8 @@ var AllowedList = map[string]bool{
 	"png": true,
 	"jpg": true,
 	"svg": true,
+	// plaintext
+	"txt": true,
+	"rtf": true,
+	"md":  true,
 }

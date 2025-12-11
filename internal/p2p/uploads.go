@@ -7,24 +7,25 @@ import (
 	"strings"
 )
 
-func ProcessUploads(folderPath string) {
+func ProcessUploads(folderPath string) bool {
 	file, err := psfs.ListFiles(folderPath)
+	var success bool = false
 	var count int = 0
 	if err != nil {
-		return
+		return false
 	}
 	for _, f := range file {
 		ftype, err := psfs.ValidateFileType(folderPath + "/" + f)
 		if err != nil {
 			fmt.Println("[ERROR] func ValidateFileType() error " + string(err.Error()))
-			return
+			return false
 		}
 		if ftype {
 			fmt.Println("[INFO] File type valid for file: " + f)
 			fsha256, err := psfs.GetSHA256(folderPath + "/" + f)
 			if err != nil {
 				fmt.Println("[ERROR] func GetSha256() error " + string(err.Error()))
-				return
+				return false
 			}
 
 			var fresult bool
@@ -33,7 +34,7 @@ func ProcessUploads(folderPath string) {
 				_, exists := store.GlobalStore.GetFile(fsha256)
 				if exists {
 					fmt.Printf("[WARNING] File already exists in GlobalStore with SHA256: %s \n", fsha256)
-					return
+					return false
 				} else {
 
 					if appconfInstance.SecurityCapability > 0 {
@@ -45,7 +46,7 @@ func ProcessUploads(folderPath string) {
 							result, err = psfs.ClamScanFileClean(folderPath + "/" + f)
 							if err != nil {
 								fmt.Println("[ERROR] (ClamScanFileClean) " + string(err.Error()))
-								return
+								return false
 							}
 						}
 
@@ -56,7 +57,7 @@ func ProcessUploads(folderPath string) {
 								result, err = psfs.GetVirusTotalWSVerdictByHash(fsha256) // true == safe
 								if err != nil {
 									fmt.Println("[ERROR] (GetVirusTotalVerdictByHash) " + string(err.Error()))
-									return
+									return false
 								}
 							}
 						}
@@ -74,19 +75,22 @@ func ProcessUploads(folderPath string) {
 					fmt.Println("[INFO] File: " + f + " ++added to IPFS with CID: " + fcid)
 					fileExtension, err := psfs.GetExtension(f)
 					if err != nil {
-						return
+						return false
 					}
 
+					var tagMap = make(map[string]int) // Potential for bug here to wipe all the tags since we init a blank map
+					tagMap["filename:"+f] = 1         // we assume this file does not exist so do not seek to load existing tags. a check is done at line 33
 					metadata := store.BaseMetadata{
 						FileSHA256: strings.ToLower(fsha256),
 						IPFSCID:    strings.ToLower(fcid),
 						FileType:   strings.ToLower(fileExtension),
+						Tags:       tagMap,
 					}
 
 					errgs := store.GlobalStore.AddFile(metadata)
 					if errgs != nil {
-						fmt.Printf("[ERROR] failed to add file to GlobalStore: %w \n", errgs)
-						return
+						fmt.Printf("[ERROR] failed to add file to GlobalStore: %v\n", errgs)
+						return false
 					}
 					fmt.Println("[INFO] File: " + f + " ++added to GlobalStore with CID: " + fcid)
 					count = count + 1
@@ -96,6 +100,7 @@ func ProcessUploads(folderPath string) {
 							fmt.Println("[ERROR] Error moving file: ", err)
 						}
 					}
+					success = true
 				}
 			} else {
 				if appconfInstance.FFSendFileVT {
@@ -122,7 +127,7 @@ func ProcessUploads(folderPath string) {
 						}
 					}
 				} else {
-					fmt.Println("[ERROR] File Security check failed for file: " + f + " with SHA256: " + fsha256)
+					fmt.Println("[ERROR] File Security check, failed for file: " + f + " with SHA256: " + fsha256)
 				}
 			}
 		} else {
@@ -139,5 +144,7 @@ func ProcessUploads(folderPath string) {
 	}
 	if count >= 1 {
 		store.GlobalStore.Save(appconfInstance.MetaDataFile)
+		success = true
 	}
+	return success
 }

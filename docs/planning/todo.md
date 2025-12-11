@@ -93,7 +93,8 @@
    - [x] Readme.md Overview and Usage Guide
 - [ ] Testing:
    - [ ] API: test all functions
-   - [ ] unit tests   
+   - [ ] unit tests
+   - [ ] network tests
 
 # Releases
 
