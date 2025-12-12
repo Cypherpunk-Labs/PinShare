@@ -57,19 +57,19 @@ func installService() error {
 	recoveryActions := []mgr.RecoveryAction{
 		{
 			Type:  mgr.ServiceRestart,
-			Delay: 5 * time.Second,
+			Delay: winservice.RecoveryDelayFirst,
 		},
 		{
 			Type:  mgr.ServiceRestart,
-			Delay: 10 * time.Second,
+			Delay: winservice.RecoveryDelaySecond,
 		},
 		{
 			Type:  mgr.ServiceRestart,
-			Delay: 30 * time.Second,
+			Delay: winservice.RecoveryDelayThird,
 		},
 	}
 
-	if err := service.SetRecoveryActions(recoveryActions, 60); err != nil {
+	if err := service.SetRecoveryActions(recoveryActions, winservice.RecoveryResetPeriod); err != nil {
 		// Non-fatal, just log
 		fmt.Printf("Warning: Failed to set recovery actions: %v\n", err)
 	}

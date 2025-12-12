@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"golang.org/x/sys/windows/svc/debug"
+	"pinshare/internal/winservice"
 )
 
 type ProcessManager struct {
@@ -287,7 +288,7 @@ func (pm *ProcessManager) StopIPFS() error {
 	// This avoids calling Wait() twice which causes a race condition
 	if pm.ipfsExited != nil {
 		select {
-		case <-time.After(10 * time.Second):
+		case <-time.After(winservice.ProcessShutdownTimeout):
 			pm.logError("IPFS shutdown timeout", nil)
 		case <-pm.ipfsExited:
 			// Process exited, monitor goroutine has called Wait()
@@ -332,7 +333,7 @@ func (pm *ProcessManager) StopPinShare() error {
 	// This avoids calling Wait() twice which causes a race condition
 	if pm.pinshareExited != nil {
 		select {
-		case <-time.After(10 * time.Second):
+		case <-time.After(winservice.ProcessShutdownTimeout):
 			pm.logError("PinShare shutdown timeout", nil)
 		case <-pm.pinshareExited:
 			// Process exited, monitor goroutine has called Wait()
@@ -355,7 +356,7 @@ func (pm *ProcessManager) RestartIPFS(ctx context.Context) error {
 	if err := pm.StopIPFS(); err != nil {
 		return err
 	}
-	time.Sleep(2 * time.Second)
+	time.Sleep(winservice.ServiceRestartDelay)
 	return pm.StartIPFS(ctx)
 }
 
@@ -364,7 +365,7 @@ func (pm *ProcessManager) RestartPinShare(ctx context.Context) error {
 	if err := pm.StopPinShare(); err != nil {
 		return err
 	}
-	time.Sleep(2 * time.Second)
+	time.Sleep(winservice.ServiceRestartDelay)
 	return pm.StartPinShare(ctx)
 }
 

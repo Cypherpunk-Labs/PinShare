@@ -11,6 +11,9 @@ import (
 	"pinshare/internal/winservice"
 )
 
+// EncryptionKeyLength is the length in bytes for generated encryption keys
+const EncryptionKeyLength = 32
+
 type ServiceConfig struct {
 	// Installation paths
 	InstallDirectory string `json:"install_directory"`
@@ -233,9 +236,9 @@ func (c *ServiceConfig) SaveToFile() error {
 	return nil
 }
 
-// generateEncryptionKey generates a cryptographically secure random 32-byte encryption key
+// generateEncryptionKey generates a cryptographically secure random encryption key
 func generateEncryptionKey() string {
-	bytes := make([]byte, 32)
+	bytes := make([]byte, EncryptionKeyLength)
 	if _, err := rand.Read(bytes); err != nil {
 		// If random generation fails, panic as this is a critical security requirement
 		panic(fmt.Sprintf("failed to generate encryption key: %v", err))

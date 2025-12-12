@@ -16,7 +16,7 @@ const (
 	ServiceDescription = "PinShare - Decentralized IPFS pinning service with libp2p"
 )
 
-// Default ports
+// Default port configuration - shared across all components
 const (
 	DefaultIPFSAPIPort     = 5001
 	DefaultIPFSGatewayPort = 8080
@@ -26,15 +26,23 @@ const (
 	DefaultUIPort          = 8888
 )
 
-// Timing constants
+// Service control timeouts
 const (
 	StatusCheckInterval    = 10 * time.Second
 	HealthCheckInterval    = 30 * time.Second
-	ServiceStartTimeout    = 30 * time.Second
+	ServiceStartTimeout    = 60 * time.Second
 	ServiceStopTimeout     = 30 * time.Second
-	ServicePollInterval    = 500 * time.Millisecond
+	ServicePollInterval    = 300 * time.Millisecond
 	ServiceRestartDelay    = 2 * time.Second
 	ProcessShutdownTimeout = 10 * time.Second
+)
+
+// Recovery action delays for Windows service manager
+const (
+	RecoveryDelayFirst  = 5 * time.Second
+	RecoveryDelaySecond = 10 * time.Second
+	RecoveryDelayThird  = 30 * time.Second
+	RecoveryResetPeriod = 60 // seconds
 )
 
 // Error message limits
