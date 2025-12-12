@@ -8,6 +8,7 @@ import (
 	"pinshare/internal/winservice"
 
 	"golang.org/x/sys/windows/svc"
+	"pinshare/internal/winservice"
 )
 
 func main() {

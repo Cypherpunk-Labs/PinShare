@@ -1,14 +1,19 @@
+// Package winservice provides shared constants and utilities for Windows service management.
 package winservice
 
 import "time"
 
-var ServiceNamePtr *uint16
-
 // Service identification
 const (
-	ServiceName        = "PinShareService"
+	// ServiceName is the Windows service name used for registration and control.
+	// This must be consistent across all components (service, tray, etc.).
+	ServiceName = "PinShareService"
+
+	// ServiceDisplayName is the human-readable name shown in Windows Services.
 	ServiceDisplayName = "PinShare Service"
-	ServiceDescription = "PinShare decentralized IPFS pinning service"
+
+	// ServiceDescription is the description shown in Windows Services.
+	ServiceDescription = "PinShare - Decentralized IPFS pinning service with libp2p"
 )
 
 // Default ports

@@ -4,28 +4,44 @@ This document describes the architecture of PinShare when deployed on Windows.
 
 ## Process Hierarchy
 
-```mermaid
-flowchart TB
-    subgraph WSM["Windows Service Manager<br/>(runs at system startup)"]
-    end
-
-    subgraph SVC["pinsharesvc.exe (Windows Service)<br/>PinShareService"]
-        direction TB
-        SVC_DESC["• Runs as SYSTEM account (no user login required)<br/>• Manages child processes (keeps them alive)<br/>• Monitors health & auto-restarts crashed processes"]
-
-        subgraph Children[" "]
-            direction LR
-            IPFS["<b>ipfs.exe</b><br/>(child process)<br/><br/>• IPFS daemon<br/>• Port 5001 (API)<br/>• Port 4001 (swarm)<br/>• Port 8080 (gw)"]
-            PS["<b>pinshare.exe</b><br/>(child process)<br/><br/>• libp2p host<br/>• PubSub messaging<br/>• File watcher<br/>• API on port 9090"]
-        end
-    end
-
-    subgraph TRAY["pinshare-tray.exe (User Process)<br/>(runs at user login via Startup folder)"]
-        TRAY_DESC["• Runs in USER context (per-user, after login)<br/>• System tray icon for user interaction<br/>• NOT managed by service - completely independent<br/>• Talks to service via HTTP APIs"]
-    end
-
-    WSM --> SVC
-    PS -->|"connects to"| IPFS
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  pinshare-tray.exe (User Process)                                           │
+│  ┌─────────────────────────────────────┐                                    │
+│  │ • Runs in USER context              │                                    │
+│  │   (per-user, after login)           │                                    │
+│  │ • System tray icon for user         │                                    │
+│  │   interaction                        │                                    │
+│  │ • NOT managed by service            │                                    │
+│  │   - completely independent          │                                    │
+│  │ • Talks to service via HTTP APIs    │                                    │
+│  └─────────────────────────────────────┘                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+        │
+        │ HTTP API calls
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Windows Service Manager (runs at system startup)                           │
+│                          │                                                  │
+│                          ▼                                                  │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  pinsharesvc.exe (Windows Service)                                    │  │
+│  │                                                                       │  │
+│  │  • Runs as SYSTEM account (no user login required)                    │  │
+│  │  • Manages child processes (keeps them alive)                         │  │
+│  │  • Monitors health & auto-restarts crashed processes                  │  │
+│  │                                                                       │  │
+│  │  ┌─────────────────────────────┐   ┌─────────────────────────────┐   │  │
+│  │  │  pinshare.exe               │   │  ipfs.exe                   │   │  │
+│  │  │  (child process)            │   │  (child process)            │   │  │
+│  │  │                             │   │                             │   │  │
+│  │  │  • libp2p host              │   │  • IPFS daemon              │   │  │
+│  │  │  • PubSub messaging         │──▶│  • Port 5001 (API)          │   │  │
+│  │  │  • File watcher             │   │  • Port 4001 (swarm)        │   │  │
+│  │  │  • API on port 9090         │   │  • Port 8080 (gw)           │   │  │
+│  │  └─────────────────────────────┘   └─────────────────────────────┘   │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Components

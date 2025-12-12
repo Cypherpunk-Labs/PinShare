@@ -13,6 +13,16 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+const (
+	// healthCheckTimeout is the HTTP timeout for health check requests
+	healthCheckTimeout = 2 * time.Second
+
+	// serviceActionDelay is the delay after starting/stopping service before checking status
+	serviceActionDelay = 1 * time.Second
+
+	// serviceRestartDelay is the delay between stop and start during restart
+	serviceRestartDelay = 2 * time.Second
+)
 // ServiceState represents the state of the Windows service
 type ServiceState string
 
@@ -151,7 +161,7 @@ func (t *Tray) handleStartService() {
 		log.Printf("Failed to start service: %v", err)
 		showError("PinShare", fmt.Sprintf("Failed to start service:\n\n%v", err))
 	} else {
-		time.Sleep(1 * time.Second)
+		time.Sleep(serviceActionDelay)
 		t.updateStatus()
 	}
 }
@@ -162,7 +172,7 @@ func (t *Tray) handleStopService() {
 		log.Printf("Failed to stop service: %v", err)
 		showError("PinShare", fmt.Sprintf("Failed to stop service:\n\n%v", err))
 	} else {
-		time.Sleep(1 * time.Second)
+		time.Sleep(serviceActionDelay)
 		t.updateStatus()
 	}
 }
@@ -177,14 +187,14 @@ func (t *Tray) handleRestartService() {
 	}
 
 	// Wait a bit
-	time.Sleep(2 * time.Second)
+	time.Sleep(serviceRestartDelay)
 
 	// Start again
 	if err := startService(); err != nil {
 		log.Printf("Failed to start service: %v", err)
 		showError("PinShare", fmt.Sprintf("Failed to start service:\n\n%v", err))
 	} else {
-		time.Sleep(1 * time.Second)
+		time.Sleep(serviceActionDelay)
 		t.updateStatus()
 	}
 }
@@ -233,7 +243,7 @@ func (t *Tray) handleAbout() {
 	showMessage("About PinShare",
 		"PinShare - Decentralized IPFS Pinning Service\n"+
 			"Version 1.0\n\n"+
-			"GitHub: https://github.com/Cypherpunk-Labs/PinShare")
+			"https://github.com/Cypherpunk-Labs/PinShare")
 }
 
 // UpdateStatusLoop periodically updates the status
@@ -366,12 +376,12 @@ func getServiceStatus() (ServiceState, error) {
 	defer windows.CloseServiceHandle(scmHandle)
 
 	// Open the service with query status permission only
-	winservice.ServiceNamePtr, err = windows.UTF16PtrFromString(winservice.ServiceName)
+	serviceNamePtr, err := windows.UTF16PtrFromString(winservice.ServiceName)
 	if err != nil {
 		return StateStopped, fmt.Errorf("invalid service name: %w", err)
 	}
 
-	svcHandle, err := windows.OpenService(scmHandle, winservice.ServiceNamePtr, windows.SERVICE_QUERY_STATUS)
+	svcHandle, err := windows.OpenService(scmHandle, serviceNamePtr, windows.SERVICE_QUERY_STATUS)
 	if err != nil {
 		// Service doesn't exist (ERROR_SERVICE_DOES_NOT_EXIST = 1060)
 		return StateNotInstalled, fmt.Errorf("service not installed")
@@ -406,7 +416,7 @@ func getServiceStatus() (ServiceState, error) {
 func checkIPFSHealth() bool {
 	config := getConfig()
 	client := &http.Client{
-		Timeout: 2 * time.Second,
+		Timeout: healthCheckTimeout,
 	}
 
 	// IPFS version endpoint requires POST
@@ -424,7 +434,7 @@ func checkIPFSHealth() bool {
 func checkPinShareHealth() bool {
 	config := getConfig()
 	client := &http.Client{
-		Timeout: 2 * time.Second,
+		Timeout: healthCheckTimeout,
 	}
 
 	url := fmt.Sprintf("http://localhost:%d/api/health", config.PinShareAPIPort)

@@ -17,12 +17,15 @@ Complete guide for building PinShare Windows distribution from source.
 
 ### Platform-Specific Requirements
 
-#### Building on Windows
+#### Building on Windows (Git Bash)
 
 **Required:**
-- **WiX Toolset 4.x or 6.x** (for installer only)
-  - Install via .NET: `dotnet tool install --global wix`
-  - Or download from: https://wixtoolset.org/
+- **Git Bash** (preferred shell for build commands)
+  - Included with Git for Windows
+
+- **WiX Toolset 6** (for installer, installed via .NET tool)
+  - Requires .NET SDK 6+: https://dotnet.microsoft.com/download
+  - WiX is installed automatically by build scripts via `dotnet tool install --global wix`
 
 #### Cross-Compiling from Linux (Debian/Ubuntu)
 
@@ -44,7 +47,7 @@ No additional dependencies required beyond Go and Git.
 ### Clone Repository
 
 ```bash
-git clone https://github.com/Episk-pos/PinShare.git
+git clone https://github.com/Cypherpunk-Labs/PinShare.git
 cd PinShare
 ```
 
@@ -85,6 +88,8 @@ GOOS=windows GOARCH=amd64 go build -o dist/windows/pinshare.exe .
 # On Windows (Git Bash)
 GOOS=windows GOARCH=amd64 go build -o dist/windows/pinshare.exe .
 ```
+
+**Note:** CGO is disabled by default for Windows builds.
 
 #### 2. Windows Service Wrapper
 
@@ -137,12 +142,11 @@ Remove-Item -Recurse kubo
 
 ### Prerequisites
 
-**WiX Toolset must be installed and in PATH.**
+**WiX Toolset 6 must be installed via .NET tool.**
 
 Verify:
-```cmd
-candle.exe -?
-light.exe -?
+```bash
+wix --version
 ```
 
 ### Build Steps
@@ -179,11 +183,11 @@ For automated builds, use GitHub Actions with Windows runners. See `.github/work
 
 ### WiX Errors
 
-**Error:** `candle.exe: command not found`
+**Error:** `wix: command not found`
 
-**Solution:** Add WiX to PATH:
-```cmd
-set PATH=%PATH%;C:\Program Files (x86)\WiX Toolset v3.11\bin
+**Solution:** Install WiX via .NET tool:
+```bash
+dotnet tool install --global wix
 ```
 
 **Error:** `The system cannot find the file specified`
@@ -296,5 +300,5 @@ After building:
 
 For build issues, check:
 - [Troubleshooting](#troubleshooting-build-issues)
-- [GitHub Issues](https://github.com/Episk-pos/PinShare/issues)
+- [GitHub Issues](https://github.com/Cypherpunk-Labs/PinShare/issues)
 - Build logs in `dist/build.log`

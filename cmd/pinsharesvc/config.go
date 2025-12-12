@@ -49,12 +49,11 @@ type ServiceConfig struct {
 // LoadConfig loads configuration from JSON file
 func LoadConfig() (*ServiceConfig, error) {
 	config, err := loadFromFile()
-	if err == nil {
-		return config, nil
+	if err != nil {
+		// Use defaults if config file doesn't exist or can't be read
+		return getDefaultConfig()
 	}
-
-	// Use defaults if config file doesn't exist
-	return getDefaultConfig()
+	return config, nil
 }
 
 // loadFromFile loads configuration from JSON file
