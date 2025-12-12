@@ -260,109 +260,133 @@ func (t *Tray) UpdateStatusLoop() {
 func (t *Tray) updateStatus() {
 	status, err := getServiceStatus()
 	if err != nil {
-		t.lastError = err
-		t.serviceRunning = false
-
-		// Check if it's a "service not installed" error
-		if status == StateNotInstalled {
-			t.menuStatus.SetTitle("Status: Not Installed")
-			systray.SetTooltip("PinShare - Service not installed")
-		} else {
-			// Show actual error for debugging
-			t.menuStatus.SetTitle("Status: Error")
-			systray.SetTooltip(fmt.Sprintf("PinShare - %s", truncateErrorMessage(err.Error())))
-		}
-
-		t.menuIPFSStatus.SetTitle("  IPFS: -")
-		t.menuPinShareStatus.SetTitle("  PinShare: -")
-		t.menuPeersStatus.SetTitle("  Peers: -")
-
-		// Enable start (to allow install attempt), disable stop
-		t.menuStart.Enable()
-		t.menuStop.Disable()
-		t.menuRestart.Disable()
+		t.handleStatusError(status, err)
 		return
 	}
 
 	switch status {
 	case StateRunning:
-		t.serviceRunning = true
-		t.menuStart.Disable()
-		t.menuStop.Enable()
-		t.menuRestart.Enable()
-
-		// Check actual component health via HTTP
-		ipfsHealthy := checkIPFSHealth()
-		pinshareHealthy := checkPinShareHealth()
-
-		if ipfsHealthy {
-			t.menuIPFSStatus.SetTitle("  IPFS: Online")
-		} else {
-			t.menuIPFSStatus.SetTitle("  IPFS: Starting...")
-		}
-
-		if pinshareHealthy {
-			t.menuPinShareStatus.SetTitle("  PinShare: Online")
-			t.menuStatus.SetTitle("Status: Running")
-			systray.SetTooltip("PinShare - Running")
-		} else {
-			t.menuPinShareStatus.SetTitle("  PinShare: Starting...")
-			t.menuStatus.SetTitle("Status: Starting...")
-			systray.SetTooltip("PinShare - Components starting...")
-		}
-
-		if ipfsHealthy && pinshareHealthy {
-			t.menuPeersStatus.SetTitle("  Peers: Connected")
-		} else {
-			t.menuPeersStatus.SetTitle("  Peers: Connecting...")
-		}
-
+		t.handleStatusRunning()
 	case StateStopped:
-		t.serviceRunning = false
-		t.menuStatus.SetTitle("Status: Stopped")
-		t.menuIPFSStatus.SetTitle("  IPFS: Offline")
-		t.menuPinShareStatus.SetTitle("  PinShare: Offline")
-		t.menuPeersStatus.SetTitle("  Peers: None")
-
-		// Enable start, disable stop
-		t.menuStart.Enable()
-		t.menuStop.Disable()
-		t.menuRestart.Disable()
-
-		systray.SetTooltip("PinShare - Stopped")
-
+		t.handleStatusStopped()
 	case StateStartPending:
-		t.menuStatus.SetTitle("Status: Starting...")
-		t.menuIPFSStatus.SetTitle("  IPFS: Starting...")
-		t.menuPinShareStatus.SetTitle("  PinShare: Starting...")
-		t.menuPeersStatus.SetTitle("  Peers: Connecting...")
-		t.menuStart.Disable()
-		t.menuStop.Disable()
-		t.menuRestart.Disable()
-		systray.SetTooltip("PinShare - Starting...")
-
+		t.handleStatusStartPending()
 	case StateStopPending:
-		t.menuStatus.SetTitle("Status: Stopping...")
-		t.menuStart.Disable()
-		t.menuStop.Disable()
-		t.menuRestart.Disable()
-		systray.SetTooltip("PinShare - Stopping...")
-
+		t.handleStatusStopPending()
 	case StateNotInstalled:
-		t.serviceRunning = false
-		t.menuStatus.SetTitle("Status: Not Installed")
-		t.menuIPFSStatus.SetTitle("  IPFS: -")
-		t.menuPinShareStatus.SetTitle("  PinShare: -")
-		t.menuPeersStatus.SetTitle("  Peers: -")
-		t.menuStart.Enable()
-		t.menuStop.Disable()
-		t.menuRestart.Disable()
-		systray.SetTooltip("PinShare - Service not installed")
-
+		t.handleStatusNotInstalled()
 	default:
 		t.menuStatus.SetTitle(fmt.Sprintf("Status: Unknown (%s)", status))
 		systray.SetTooltip("PinShare - Unknown status")
 	}
+}
+
+// handleStatusError handles error states when querying service status
+func (t *Tray) handleStatusError(status ServiceState, err error) {
+	t.lastError = err
+	t.serviceRunning = false
+
+	if status == StateNotInstalled {
+		t.menuStatus.SetTitle("Status: Not Installed")
+		systray.SetTooltip("PinShare - Service not installed")
+	} else {
+		t.menuStatus.SetTitle("Status: Error")
+		errMsg := err.Error()
+		if len(errMsg) > 50 {
+			errMsg = errMsg[:50] + "..."
+		}
+		systray.SetTooltip(fmt.Sprintf("PinShare - %s", errMsg))
+	}
+
+	t.menuIPFSStatus.SetTitle("  IPFS: -")
+	t.menuPinShareStatus.SetTitle("  PinShare: -")
+	t.menuPeersStatus.SetTitle("  Peers: -")
+
+	t.menuStart.Enable()
+	t.menuStop.Disable()
+	t.menuRestart.Disable()
+}
+
+// handleStatusRunning handles the running service state
+func (t *Tray) handleStatusRunning() {
+	t.serviceRunning = true
+	t.menuStart.Disable()
+	t.menuStop.Enable()
+	t.menuRestart.Enable()
+
+	ipfsHealthy := checkIPFSHealth()
+	pinshareHealthy := checkPinShareHealth()
+
+	if ipfsHealthy {
+		t.menuIPFSStatus.SetTitle("  IPFS: Online")
+	} else {
+		t.menuIPFSStatus.SetTitle("  IPFS: Starting...")
+	}
+
+	if pinshareHealthy {
+		t.menuPinShareStatus.SetTitle("  PinShare: Online")
+		t.menuStatus.SetTitle("Status: Running")
+		systray.SetTooltip("PinShare - Running")
+	} else {
+		t.menuPinShareStatus.SetTitle("  PinShare: Starting...")
+		t.menuStatus.SetTitle("Status: Starting...")
+		systray.SetTooltip("PinShare - Components starting...")
+	}
+
+	if ipfsHealthy && pinshareHealthy {
+		t.menuPeersStatus.SetTitle("  Peers: Connected")
+	} else {
+		t.menuPeersStatus.SetTitle("  Peers: Connecting...")
+	}
+}
+
+// handleStatusStopped handles the stopped service state
+func (t *Tray) handleStatusStopped() {
+	t.serviceRunning = false
+	t.menuStatus.SetTitle("Status: Stopped")
+	t.menuIPFSStatus.SetTitle("  IPFS: Offline")
+	t.menuPinShareStatus.SetTitle("  PinShare: Offline")
+	t.menuPeersStatus.SetTitle("  Peers: None")
+
+	t.menuStart.Enable()
+	t.menuStop.Disable()
+	t.menuRestart.Disable()
+
+	systray.SetTooltip("PinShare - Stopped")
+}
+
+// handleStatusStartPending handles the start-pending service state
+func (t *Tray) handleStatusStartPending() {
+	t.menuStatus.SetTitle("Status: Starting...")
+	t.menuIPFSStatus.SetTitle("  IPFS: Starting...")
+	t.menuPinShareStatus.SetTitle("  PinShare: Starting...")
+	t.menuPeersStatus.SetTitle("  Peers: Connecting...")
+	t.menuStart.Disable()
+	t.menuStop.Disable()
+	t.menuRestart.Disable()
+	systray.SetTooltip("PinShare - Starting...")
+}
+
+// handleStatusStopPending handles the stop-pending service state
+func (t *Tray) handleStatusStopPending() {
+	t.menuStatus.SetTitle("Status: Stopping...")
+	t.menuStart.Disable()
+	t.menuStop.Disable()
+	t.menuRestart.Disable()
+	systray.SetTooltip("PinShare - Stopping...")
+}
+
+// handleStatusNotInstalled handles the not-installed service state
+func (t *Tray) handleStatusNotInstalled() {
+	t.serviceRunning = false
+	t.menuStatus.SetTitle("Status: Not Installed")
+	t.menuIPFSStatus.SetTitle("  IPFS: -")
+	t.menuPinShareStatus.SetTitle("  PinShare: -")
+	t.menuPeersStatus.SetTitle("  Peers: -")
+	t.menuStart.Enable()
+	t.menuStop.Disable()
+	t.menuRestart.Disable()
+	systray.SetTooltip("PinShare - Service not installed")
 }
 
 // getServiceStatus gets the current service status using Windows Service Manager API (no spawned process)

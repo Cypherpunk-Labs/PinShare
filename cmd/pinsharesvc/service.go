@@ -14,7 +14,6 @@ import (
 
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
-	"pinshare/internal/winservice"
 )
 
 type pinshareService struct {
