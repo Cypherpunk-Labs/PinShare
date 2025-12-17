@@ -31,7 +31,7 @@ This will create:
 
 ```cmd
 cd installer
-build.bat
+build-wix6.bat
 ```
 
 This will:

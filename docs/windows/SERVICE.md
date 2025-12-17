@@ -8,32 +8,24 @@ This implementation provides a native Windows experience for PinShare, wrapping 
 
 ### Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│              Windows Service Manager                    │
-│                                                         │
-│  ┌────────────────────────────────────────────────┐   │
-│  │ PinShareService (Auto-start Windows Service)   │   │
-│  │                                                 │   │
-│  │  ┌──────────────┐  ┌──────────────────────┐   │   │
-│  │  │ IPFS Daemon  │→ │ PinShare Backend     │   │   │
-│  │  │ (subprocess) │  │ (subprocess)         │   │   │
-│  │  └──────────────┘  └──────────────────────┘   │   │
-│  │                                                 │   │
-│  │  ┌─────────────────────────────────────────┐  │   │
-│  │  │ Health Checker (30s intervals)          │  │   │
-│  │  │ - Monitors IPFS and PinShare            │  │   │
-│  │  │ - Auto-restart on failure (3 attempts)  │  │   │
-│  │  └─────────────────────────────────────────┘  │   │
-│  └────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
-                         ↕
-        ┌────────────────────────────────────────┐
-        │  System Tray Application (Startup)     │
-        │  - Start/Stop/Restart service          │
-        │  - View status and logs                │
-        │  - Quick access to settings            │
-        └────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph SCM["Windows Service Manager"]
+        subgraph SVC["PinShareService (Auto-start Windows Service)"]
+            IPFS["IPFS Daemon<br/>(subprocess)"]
+            PS["PinShare Backend<br/>(subprocess)"]
+            IPFS --> PS
+
+            subgraph HC["Health Checker (30s intervals)"]
+                HC1["Monitors IPFS and PinShare"]
+                HC2["Auto-restart on failure (3 attempts)"]
+            end
+        end
+    end
+
+    TRAY["System Tray Application (Startup)<br/>• Start/Stop/Restart service<br/>• View status and logs<br/>• Quick access to settings"]
+
+    SCM <--> TRAY
 ```
 
 ## Components
@@ -94,7 +86,7 @@ pinsharesvc.exe debug      # Run in console mode (debugging)
 
 **Files:**
 - `Product.wxs` - Main WiX configuration
-- `build.bat` - Automated build script
+- `build-wix6.bat` - Automated build script (WiX 4.x/6.x)
 - `license.rtf` - License agreement
 - `README.md` - Installer documentation
 
@@ -225,7 +217,7 @@ This creates `dist/windows/` with all binaries and UI files.
 
 ```cmd
 cd installer
-build.bat
+build-wix6.bat
 ```
 
 Output: `dist/PinShare-Setup.msi`
@@ -406,9 +398,9 @@ Start-Service PinShareService
 
 ## Documentation
 
-- **Installation Guide:** [`docs/windows/README.md`](docs/windows/README.md)
-- **Build Guide:** [`docs/windows/BUILD.md`](docs/windows/BUILD.md)
-- **Installer README:** [`installer/README.md`](installer/README.md)
+- **Installation Guide:** [README.md](README.md)
+- **Build Guide:** [BUILD.md](BUILD.md)
+- **Installer README:** [../../installer/README.md](../../installer/README.md)
 
 ## Implementation Details
 

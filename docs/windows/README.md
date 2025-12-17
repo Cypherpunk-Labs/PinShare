@@ -85,11 +85,24 @@ Edit: `C:\ProgramData\PinShare\config.json`
 
 ```json
 {
+  "install_directory": "C:\\Program Files\\PinShare",
+  "data_directory": "C:\\ProgramData\\PinShare",
+  "ipfs_binary": "C:\\Program Files\\PinShare\\ipfs.exe",
+  "pinshare_binary": "C:\\Program Files\\PinShare\\pinshare.exe",
+  "ipfs_api_port": 5001,
+  "ipfs_gateway_port": 8080,
+  "ipfs_swarm_port": 4001,
   "pinshare_api_port": 9090,
+  "pinshare_p2p_port": 50001,
+  "ui_port": 8888,
   "org_name": "MyOrganization",
   "group_name": "MyGroup",
-  "skip_virus_total": true,
-  "enable_cache": true
+  "skip_virus_total": false,
+  "enable_cache": true,
+  "archive_node": false,
+  "virus_total_token": "",
+  "log_level": "info",
+  "log_file_path": "C:\\ProgramData\\PinShare\\logs\\service.log"
 }
 ```
 
@@ -178,12 +191,6 @@ pinsharesvc.exe debug
 
 ### Firewall Configuration
 
-PinShare needs these ports open:
-
-**Outbound** (usually allowed by default):
-- All ports for IPFS swarm connections
-
-**Inbound** (may need firewall rules):
 - Port **4001** - IPFS swarm (P2P file sharing)
 - Port **50001** - PinShare libp2p (peer discovery)
 
@@ -259,8 +266,8 @@ ipfs.exe --repo-dir="C:\ProgramData\PinShare\ipfs" repo gc
 
 1. **Check firewall** - Ensure ports 4001 and 50001 are open
 2. **Check NAT** - PinShare uses relay for NAT traversal
-3. **View peer status**:
-   ```cmd
+3. **View peer status** (from Git Bash):
+   ```bash
    curl http://localhost:9090/api/status
    ```
 
@@ -408,15 +415,14 @@ Quick start (Git Bash):
 ```bash
 # Install dependencies
 # - Go 1.24+
-# - MinGW-w64 (for CGO/SQLite)
-# - WiX Toolset
+# - WiX Toolset (for installer only)
 
 # Clone repository
 git clone https://github.com/Episk-pos/PinShare.git
 cd PinShare
 
 # Build all components
-./build-windows.bat
+./build-windows.sh
 ```
 
 ## Support

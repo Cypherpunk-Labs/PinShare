@@ -20,46 +20,24 @@ Complete guide for building PinShare Windows distribution from source.
 #### Building on Windows
 
 **Required:**
-- **TDM-GCC** or **MinGW-w64** (for CGO/SQLite)
-  - TDM-GCC: https://jmeubank.github.io/tdm-gcc/
-  - Or MinGW-w64: https://www.mingw-w64.org/
-
-- **WiX Toolset 3.x or 4.x** (for installer)
-  - Download: https://wixtoolset.org/
-  - Add to PATH: `C:\Program Files (x86)\WiX Toolset v3.x\bin`
-
-**Optional:**
-- **Visual Studio Build Tools** (alternative to MinGW)
-  - Download: https://visualstudio.microsoft.com/downloads/
-  - Install "Desktop development with C++" workload
+- **WiX Toolset 4.x or 6.x** (for installer only)
+  - Install via .NET: `dotnet tool install --global wix`
+  - Or download from: https://wixtoolset.org/
 
 #### Cross-Compiling from Linux (Debian/Ubuntu)
 
 **Required packages:**
 ```bash
 sudo apt-get update
-sudo apt-get install -y \
-  gcc-mingw-w64-x86-64 \
-  wine64 \
-  wine32 \
-  unzip \
-  curl
+sudo apt-get install -y unzip curl
 
-# Add i386 architecture for Wine (if not already added)
-sudo dpkg --add-architecture i386
-sudo apt-get update
+# Optional: Wine for testing Windows binaries
+sudo apt-get install -y wine64
 ```
 
 #### Cross-Compiling from macOS
 
-**Required:**
-```bash
-# Install Homebrew if not already installed
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Install MinGW-w64
-brew install mingw-w64
-```
+No additional dependencies required beyond Go and Git.
 
 ## Building Components
 
@@ -102,24 +80,11 @@ Output: `dist/windows/`
 
 ```bash
 # On Linux/macOS (cross-compile)
-CGO_ENABLED=1 \
-GOOS=windows \
-GOARCH=amd64 \
-CC=x86_64-w64-mingw32-gcc \
-go build -o dist/windows/pinshare.exe .
+GOOS=windows GOARCH=amd64 go build -o dist/windows/pinshare.exe .
 
-# On Windows
-set CGO_ENABLED=1
-set GOOS=windows
-set GOARCH=amd64
-go build -o dist\windows\pinshare.exe .
+# On Windows (Git Bash)
+GOOS=windows GOARCH=amd64 go build -o dist/windows/pinshare.exe .
 ```
-
-**Note:** CGO is required for SQLite (`mattn/go-sqlite3`).
-
-**Alternative:** Use pure-Go SQLite to avoid CGO:
-- Replace `github.com/mattn/go-sqlite3` with `modernc.org/sqlite`
-- Build without CGO: `CGO_ENABLED=0`
 
 #### 2. Windows Service Wrapper
 
@@ -212,60 +177,6 @@ For automated builds, use GitHub Actions with Windows runners. See `.github/work
 
 ## Troubleshooting Build Issues
 
-### CGO Errors
-
-**Error:** `gcc: command not found`
-
-**Linux/macOS Solution:**
-```bash
-# Install MinGW
-sudo apt-get install gcc-mingw-w64-x86-64  # Debian/Ubuntu
-brew install mingw-w64                      # macOS
-```
-
-**Windows Solution:**
-```
-Install TDM-GCC or MinGW-w64, add to PATH
-```
-
-**Error:** `undefined reference to...` (SQLite linking)
-
-**Solution 1:** Ensure CGO is enabled
-```bash
-export CGO_ENABLED=1
-export CC=x86_64-w64-mingw32-gcc  # Linux
-```
-
-**Solution 2:** Use pure-Go SQLite
-```bash
-# In go.mod, replace:
-# github.com/mattn/go-sqlite3
-# with:
-# modernc.org/sqlite
-
-# Then build without CGO
-CGO_ENABLED=0 go build ...
-```
-
-### IPFS Download Errors
-
-**Error:** `curl: (6) Could not resolve host`
-
-**Solution:** Check internet connection, try:
-```bash
-# Use wget instead
-wget https://dist.ipfs.tech/kubo/v0.31.0/kubo_v0.31.0_windows-amd64.zip
-```
-
-**Error:** `unzip: command not found`
-
-**Linux Solution:**
-```bash
-sudo apt-get install unzip
-```
-
-**Windows Solution:** Use PowerShell's `Expand-Archive` (see above)
-
 ### WiX Errors
 
 **Error:** `candle.exe: command not found`
@@ -284,46 +195,6 @@ dir ..\dist\windows\*.exe
 
 All required files must exist before building the installer.
 
-## CI/CD Integration
-
-### GitHub Actions Example
-
-Create `.github/workflows/build-windows.yml`:
-
-```yaml
-name: Build Windows
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  build:
-    runs-on: windows-latest
-
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.24'
-
-    - name: Build Windows components
-      shell: bash
-      run: ./build-windows.bat
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: pinshare-windows
-        path: |
-          dist/windows/*.exe
-          installer/bin/Release/*.msi
-```
-
 ## Advanced Build Options
 
 ### Custom Build Flags
@@ -335,7 +206,7 @@ go build -ldflags="-X main.Version=1.0.0 -X main.GitCommit=$(git rev-parse --sho
 # Build with optimizations
 go build -ldflags="-s -w" ...  # Strip debug info
 
-# Static linking (requires CGO_ENABLED=0)
+# Static linking
 go build -ldflags="-extldflags=-static" ...
 ```
 
@@ -420,7 +291,6 @@ After building:
 - [Go Cross Compilation](https://golang.org/doc/install/source#environment)
 - [WiX Documentation](https://wixtoolset.org/documentation/)
 - [IPFS Kubo Releases](https://dist.ipfs.tech/)
-- [MinGW-w64](https://www.mingw-w64.org/)
 
 ## Support
 
