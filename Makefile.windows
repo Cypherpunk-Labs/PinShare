@@ -6,8 +6,7 @@
 # Configuration
 GOOS := windows
 GOARCH := amd64
-CGO_ENABLED := 1
-CC := x86_64-w64-mingw32-gcc
+CGO_ENABLED := 0
 
 # Directories
 DIST_DIR := dist/windows
@@ -52,7 +51,7 @@ $(DIST_DIR):
 # Build PinShare backend for Windows
 windows-backend: $(DIST_DIR)
 	@echo "Building PinShare backend for Windows..."
-	CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH) CC=$(CC) \
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH) \
 		go build -ldflags "$(LDFLAGS) -X main.Version=$(VERSION) -X main.GitCommit=$(GIT_COMMIT) -X main.BuildDate=$(BUILD_DATE)" \
 		-o $(DIST_DIR)/pinshare.exe .
 	@echo "✓ Built: $(DIST_DIR)/pinshare.exe"
@@ -111,14 +110,14 @@ installer: windows-all
 	@echo "Building Windows installer..."
 	@if command -v candle.exe >/dev/null 2>&1; then \
 		echo "WiX detected, building MSI..."; \
-		cd $(INSTALLER_DIR) && ./build.bat; \
+		cd $(INSTALLER_DIR) && ./build-wix6.bat; \
 	else \
 		echo ""; \
 		echo "ERROR: WiX Toolset not found!"; \
 		echo ""; \
 		echo "To build the installer:"; \
 		echo "1. Install WiX Toolset from https://wixtoolset.org/"; \
-		echo "2. On Windows, run: cd installer && build.bat"; \
+		echo "2. On Windows, run: cd installer && build-wix6.bat"; \
 		echo "3. Or manually run WiX commands (see installer/README.md)"; \
 		echo ""; \
 		exit 1; \
@@ -160,9 +159,6 @@ check-deps:
 	@echo ""
 	@echo "Go version:"
 	@go version || echo "ERROR: Go not found"
-	@echo ""
-	@echo "Cross-compilation support (optional, for CGO):"
-	@which $(CC) >/dev/null 2>&1 && echo "✓ MinGW-w64 found: $(CC)" || echo "⚠ MinGW-w64 not found (only needed if CGO_ENABLED=1)"
 	@echo ""
 	@echo "Build tools:"
 	@which unzip >/dev/null 2>&1 && echo "✓ unzip found" || echo "⚠ unzip not found"

@@ -68,7 +68,7 @@ jobs:
 
       - name: Build PinShare backend
         env:
-          CGO_ENABLED: 1
+          CGO_ENABLED: 0
           GOOS: windows
           GOARCH: amd64
         run: |
@@ -77,7 +77,7 @@ jobs:
 
       - name: Build Windows service wrapper
         env:
-          CGO_ENABLED: 1
+          CGO_ENABLED: 0
           GOOS: windows
           GOARCH: amd64
         run: |
@@ -86,7 +86,7 @@ jobs:
 
       - name: Build system tray application
         env:
-          CGO_ENABLED: 1
+          CGO_ENABLED: 0
           GOOS: windows
           GOARCH: amd64
         run: |

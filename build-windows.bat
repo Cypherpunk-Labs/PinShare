@@ -60,7 +60,7 @@ if not exist "%DIST_DIR%" mkdir "%DIST_DIR%"
 
 REM Build PinShare backend
 echo Building PinShare backend...
-set CGO_ENABLED=1
+set CGO_ENABLED=0
 set GOOS=windows
 set GOARCH=amd64
 
