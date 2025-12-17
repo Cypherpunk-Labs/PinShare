@@ -7,15 +7,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/Cypherpunk-Labs/PinShare/internal/winservice"
 	"github.com/getlantern/systray"
 	"golang.org/x/sys/windows"
-)
-
-
-const (
-	serviceName = "PinShareService"
-	// TODO: Re-enable when UI is ready
-	// uiPort = 8888 // Default UI port
 )
 
 // ServiceState represents the state of the Windows service
@@ -235,12 +229,15 @@ func (t *Tray) handleViewLogs() {
 
 // handleAbout shows about information
 func (t *Tray) handleAbout() {
-	showMessage("About PinShare", "PinShare - Decentralized IPFS Pinning Service\nVersion 1.0")
+	showMessage("About PinShare",
+		"PinShare - Decentralized IPFS Pinning Service\n"+
+			"Version 1.0\n\n"+
+			"GitHub: https://github.com/Cypherpunk-Labs/PinShare")
 }
 
 // UpdateStatusLoop periodically updates the status
 func (t *Tray) UpdateStatusLoop() {
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(winservice.StatusCheckInterval)
 	defer ticker.Stop()
 
 	for range ticker.C {
@@ -262,11 +259,7 @@ func (t *Tray) updateStatus() {
 		} else {
 			// Show actual error for debugging
 			t.menuStatus.SetTitle("Status: Error")
-			errMsg := err.Error()
-			if len(errMsg) > 50 {
-				errMsg = errMsg[:50] + "..."
-			}
-			systray.SetTooltip(fmt.Sprintf("PinShare - %s", errMsg))
+			systray.SetTooltip(fmt.Sprintf("PinShare - %s", truncateErrorMessage(err.Error())))
 		}
 
 		t.menuIPFSStatus.SetTitle("  IPFS: -")
@@ -372,12 +365,12 @@ func getServiceStatus() (ServiceState, error) {
 	defer windows.CloseServiceHandle(scmHandle)
 
 	// Open the service with query status permission only
-	serviceNamePtr, err := windows.UTF16PtrFromString(serviceName)
+	winservice.ServiceNamePtr, err := windows.UTF16PtrFromString(winservice.ServiceName)
 	if err != nil {
 		return StateStopped, fmt.Errorf("invalid service name: %w", err)
 	}
 
-	svcHandle, err := windows.OpenService(scmHandle, serviceNamePtr, windows.SERVICE_QUERY_STATUS)
+	svcHandle, err := windows.OpenService(scmHandle, winservice.ServiceNamePtr, windows.SERVICE_QUERY_STATUS)
 	if err != nil {
 		// Service doesn't exist (ERROR_SERVICE_DOES_NOT_EXIST = 1060)
 		return StateNotInstalled, fmt.Errorf("service not installed")
@@ -459,9 +452,9 @@ func runElevated(executable, args string) error {
 
 // startService starts the service using sc.exe with UAC elevation
 func startService() error {
-	log.Printf("Starting service %s with elevation...", serviceName)
+	log.Printf("Starting service %s with elevation...", winservice.ServiceName)
 
-	err := runElevated("sc.exe", fmt.Sprintf("start %s", serviceName))
+	err := runElevated("sc.exe", fmt.Sprintf("start %s", winservice.ServiceName))
 	if err != nil {
 		log.Printf("Failed to start service: %v", err)
 		return fmt.Errorf("failed to start service: %w", err)
@@ -473,9 +466,9 @@ func startService() error {
 
 // stopService stops the service using sc.exe with UAC elevation
 func stopService() error {
-	log.Printf("Stopping service %s with elevation...", serviceName)
+	log.Printf("Stopping service %s with elevation...", winservice.ServiceName)
 
-	err := runElevated("sc.exe", fmt.Sprintf("stop %s", serviceName))
+	err := runElevated("sc.exe", fmt.Sprintf("stop %s", winservice.ServiceName))
 	if err != nil {
 		log.Printf("Failed to stop service: %v", err)
 		return fmt.Errorf("failed to stop service: %w", err)
@@ -483,4 +476,12 @@ func stopService() error {
 
 	log.Printf("Service stop command initiated")
 	return nil
+}
+
+// truncateErrorMessage truncates error messages to a maximum length for display
+func truncateErrorMessage(msg string) string {
+	if len(msg) > winservice.MaxErrorMessageLength {
+		return msg[:winservice.MaxErrorMessageLength] + "..."
+	}
+	return msg
 }

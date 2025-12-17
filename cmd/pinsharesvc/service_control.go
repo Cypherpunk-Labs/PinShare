@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/Cypherpunk-Labs/PinShare/internal/winservice"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 )
@@ -25,27 +26,27 @@ func installService() error {
 	defer manager.Disconnect()
 
 	// Check if service already exists
-	service, err := manager.OpenService(serviceName)
+	service, err := manager.OpenService(winservice.ServiceName)
 	if err == nil {
 		service.Close()
 		// Service already exists - this is fine for reinstall/upgrade scenarios where
 		// the MSI installer runs the install command but the service is already registered.
 		// We skip re-registration to preserve the existing service configuration and avoid
 		// errors from attempting to create a duplicate service entry.
-		fmt.Printf("Service %s already exists, skipping installation\n", serviceName)
+		fmt.Printf("Service %s already exists, skipping installation\n", winservice.ServiceName)
 		return nil
 	}
 
 	// Create Windows service configuration
 	winSvcConfig := mgr.Config{
-		DisplayName:  "PinShare Service",
-		Description:  "PinShare - Decentralized IPFS pinning service with libp2p",
+		DisplayName:  winservice.ServiceDisplayName,
+		Description:  winservice.ServiceDescription,
 		StartType:    mgr.StartAutomatic,
 		ErrorControl: mgr.ErrorNormal,
 	}
 
 	// Create service
-	service, err = manager.CreateService(serviceName, exePath, winSvcConfig)
+	service, err = manager.CreateService(winservice.ServiceName, exePath, winSvcConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create service: %w", err)
 	}
@@ -96,7 +97,7 @@ func installService() error {
 		return fmt.Errorf("failed to save config file: %w", err)
 	}
 
-	fmt.Printf("Service %s installed successfully\n", serviceName)
+	fmt.Printf("Service %s installed successfully\n", winservice.ServiceName)
 	fmt.Printf("Installation directory: %s\n", pinShareConfig.InstallDirectory)
 	fmt.Printf("Data directory: %s\n", pinShareConfig.DataDirectory)
 	fmt.Printf("\nTo start the service, run: %s start\n", exePath)
@@ -114,9 +115,9 @@ func uninstallService() error {
 	defer manager.Disconnect()
 
 	// Open service
-	service, err := manager.OpenService(serviceName)
+	service, err := manager.OpenService(winservice.ServiceName)
 	if err != nil {
-		return fmt.Errorf("service %s not found: %w", serviceName, err)
+		return fmt.Errorf("service %s not found: %w", winservice.ServiceName, err)
 	}
 	defer service.Close()
 
@@ -134,12 +135,12 @@ func uninstallService() error {
 		}
 
 		// Wait for service to stop
-		timeout := time.Now().Add(30 * time.Second)
+		timeout := time.Now().Add(winservice.ServiceStopTimeout)
 		for status.State != svc.Stopped {
 			if time.Now().After(timeout) {
 				return fmt.Errorf("timeout waiting for service to stop")
 			}
-			time.Sleep(300 * time.Millisecond)
+			time.Sleep(winservice.ServicePollInterval)
 			status, err = service.Query()
 			if err != nil {
 				return fmt.Errorf("failed to query service status: %w", err)
@@ -158,7 +159,7 @@ func uninstallService() error {
 		fmt.Printf("Warning: Failed to remove event log source: %v\n", err)
 	}
 
-	fmt.Printf("Service %s uninstalled successfully\n", serviceName)
+	fmt.Printf("Service %s uninstalled successfully\n", winservice.ServiceName)
 	fmt.Println("\nNote: Data directory was not removed. To remove it manually, delete:")
 
 	config, err := LoadConfig()
@@ -179,9 +180,9 @@ func startService() error {
 	defer manager.Disconnect()
 
 	// Open service
-	service, err := manager.OpenService(serviceName)
+	service, err := manager.OpenService(winservice.ServiceName)
 	if err != nil {
-		return fmt.Errorf("service %s not found: %w", serviceName, err)
+		return fmt.Errorf("service %s not found: %w", winservice.ServiceName, err)
 	}
 	defer service.Close()
 
@@ -193,7 +194,7 @@ func startService() error {
 
 	// If already running, nothing to do
 	if status.State == svc.Running {
-		fmt.Printf("Service %s is already running\n", serviceName)
+		fmt.Printf("Service %s is already running\n", winservice.ServiceName)
 		return nil
 	}
 
@@ -203,8 +204,8 @@ func startService() error {
 	}
 
 	// Wait for service to be running
-	fmt.Printf("Starting service %s...\n", serviceName)
-	timeout := time.Now().Add(60 * time.Second)
+	fmt.Printf("Starting service %s...\n", winservice.ServiceName)
+	timeout := time.Now().Add(winservice.ServiceStartTimeout)
 	for {
 		status, err = service.Query()
 		if err != nil {
@@ -223,10 +224,10 @@ func startService() error {
 			return fmt.Errorf("timeout waiting for service to start")
 		}
 
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(winservice.ServicePollInterval)
 	}
 
-	fmt.Printf("Service %s started successfully\n", serviceName)
+	fmt.Printf("Service %s started successfully\n", winservice.ServiceName)
 
 	// Load config to show API URL
 	config, err := LoadConfig()
@@ -247,9 +248,9 @@ func stopService() error {
 	defer manager.Disconnect()
 
 	// Open service
-	service, err := manager.OpenService(serviceName)
+	service, err := manager.OpenService(winservice.ServiceName)
 	if err != nil {
-		return fmt.Errorf("service %s not found: %w", serviceName, err)
+		return fmt.Errorf("service %s not found: %w", winservice.ServiceName, err)
 	}
 	defer service.Close()
 
@@ -260,19 +261,19 @@ func stopService() error {
 	}
 
 	// Wait for service to stop
-	timeout := time.Now().Add(30 * time.Second)
+	timeout := time.Now().Add(winservice.ServiceStopTimeout)
 	for status.State != svc.Stopped {
 		if time.Now().After(timeout) {
 			return fmt.Errorf("timeout waiting for service to stop")
 		}
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(winservice.ServicePollInterval)
 		status, err = service.Query()
 		if err != nil {
 			return fmt.Errorf("failed to query service status: %w", err)
 		}
 	}
 
-	fmt.Printf("Service %s stopped successfully\n", serviceName)
+	fmt.Printf("Service %s stopped successfully\n", winservice.ServiceName)
 	return nil
 }
 
@@ -283,7 +284,7 @@ func restartService() error {
 		return err
 	}
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(winservice.ServiceRestartDelay)
 
 	fmt.Println("Starting service...")
 	return startService()

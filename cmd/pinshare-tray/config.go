@@ -4,12 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-)
 
-// Default ports (must match pinsharesvc defaults)
-const (
-	defaultIPFSAPIPort     = 5001
-	defaultPinShareAPIPort = 9090
+	"github.com/Cypherpunk-Labs/PinShare/internal/winservice"
 )
 
 // TrayConfig holds configuration values needed by the tray application
@@ -25,8 +21,8 @@ var appConfig *TrayConfig
 // Falls back to defaults if config file doesn't exist or can't be read
 func loadConfig() *TrayConfig {
 	config := &TrayConfig{
-		IPFSAPIPort:     defaultIPFSAPIPort,
-		PinShareAPIPort: defaultPinShareAPIPort,
+		IPFSAPIPort:     winservice.DefaultIPFSAPIPort,
+		PinShareAPIPort: winservice.DefaultPinShareAPIPort,
 	}
 
 	programData := os.Getenv("PROGRAMDATA")
@@ -50,10 +46,10 @@ func loadConfig() *TrayConfig {
 
 	// Apply defaults for zero values
 	if config.IPFSAPIPort == 0 {
-		config.IPFSAPIPort = defaultIPFSAPIPort
+		config.IPFSAPIPort = winservice.DefaultIPFSAPIPort
 	}
 	if config.PinShareAPIPort == 0 {
-		config.PinShareAPIPort = defaultPinShareAPIPort
+		config.PinShareAPIPort = winservice.DefaultPinShareAPIPort
 	}
 
 	return config
@@ -70,4 +66,11 @@ func getConfig() *TrayConfig {
 // reloadConfig forces a reload of the configuration
 func reloadConfig() {
 	appConfig = loadConfig()
+}
+
+// Reload reloads the configuration from disk
+func (c *TrayConfig) Reload() {
+	newConfig := loadConfig()
+	c.IPFSAPIPort = newConfig.IPFSAPIPort
+	c.PinShareAPIPort = newConfig.PinShareAPIPort
 }

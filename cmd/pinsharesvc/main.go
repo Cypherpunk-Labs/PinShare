@@ -5,10 +5,9 @@ import (
 	"log"
 	"os"
 
+	"github.com/Cypherpunk-Labs/PinShare/internal/winservice"
 	"golang.org/x/sys/windows/svc"
 )
-
-const serviceName = "PinShareService"
 
 func main() {
 	// Check if running as Windows service
@@ -70,7 +69,7 @@ Commands:
 }
 
 func runService() {
-	err := svc.Run(serviceName, &pinshareService{})
+	err := svc.Run(winservice.ServiceName, &pinshareService{})
 	if err != nil {
 		log.Fatalf("Service failed: %v", err)
 	}

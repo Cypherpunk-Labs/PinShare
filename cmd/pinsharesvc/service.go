@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Cypherpunk-Labs/PinShare/internal/winservice"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
 )
@@ -87,7 +88,7 @@ func (s *pinshareService) initialize() error {
 	s.config = config
 
 	// Initialize event log
-	s.eventLog, err = openEventLog(serviceName)
+	s.eventLog, err = openEventLog(winservice.ServiceName)
 	if err != nil {
 		return fmt.Errorf("failed to open event log: %w", err)
 	}

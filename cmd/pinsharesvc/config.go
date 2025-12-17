@@ -7,16 +7,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-)
 
-const (
-	// Default ports
-	defaultIPFSAPIPort    = 5001
-	defaultIPFSGatewayPort = 8080
-	defaultIPFSSwarmPort  = 4001
-	defaultPinShareAPIPort = 9090
-	defaultPinShareP2PPort = 50001
-	defaultUIPort         = 8888
+	"github.com/Cypherpunk-Labs/PinShare/internal/winservice"
 )
 
 type ServiceConfig struct {
@@ -109,12 +101,12 @@ func getDefaultConfig() (*ServiceConfig, error) {
 		IPFSBinary:       filepath.Join(installDir, "ipfs.exe"),
 		PinShareBinary:   filepath.Join(installDir, "pinshare.exe"),
 
-		IPFSAPIPort:      defaultIPFSAPIPort,
-		IPFSGatewayPort:  defaultIPFSGatewayPort,
-		IPFSSwarmPort:    defaultIPFSSwarmPort,
-		PinShareAPIPort:  defaultPinShareAPIPort,
-		PinShareP2PPort:  defaultPinShareP2PPort,
-		UIPort:           defaultUIPort,
+		IPFSAPIPort:      winservice.DefaultIPFSAPIPort,
+		IPFSGatewayPort:  winservice.DefaultIPFSGatewayPort,
+		IPFSSwarmPort:    winservice.DefaultIPFSSwarmPort,
+		PinShareAPIPort:  winservice.DefaultPinShareAPIPort,
+		PinShareP2PPort:  winservice.DefaultPinShareP2PPort,
+		UIPort:           winservice.DefaultUIPort,
 
 		OrgName:   "MyOrganization",
 		GroupName: "MyGroup",
@@ -135,22 +127,22 @@ func getDefaultConfig() (*ServiceConfig, error) {
 // applyDefaults fills in missing configuration values with defaults
 func (c *ServiceConfig) applyDefaults() {
 	if c.IPFSAPIPort == 0 {
-		c.IPFSAPIPort = defaultIPFSAPIPort
+		c.IPFSAPIPort = winservice.DefaultIPFSAPIPort
 	}
 	if c.IPFSGatewayPort == 0 {
-		c.IPFSGatewayPort = defaultIPFSGatewayPort
+		c.IPFSGatewayPort = winservice.DefaultIPFSGatewayPort
 	}
 	if c.IPFSSwarmPort == 0 {
-		c.IPFSSwarmPort = defaultIPFSSwarmPort
+		c.IPFSSwarmPort = winservice.DefaultIPFSSwarmPort
 	}
 	if c.PinShareAPIPort == 0 {
-		c.PinShareAPIPort = defaultPinShareAPIPort
+		c.PinShareAPIPort = winservice.DefaultPinShareAPIPort
 	}
 	if c.PinShareP2PPort == 0 {
-		c.PinShareP2PPort = defaultPinShareP2PPort
+		c.PinShareP2PPort = winservice.DefaultPinShareP2PPort
 	}
 	if c.UIPort == 0 {
-		c.UIPort = defaultUIPort
+		c.UIPort = winservice.DefaultUIPort
 	}
 	if c.LogLevel == "" {
 		c.LogLevel = "info"
