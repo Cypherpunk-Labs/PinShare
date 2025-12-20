@@ -7,7 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/Cypherpunk-Labs/PinShare/internal/winservice"
+	"pinshare/internal/winservice"
+
 	"github.com/getlantern/systray"
 	"golang.org/x/sys/windows"
 )
@@ -25,21 +26,21 @@ const (
 
 type Tray struct {
 	// Menu items
-	menuOpenUI        *systray.MenuItem
-	menuStatus        *systray.MenuItem
-	menuIPFSStatus    *systray.MenuItem
+	menuOpenUI         *systray.MenuItem
+	menuStatus         *systray.MenuItem
+	menuIPFSStatus     *systray.MenuItem
 	menuPinShareStatus *systray.MenuItem
-	menuPeersStatus   *systray.MenuItem
-	menuSeparator1    *systray.MenuItem
-	menuStart         *systray.MenuItem
-	menuStop          *systray.MenuItem
-	menuRestart       *systray.MenuItem
-	menuSeparator2    *systray.MenuItem
-	menuSettings      *systray.MenuItem
-	menuLogs          *systray.MenuItem
-	menuAbout         *systray.MenuItem
-	menuSeparator3    *systray.MenuItem
-	menuExit          *systray.MenuItem
+	menuPeersStatus    *systray.MenuItem
+	menuSeparator1     *systray.MenuItem
+	menuStart          *systray.MenuItem
+	menuStop           *systray.MenuItem
+	menuRestart        *systray.MenuItem
+	menuSeparator2     *systray.MenuItem
+	menuSettings       *systray.MenuItem
+	menuLogs           *systray.MenuItem
+	menuAbout          *systray.MenuItem
+	menuSeparator3     *systray.MenuItem
+	menuExit           *systray.MenuItem
 
 	// State
 	serviceRunning bool
@@ -365,7 +366,7 @@ func getServiceStatus() (ServiceState, error) {
 	defer windows.CloseServiceHandle(scmHandle)
 
 	// Open the service with query status permission only
-	winservice.ServiceNamePtr, err := windows.UTF16PtrFromString(winservice.ServiceName)
+	winservice.ServiceNamePtr, err = windows.UTF16PtrFromString(winservice.ServiceName)
 	if err != nil {
 		return StateStopped, fmt.Errorf("invalid service name: %w", err)
 	}

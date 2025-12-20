@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Cypherpunk-Labs/PinShare/internal/winservice"
+	"pinshare/internal/winservice"
 )
 
 type ServiceConfig struct {
@@ -21,16 +21,16 @@ type ServiceConfig struct {
 	PinShareBinary string `json:"pinshare_binary"`
 
 	// Ports
-	IPFSAPIPort      int `json:"ipfs_api_port"`
-	IPFSGatewayPort  int `json:"ipfs_gateway_port"`
-	IPFSSwarmPort    int `json:"ipfs_swarm_port"`
-	PinShareAPIPort  int `json:"pinshare_api_port"`
-	PinShareP2PPort  int `json:"pinshare_p2p_port"`
-	UIPort           int `json:"ui_port"` // Reserved for future web UI integration
+	IPFSAPIPort     int `json:"ipfs_api_port"`
+	IPFSGatewayPort int `json:"ipfs_gateway_port"`
+	IPFSSwarmPort   int `json:"ipfs_swarm_port"`
+	PinShareAPIPort int `json:"pinshare_api_port"`
+	PinShareP2PPort int `json:"pinshare_p2p_port"`
+	UIPort          int `json:"ui_port"` // Reserved for future web UI integration
 
 	// PinShare configuration
-	OrgName    string `json:"org_name"`
-	GroupName  string `json:"group_name"`
+	OrgName   string `json:"org_name"`
+	GroupName string `json:"group_name"`
 
 	// Feature flags
 	SkipVirusTotal bool `json:"skip_virus_total"`
@@ -101,12 +101,12 @@ func getDefaultConfig() (*ServiceConfig, error) {
 		IPFSBinary:       filepath.Join(installDir, "ipfs.exe"),
 		PinShareBinary:   filepath.Join(installDir, "pinshare.exe"),
 
-		IPFSAPIPort:      winservice.DefaultIPFSAPIPort,
-		IPFSGatewayPort:  winservice.DefaultIPFSGatewayPort,
-		IPFSSwarmPort:    winservice.DefaultIPFSSwarmPort,
-		PinShareAPIPort:  winservice.DefaultPinShareAPIPort,
-		PinShareP2PPort:  winservice.DefaultPinShareP2PPort,
-		UIPort:           winservice.DefaultUIPort,
+		IPFSAPIPort:     winservice.DefaultIPFSAPIPort,
+		IPFSGatewayPort: winservice.DefaultIPFSGatewayPort,
+		IPFSSwarmPort:   winservice.DefaultIPFSSwarmPort,
+		PinShareAPIPort: winservice.DefaultPinShareAPIPort,
+		PinShareP2PPort: winservice.DefaultPinShareP2PPort,
+		UIPort:          winservice.DefaultUIPort,
 
 		OrgName:   "MyOrganization",
 		GroupName: "MyGroup",

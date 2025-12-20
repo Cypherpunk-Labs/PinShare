@@ -2,6 +2,8 @@ package winservice
 
 import "time"
 
+var ServiceNamePtr *uint16
+
 // Service identification
 const (
 	ServiceName        = "PinShareService"
