@@ -338,6 +338,12 @@ rmdir /s "C:\ProgramData\PinShare"
 
 ## Advanced Topics
 
+### Windows 11 Compatibility
+
+PinShare is fully compatible with Windows 11. The installer includes enhanced service startup logic to handle Windows 11's stricter security policies.
+
+For technical details about Windows 11 specific improvements, see [Windows 11 Compatibility Guide](WINDOWS11_COMPATIBILITY.md).
+
 ### Running Multiple Instances
 
 To run multiple PinShare instances:

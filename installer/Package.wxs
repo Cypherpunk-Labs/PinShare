@@ -61,9 +61,13 @@
     <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
 
     <!-- Custom actions -->
-    <!-- Use net.exe for start/stop - it waits for service to start/stop and is silent -->
-    <SetProperty Id="StartService" Value="&quot;[SystemFolder]net.exe&quot; start PinShareService" Before="StartService" Sequence="execute" />
-    <CustomAction Id="StartService"
+    <!-- Use PowerShell script for reliable service start with retry logic -->
+    <!-- This handles Windows 11's stricter service startup requirements -->
+    <SetProperty Id="StartServicePS"
+                 Value="&quot;[SystemFolder]WindowsPowerShell\v1.0\powershell.exe&quot; -ExecutionPolicy Bypass -NoProfile -File &quot;[INSTALLFOLDER]start-service.ps1&quot;"
+                 Before="StartServicePS"
+                 Sequence="execute" />
+    <CustomAction Id="StartServicePS"
                   DllEntry="WixQuietExec64"
                   Impersonate="no"
                   BinaryRef="Wix4UtilCA_X64"
@@ -108,11 +112,13 @@
 
       <!-- Always install service on fresh install -->
       <Custom Action="InstallService" After="InstallFiles" Condition="NOT Installed" />
-      <!-- Only start service if START_SERVICE_NOW=1 -->
-      <Custom Action="StartService" After="InstallService" Condition="NOT Installed AND START_SERVICE_NOW=1" />
+
+      <!-- Start service using PowerShell script with retry logic -->
+      <!-- This works reliably on both Windows 10 and Windows 11 -->
+      <Custom Action="StartServicePS" After="InstallService" Condition="NOT Installed AND START_SERVICE_NOW=1" />
 
       <!-- Start tray application if START_TRAY_NOW=1 -->
-      <Custom Action="StartTray" After="StartService" Condition="NOT Installed AND START_TRAY_NOW=1" />
+      <Custom Action="StartTray" After="StartServicePS" Condition="NOT Installed AND START_TRAY_NOW=1" />
     </InstallExecuteSequence>
 
     <!-- Features -->
@@ -186,6 +192,13 @@
         <File Id="IPFSExe"
               Name="ipfs.exe"
               Source="..\dist\windows\ipfs.exe" />
+      </Component>
+
+      <!-- PowerShell script for service start -->
+      <Component Id="StartServiceScript" Bitness="always64">
+        <File Id="StartServicePS1"
+              Name="start-service.ps1"
+              Source="start-service.ps1" />
       </Component>
 
       <!-- TEMPORARILY DISABLED: icon.ico file not yet created -->
