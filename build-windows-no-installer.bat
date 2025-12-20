@@ -1,11 +1,11 @@
 @echo off
-REM Build PinShare for Windows - Simple batch script
-REM No make required!
+REM Build PinShare for Windows - Binaries only (no MSI)
+REM This version skips the MSI installer build
 
 setlocal enabledelayedexpansion
 
 echo ==========================================
-echo Building PinShare for Windows
+echo Building PinShare for Windows (No MSI)
 echo ==========================================
 echo.
 
@@ -156,53 +156,12 @@ echo.
 echo Binaries:
 dir /b "%DIST_DIR%\*.exe"
 echo.
-
-REM Ask about building installer
+echo Build output: %DIST_DIR%
 echo.
-echo Would you like to build the MSI installer now? (Y/N)
-set /p BUILD_INSTALLER=
-if /i "%BUILD_INSTALLER%"=="Y" (
-    echo.
-
-    REM Ensure .NET SDK is in PATH before building installer
-    dotnet --version >nul 2>&1
-    if errorlevel 1 (
-        if exist "C:\Program Files\dotnet\dotnet.exe" (
-            set "PATH=C:\Program Files\dotnet;%PATH%"
-        ) else if exist "%USERPROFILE%\.dotnet\dotnet.exe" (
-            set "PATH=%USERPROFILE%\.dotnet;%PATH%"
-        )
-    )
-
-    echo Building MSI installer...
-    pushd "%SCRIPT_DIR%installer"
-    if errorlevel 1 (
-        echo ERROR: Failed to change to installer directory at %SCRIPT_DIR%installer
-        exit /b 1
-    )
-
-    call build-wix6.bat %VERSION%
-    if errorlevel 1 (
-        echo ERROR: Installer build failed
-        popd
-        exit /b 1
-    )
-
-    popd
-    echo.
-    echo ==========================================
-    echo Build Complete!
-    echo ==========================================
-    echo.
-    echo Installer: %SCRIPT_DIR%installer\bin\Release\PinShare-Setup.msi
-    echo.
-    echo To install, run:
-    echo   msiexec /i "%SCRIPT_DIR%installer\bin\Release\PinShare-Setup.msi"
-) else (
-    echo.
-    echo Skipping installer build. To build later, run:
-    echo   cd "%SCRIPT_DIR%installer"
-    echo   build-wix6.bat
-)
+echo To build the MSI installer:
+echo   1. Install .NET SDK 6.0+ from https://dotnet.microsoft.com/download
+echo   2. Run: cd installer
+echo   3. Run: build-wix6.bat %VERSION%
+echo.
 
 endlocal
