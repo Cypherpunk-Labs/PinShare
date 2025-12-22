@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"pinshare/internal/winservice"
@@ -454,18 +455,33 @@ func checkPinShareHealth() bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-// startService starts the service using Windows API (no UAC required if DACL is set)
+// startService starts the service, trying direct API first, then falling back to UAC elevation
 func startService() error {
 	log.Printf("Starting service %s...", winservice.ServiceName)
 
-	// Open service control manager with minimal permissions
+	// Try direct API first (works if DACL was set during installation)
+	err := startServiceDirect()
+	if err == nil {
+		return nil
+	}
+
+	// Check if it's an access denied error
+	if isAccessDenied(err) {
+		log.Printf("Direct API access denied, trying with elevation...")
+		return startServiceElevated()
+	}
+
+	return err
+}
+
+// startServiceDirect tries to start the service using Windows API directly
+func startServiceDirect() error {
 	scmHandle, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
 	if err != nil {
 		return fmt.Errorf("failed to connect to service manager: %w", err)
 	}
 	defer windows.CloseServiceHandle(scmHandle)
 
-	// Open service with start permission
 	serviceNamePtr, _ := windows.UTF16PtrFromString(winservice.ServiceName)
 	svcHandle, err := windows.OpenService(scmHandle, serviceNamePtr, windows.SERVICE_START|windows.SERVICE_QUERY_STATUS)
 	if err != nil {
@@ -482,7 +498,6 @@ func startService() error {
 		}
 	}
 
-	// Start the service
 	err = windows.StartService(svcHandle, 0, nil)
 	if err != nil {
 		return fmt.Errorf("failed to start service: %w", err)
@@ -492,10 +507,33 @@ func startService() error {
 	return nil
 }
 
-// stopService stops the service using Windows API (no UAC required if DACL is set)
+// startServiceElevated starts the service using sc.exe with UAC elevation
+func startServiceElevated() error {
+	log.Printf("Starting service %s with elevation...", winservice.ServiceName)
+	return runElevated("sc.exe", fmt.Sprintf("start %s", winservice.ServiceName))
+}
+
+// stopService stops the service, trying direct API first, then falling back to UAC elevation
 func stopService() error {
 	log.Printf("Stopping service %s...", winservice.ServiceName)
 
+	// Try direct API first (works if DACL was set during installation)
+	err := stopServiceDirect()
+	if err == nil {
+		return nil
+	}
+
+	// Check if it's an access denied error
+	if isAccessDenied(err) {
+		log.Printf("Direct API access denied, trying with elevation...")
+		return stopServiceElevated()
+	}
+
+	return err
+}
+
+// stopServiceDirect tries to stop the service using Windows API directly
+func stopServiceDirect() error {
 	scmHandle, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
 	if err != nil {
 		return fmt.Errorf("failed to connect to service manager: %w", err)
@@ -518,7 +556,6 @@ func stopService() error {
 		}
 	}
 
-	// Stop the service
 	err = windows.ControlService(svcHandle, windows.SERVICE_CONTROL_STOP, &status)
 	if err != nil {
 		return fmt.Errorf("failed to stop service: %w", err)
@@ -526,6 +563,41 @@ func stopService() error {
 
 	log.Printf("Service stop initiated")
 	return nil
+}
+
+// stopServiceElevated stops the service using sc.exe with UAC elevation
+func stopServiceElevated() error {
+	log.Printf("Stopping service %s with elevation...", winservice.ServiceName)
+	return runElevated("sc.exe", fmt.Sprintf("stop %s", winservice.ServiceName))
+}
+
+// runElevated runs a command with UAC elevation using ShellExecute
+func runElevated(executable, args string) error {
+	verbPtr, _ := windows.UTF16PtrFromString("runas")
+	exePtr, _ := windows.UTF16PtrFromString(executable)
+	argsPtr, _ := windows.UTF16PtrFromString(args)
+
+	err := windows.ShellExecute(0, verbPtr, exePtr, argsPtr, nil, windows.SW_HIDE)
+	if err != nil {
+		return fmt.Errorf("failed to execute with elevation: %w", err)
+	}
+	return nil
+}
+
+// isAccessDenied checks if an error is an "access denied" error
+func isAccessDenied(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Check for Windows ERROR_ACCESS_DENIED (5)
+	if err == windows.ERROR_ACCESS_DENIED {
+		return true
+	}
+	// Also check error message for wrapped errors
+	errStr := err.Error()
+	return strings.Contains(errStr, "Access is denied") ||
+		strings.Contains(errStr, "access denied") ||
+		strings.Contains(errStr, "ERROR_ACCESS_DENIED")
 }
 
 // ensureServiceRunning starts the service if it's not already running.
