@@ -28,9 +28,31 @@ const (
 	ServicePollInterval    = 500 * time.Millisecond
 	ServiceRestartDelay    = 2 * time.Second
 	ProcessShutdownTimeout = 10 * time.Second
+
+	// Startup wait timeouts
+	IPFSStartTimeout     = 30 * time.Second
+	PinShareStartTimeout = 60 * time.Second
+	HealthCheckPoll      = 1 * time.Second
+
+	// Service recovery delays
+	RecoveryDelayFirst  = 5 * time.Second
+	RecoveryDelaySecond = 10 * time.Second
+	RecoveryDelayThird  = 30 * time.Second
+	RecoveryResetPeriod = 60 // seconds
 )
 
 // Error message limits
 const (
 	MaxErrorMessageLength = 50
+)
+
+// ServiceState represents the state of the Windows service
+type ServiceState string
+
+const (
+	StateRunning      ServiceState = "RUNNING"
+	StateStopped      ServiceState = "STOPPED"
+	StateStartPending ServiceState = "START_PENDING"
+	StateStopPending  ServiceState = "STOP_PENDING"
+	StateNotInstalled ServiceState = "NOT_INSTALLED"
 )

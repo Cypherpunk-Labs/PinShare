@@ -7,20 +7,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/Cypherpunk-Labs/PinShare/internal/winservice"
+	"pinshare/internal/winservice"
 	"github.com/getlantern/systray"
 	"golang.org/x/sys/windows"
-)
-
-// ServiceState represents the state of the Windows service
-type ServiceState string
-
-const (
-	StateRunning      ServiceState = "RUNNING"
-	StateStopped      ServiceState = "STOPPED"
-	StateStartPending ServiceState = "START_PENDING"
-	StateStopPending  ServiceState = "STOP_PENDING"
-	StateNotInstalled ServiceState = "NOT_INSTALLED"
 )
 
 type Tray struct {
@@ -253,7 +242,7 @@ func (t *Tray) updateStatus() {
 		t.serviceRunning = false
 
 		// Check if it's a "service not installed" error
-		if status == StateNotInstalled {
+		if status == winservice.StateNotInstalled {
 			t.menuStatus.SetTitle("Status: Not Installed")
 			systray.SetTooltip("PinShare - Service not installed")
 		} else {
@@ -274,106 +263,123 @@ func (t *Tray) updateStatus() {
 	}
 
 	switch status {
-	case StateRunning:
-		t.serviceRunning = true
-		t.menuStart.Disable()
-		t.menuStop.Enable()
-		t.menuRestart.Enable()
-
-		// Check actual component health via HTTP
-		ipfsHealthy := checkIPFSHealth()
-		pinshareHealthy := checkPinShareHealth()
-
-		if ipfsHealthy {
-			t.menuIPFSStatus.SetTitle("  IPFS: Online")
-		} else {
-			t.menuIPFSStatus.SetTitle("  IPFS: Starting...")
-		}
-
-		if pinshareHealthy {
-			t.menuPinShareStatus.SetTitle("  PinShare: Online")
-			t.menuStatus.SetTitle("Status: Running")
-			systray.SetTooltip("PinShare - Running")
-		} else {
-			t.menuPinShareStatus.SetTitle("  PinShare: Starting...")
-			t.menuStatus.SetTitle("Status: Starting...")
-			systray.SetTooltip("PinShare - Components starting...")
-		}
-
-		if ipfsHealthy && pinshareHealthy {
-			t.menuPeersStatus.SetTitle("  Peers: Connected")
-		} else {
-			t.menuPeersStatus.SetTitle("  Peers: Connecting...")
-		}
-
-	case StateStopped:
-		t.serviceRunning = false
-		t.menuStatus.SetTitle("Status: Stopped")
-		t.menuIPFSStatus.SetTitle("  IPFS: Offline")
-		t.menuPinShareStatus.SetTitle("  PinShare: Offline")
-		t.menuPeersStatus.SetTitle("  Peers: None")
-
-		// Enable start, disable stop
-		t.menuStart.Enable()
-		t.menuStop.Disable()
-		t.menuRestart.Disable()
-
-		systray.SetTooltip("PinShare - Stopped")
-
-	case StateStartPending:
-		t.menuStatus.SetTitle("Status: Starting...")
-		t.menuIPFSStatus.SetTitle("  IPFS: Starting...")
-		t.menuPinShareStatus.SetTitle("  PinShare: Starting...")
-		t.menuPeersStatus.SetTitle("  Peers: Connecting...")
-		t.menuStart.Disable()
-		t.menuStop.Disable()
-		t.menuRestart.Disable()
-		systray.SetTooltip("PinShare - Starting...")
-
-	case StateStopPending:
-		t.menuStatus.SetTitle("Status: Stopping...")
-		t.menuStart.Disable()
-		t.menuStop.Disable()
-		t.menuRestart.Disable()
-		systray.SetTooltip("PinShare - Stopping...")
-
-	case StateNotInstalled:
-		t.serviceRunning = false
-		t.menuStatus.SetTitle("Status: Not Installed")
-		t.menuIPFSStatus.SetTitle("  IPFS: -")
-		t.menuPinShareStatus.SetTitle("  PinShare: -")
-		t.menuPeersStatus.SetTitle("  Peers: -")
-		t.menuStart.Enable()
-		t.menuStop.Disable()
-		t.menuRestart.Disable()
-		systray.SetTooltip("PinShare - Service not installed")
-
+	case winservice.StateRunning:
+		t.updateStatusRunning()
+	case winservice.StateStopped:
+		t.updateStatusStopped()
+	case winservice.StateStartPending:
+		t.updateStatusStartPending()
+	case winservice.StateStopPending:
+		t.updateStatusStopPending()
+	case winservice.StateNotInstalled:
+		t.updateStatusNotInstalled()
 	default:
 		t.menuStatus.SetTitle(fmt.Sprintf("Status: Unknown (%s)", status))
 		systray.SetTooltip("PinShare - Unknown status")
 	}
 }
 
+// updateStatusRunning updates UI for running service state
+func (t *Tray) updateStatusRunning() {
+	t.serviceRunning = true
+	t.menuStart.Disable()
+	t.menuStop.Enable()
+	t.menuRestart.Enable()
+
+	// Check actual component health via HTTP
+	ipfsHealthy := checkIPFSHealth()
+	pinshareHealthy := checkPinShareHealth()
+
+	if ipfsHealthy {
+		t.menuIPFSStatus.SetTitle("  IPFS: Online")
+	} else {
+		t.menuIPFSStatus.SetTitle("  IPFS: Starting...")
+	}
+
+	if pinshareHealthy {
+		t.menuPinShareStatus.SetTitle("  PinShare: Online")
+		t.menuStatus.SetTitle("Status: Running")
+		systray.SetTooltip("PinShare - Running")
+	} else {
+		t.menuPinShareStatus.SetTitle("  PinShare: Starting...")
+		t.menuStatus.SetTitle("Status: Starting...")
+		systray.SetTooltip("PinShare - Components starting...")
+	}
+
+	if ipfsHealthy && pinshareHealthy {
+		t.menuPeersStatus.SetTitle("  Peers: Connected")
+	} else {
+		t.menuPeersStatus.SetTitle("  Peers: Connecting...")
+	}
+}
+
+// updateStatusStopped updates UI for stopped service state
+func (t *Tray) updateStatusStopped() {
+	t.serviceRunning = false
+	t.menuStatus.SetTitle("Status: Stopped")
+	t.menuIPFSStatus.SetTitle("  IPFS: Offline")
+	t.menuPinShareStatus.SetTitle("  PinShare: Offline")
+	t.menuPeersStatus.SetTitle("  Peers: None")
+	t.menuStart.Enable()
+	t.menuStop.Disable()
+	t.menuRestart.Disable()
+	systray.SetTooltip("PinShare - Stopped")
+}
+
+// updateStatusStartPending updates UI for service start pending state
+func (t *Tray) updateStatusStartPending() {
+	t.menuStatus.SetTitle("Status: Starting...")
+	t.menuIPFSStatus.SetTitle("  IPFS: Starting...")
+	t.menuPinShareStatus.SetTitle("  PinShare: Starting...")
+	t.menuPeersStatus.SetTitle("  Peers: Connecting...")
+	t.menuStart.Disable()
+	t.menuStop.Disable()
+	t.menuRestart.Disable()
+	systray.SetTooltip("PinShare - Starting...")
+}
+
+// updateStatusStopPending updates UI for service stop pending state
+func (t *Tray) updateStatusStopPending() {
+	t.menuStatus.SetTitle("Status: Stopping...")
+	t.menuStart.Disable()
+	t.menuStop.Disable()
+	t.menuRestart.Disable()
+	systray.SetTooltip("PinShare - Stopping...")
+}
+
+// updateStatusNotInstalled updates UI for service not installed state
+func (t *Tray) updateStatusNotInstalled() {
+	t.serviceRunning = false
+	t.menuStatus.SetTitle("Status: Not Installed")
+	t.menuIPFSStatus.SetTitle("  IPFS: -")
+	t.menuPinShareStatus.SetTitle("  PinShare: -")
+	t.menuPeersStatus.SetTitle("  Peers: -")
+	t.menuStart.Enable()
+	t.menuStop.Disable()
+	t.menuRestart.Disable()
+	systray.SetTooltip("PinShare - Service not installed")
+}
+
 // getServiceStatus gets the current service status using Windows Service Manager API (no spawned process)
 // Uses minimal permissions (SC_MANAGER_CONNECT and SERVICE_QUERY_STATUS) so no elevation is required.
-func getServiceStatus() (ServiceState, error) {
+func getServiceStatus() (winservice.ServiceState, error) {
 	// Open service control manager with minimal permissions (connect only)
 	scmHandle, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
 	if err != nil {
-		return StateStopped, fmt.Errorf("failed to connect to service manager: %w", err)
+		return winservice.StateStopped, fmt.Errorf("failed to connect to service manager: %w", err)
 	}
 	defer windows.CloseServiceHandle(scmHandle)
 
 	// Open the service with query status permission only
-	winservice.ServiceNamePtr, err := windows.UTF16PtrFromString(winservice.ServiceName)
+	serviceNamePtr, err := windows.UTF16PtrFromString(winservice.ServiceName)
 	if err != nil {
-		return StateStopped, fmt.Errorf("invalid service name: %w", err)
+		return winservice.StateStopped, fmt.Errorf("invalid service name: %w", err)
 	}
 
-	svcHandle, err := windows.OpenService(scmHandle, winservice.ServiceNamePtr, windows.SERVICE_QUERY_STATUS)
+	svcHandle, err := windows.OpenService(scmHandle, serviceNamePtr, windows.SERVICE_QUERY_STATUS)
 	if err != nil {
 		// Service doesn't exist (ERROR_SERVICE_DOES_NOT_EXIST = 1060)
-		return StateNotInstalled, fmt.Errorf("service not installed")
+		return winservice.StateNotInstalled, fmt.Errorf("service not installed")
 	}
 	defer windows.CloseServiceHandle(svcHandle)
 
@@ -381,23 +387,23 @@ func getServiceStatus() (ServiceState, error) {
 	var status windows.SERVICE_STATUS
 	err = windows.QueryServiceStatus(svcHandle, &status)
 	if err != nil {
-		return StateStopped, fmt.Errorf("failed to query service: %w", err)
+		return winservice.StateStopped, fmt.Errorf("failed to query service: %w", err)
 	}
 
 	// Map Windows service state to our ServiceState
 	switch status.CurrentState {
 	case windows.SERVICE_RUNNING:
-		return StateRunning, nil
+		return winservice.StateRunning, nil
 	case windows.SERVICE_STOPPED:
-		return StateStopped, nil
+		return winservice.StateStopped, nil
 	case windows.SERVICE_START_PENDING:
-		return StateStartPending, nil
+		return winservice.StateStartPending, nil
 	case windows.SERVICE_STOP_PENDING:
-		return StateStopPending, nil
+		return winservice.StateStopPending, nil
 	case windows.SERVICE_PAUSED, windows.SERVICE_PAUSE_PENDING, windows.SERVICE_CONTINUE_PENDING:
-		return StateStopped, nil
+		return winservice.StateStopped, nil
 	default:
-		return StateStopped, fmt.Errorf("unknown service state: %d", status.CurrentState)
+		return winservice.StateStopped, fmt.Errorf("unknown service state: %d", status.CurrentState)
 	}
 }
 
@@ -436,46 +442,111 @@ func checkPinShareHealth() bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-// runElevated runs a command with UAC elevation using ShellExecute
-func runElevated(executable, args string) error {
-	verbPtr, _ := windows.UTF16PtrFromString("runas")
-	exePtr, _ := windows.UTF16PtrFromString(executable)
-	argsPtr, _ := windows.UTF16PtrFromString(args)
-
-	// ShellExecute with "runas" verb triggers UAC prompt
-	err := windows.ShellExecute(0, verbPtr, exePtr, argsPtr, nil, windows.SW_HIDE)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// startService starts the service using sc.exe with UAC elevation
+// startService starts the service using Windows API (no UAC required if DACL is set)
 func startService() error {
-	log.Printf("Starting service %s with elevation...", winservice.ServiceName)
+	log.Printf("Starting service %s...", winservice.ServiceName)
 
-	err := runElevated("sc.exe", fmt.Sprintf("start %s", winservice.ServiceName))
+	// Open service control manager with minimal permissions
+	scmHandle, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
 	if err != nil {
-		log.Printf("Failed to start service: %v", err)
+		return fmt.Errorf("failed to connect to service manager: %w", err)
+	}
+	defer windows.CloseServiceHandle(scmHandle)
+
+	// Open service with start permission
+	serviceNamePtr, _ := windows.UTF16PtrFromString(winservice.ServiceName)
+	svcHandle, err := windows.OpenService(scmHandle, serviceNamePtr, windows.SERVICE_START|windows.SERVICE_QUERY_STATUS)
+	if err != nil {
+		return fmt.Errorf("failed to open service: %w", err)
+	}
+	defer windows.CloseServiceHandle(svcHandle)
+
+	// Check if already running
+	var status windows.SERVICE_STATUS
+	if err := windows.QueryServiceStatus(svcHandle, &status); err == nil {
+		if status.CurrentState == windows.SERVICE_RUNNING {
+			log.Printf("Service already running")
+			return nil
+		}
+	}
+
+	// Start the service
+	err = windows.StartService(svcHandle, 0, nil)
+	if err != nil {
 		return fmt.Errorf("failed to start service: %w", err)
 	}
 
-	log.Printf("Service start command initiated")
+	log.Printf("Service start initiated")
 	return nil
 }
 
-// stopService stops the service using sc.exe with UAC elevation
+// stopService stops the service using Windows API (no UAC required if DACL is set)
 func stopService() error {
-	log.Printf("Stopping service %s with elevation...", winservice.ServiceName)
+	log.Printf("Stopping service %s...", winservice.ServiceName)
 
-	err := runElevated("sc.exe", fmt.Sprintf("stop %s", winservice.ServiceName))
+	scmHandle, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
 	if err != nil {
-		log.Printf("Failed to stop service: %v", err)
+		return fmt.Errorf("failed to connect to service manager: %w", err)
+	}
+	defer windows.CloseServiceHandle(scmHandle)
+
+	serviceNamePtr, _ := windows.UTF16PtrFromString(winservice.ServiceName)
+	svcHandle, err := windows.OpenService(scmHandle, serviceNamePtr, windows.SERVICE_STOP|windows.SERVICE_QUERY_STATUS)
+	if err != nil {
+		return fmt.Errorf("failed to open service: %w", err)
+	}
+	defer windows.CloseServiceHandle(svcHandle)
+
+	// Check if already stopped
+	var status windows.SERVICE_STATUS
+	if err := windows.QueryServiceStatus(svcHandle, &status); err == nil {
+		if status.CurrentState == windows.SERVICE_STOPPED {
+			log.Printf("Service already stopped")
+			return nil
+		}
+	}
+
+	// Stop the service
+	err = windows.ControlService(svcHandle, windows.SERVICE_CONTROL_STOP, &status)
+	if err != nil {
 		return fmt.Errorf("failed to stop service: %w", err)
 	}
 
-	log.Printf("Service stop command initiated")
+	log.Printf("Service stop initiated")
 	return nil
+}
+
+// ensureServiceRunning starts the service if it's not already running.
+// Called when the tray application starts.
+func (t *Tray) ensureServiceRunning() {
+	status, err := getServiceStatus()
+	if err != nil {
+		if status == winservice.StateNotInstalled {
+			log.Printf("Service not installed, cannot auto-start")
+			return
+		}
+		log.Printf("Failed to get service status: %v", err)
+		return
+	}
+
+	switch status {
+	case winservice.StateRunning:
+		log.Printf("Service already running")
+	case winservice.StateStopped:
+		log.Printf("Service stopped, starting it...")
+		if err := startService(); err != nil {
+			log.Printf("Failed to start service: %v", err)
+			showError("PinShare", fmt.Sprintf("Failed to start service:\n\n%v", err))
+		} else {
+			// Wait a moment and update status
+			time.Sleep(1 * time.Second)
+			t.updateStatus()
+		}
+	case winservice.StateStartPending:
+		log.Printf("Service is starting...")
+	default:
+		log.Printf("Service in state: %s", status)
+	}
 }
 
 // truncateErrorMessage truncates error messages to a maximum length for display

@@ -5,7 +5,12 @@ import (
 	"pinshare/internal/psfs"
 	"pinshare/internal/store"
 	"strings"
+	"sync"
+	"sync/atomic"
 )
+
+// maxConcurrentUploads limits the number of files processed in parallel
+const maxConcurrentUploads = 4
 
 func ProcessUploads(folderPath string) {
 	files, err := psfs.ListFiles(folderPath)
@@ -13,12 +18,25 @@ func ProcessUploads(folderPath string) {
 		return
 	}
 
-	var count int
+	var count int64
+	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, maxConcurrentUploads)
+
 	for _, f := range files {
-		if processFile(folderPath, f) {
-			count++
-		}
+		wg.Add(1)
+		semaphore <- struct{}{} // Acquire semaphore slot
+
+		go func(filename string) {
+			defer wg.Done()
+			defer func() { <-semaphore }() // Release semaphore slot
+
+			if processFile(folderPath, filename) {
+				atomic.AddInt64(&count, 1)
+			}
+		}(f)
 	}
+
+	wg.Wait()
 
 	if count >= 1 {
 		store.GlobalStore.Save(appconfInstance.MetaDataFile)

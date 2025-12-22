@@ -113,30 +113,12 @@ npm install
 npm run build
 ```
 
-## CI/CD
-
-```yaml
-# GitHub Actions example
-- uses: actions/setup-dotnet@v3
-  with:
-    dotnet-version: '8.0.x'
-
-- run: dotnet tool install --global wix
-
-- run: |
-    make -f Makefile.windows windows-all
-    cd installer
-    dotnet build PinShare.wixproj -c Release
-```
-
 ## More Info
 
-- Full docs: `installer/README-WIX6.md`
+- Installer docs: `installer/README.md`
 - Build guide: `docs/windows/BUILD.md`
 - WiX docs: https://docs.firegiant.com/
 
 ---
 
-**Status**: ✅ Complete and tested
 **WiX Version**: 6.0.2
-**Committed**: branch `claude/windows-service-wrapper-plan-01NFgPq7Z22pinZbjqPcFHVu`

@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/Cypherpunk-Labs/PinShare/internal/winservice"
+	"pinshare/internal/winservice"
 	"golang.org/x/sys/windows/svc"
 )
 

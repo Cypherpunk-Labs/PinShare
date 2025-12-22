@@ -44,7 +44,7 @@ No additional dependencies required beyond Go and Git.
 ### Clone Repository
 
 ```bash
-git clone https://github.com/Episk-pos/PinShare.git
+git clone https://github.com/Cypherpunk-Labs/PinShare.git
 cd PinShare
 ```
 
@@ -296,5 +296,5 @@ After building:
 
 For build issues, check:
 - [Troubleshooting](#troubleshooting-build-issues)
-- [GitHub Issues](https://github.com/Episk-pos/PinShare/issues)
+- [GitHub Issues](https://github.com/Cypherpunk-Labs/PinShare/issues)
 - Build logs in `dist/build.log`

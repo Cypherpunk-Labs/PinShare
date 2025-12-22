@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Cypherpunk-Labs/PinShare/internal/winservice"
+	"pinshare/internal/winservice"
 )
 
 // TrayConfig holds configuration values needed by the tray application
@@ -44,14 +44,6 @@ func loadConfig() *TrayConfig {
 		return config
 	}
 
-	// Apply defaults for zero values
-	if config.IPFSAPIPort == 0 {
-		config.IPFSAPIPort = winservice.DefaultIPFSAPIPort
-	}
-	if config.PinShareAPIPort == 0 {
-		config.PinShareAPIPort = winservice.DefaultPinShareAPIPort
-	}
-
 	return config
 }
 
@@ -66,11 +58,4 @@ func getConfig() *TrayConfig {
 // reloadConfig forces a reload of the configuration
 func reloadConfig() {
 	appConfig = loadConfig()
-}
-
-// Reload reloads the configuration from disk
-func (c *TrayConfig) Reload() {
-	newConfig := loadConfig()
-	c.IPFSAPIPort = newConfig.IPFSAPIPort
-	c.PinShareAPIPort = newConfig.PinShareAPIPort
 }

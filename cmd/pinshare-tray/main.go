@@ -15,6 +15,9 @@ import (
 var (
 	user32           = syscall.NewLazyDLL("user32.dll")
 	procMessageBoxW  = user32.NewProc("MessageBoxW")
+
+	// Package-level tray instance for access in onExit
+	trayInstance *Tray
 )
 
 const (
@@ -47,19 +50,28 @@ func onReady() {
 	systray.SetTitle("PinShare")
 	systray.SetTooltip("PinShare - Decentralized IPFS Pinning")
 
-	// Create tray instance
-	tray := NewTray()
+	// Create tray instance and store in package-level variable
+	trayInstance = NewTray()
 
 	// Build menu
-	tray.BuildMenu()
+	trayInstance.BuildMenu()
+
+	// Ensure service is running (start if stopped)
+	trayInstance.ensureServiceRunning()
 
 	// Start status update loop
-	go tray.UpdateStatusLoop()
+	go trayInstance.UpdateStatusLoop()
 }
 
 func onExit() {
-	// Cleanup
 	log.Println("PinShare tray application exiting")
+
+	// Stop the service when tray exits
+	if err := stopService(); err != nil {
+		log.Printf("Failed to stop service on exit: %v", err)
+	} else {
+		log.Println("Service stopped")
+	}
 }
 
 // loadIcon loads the application icon

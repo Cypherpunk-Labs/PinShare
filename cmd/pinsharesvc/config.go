@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Cypherpunk-Labs/PinShare/internal/winservice"
+	"pinshare/internal/winservice"
 )
 
 type ServiceConfig struct {
@@ -208,8 +208,8 @@ func (c *ServiceConfig) EnsureDirectories() error {
 	return nil
 }
 
-// GetIPFSRepoPath returns the IPFS repository path
-func (c *ServiceConfig) GetIPFSRepoPath() string {
+// GetIPFSDataPath returns the IPFS data directory path
+func (c *ServiceConfig) GetIPFSDataPath() string {
 	return filepath.Join(c.DataDirectory, "ipfs")
 }
 

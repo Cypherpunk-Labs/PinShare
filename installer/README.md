@@ -1,74 +1,148 @@
-# PinShare Windows Installer
+# PinShare Windows Installer (WiX 6)
 
-This directory contains the WiX Toolset configuration for building the PinShare Windows installer.
+This directory contains the WiX 6 configuration for building the PinShare Windows installer.
 
 ## Prerequisites
 
-1. **WiX Toolset 3.x or 4.x**
-   - Download from: https://wixtoolset.org/
-   - Add WiX bin directory to PATH
+### 1. .NET SDK 6.0 or later
 
-2. **Visual C++ Redistributable** (for end users)
-   - The installer should bundle this if CGO is used
+```powershell
+# Download from https://dotnet.microsoft.com/download
+# Or via winget:
+winget install Microsoft.DotNet.SDK.8
+
+# Verify
+dotnet --version
+```
+
+### 2. WiX .NET Tool
+
+```powershell
+# Install globally
+dotnet tool install --global wix
+
+# Verify
+wix --version
+
+# Update if already installed
+dotnet tool update --global wix
+```
 
 ## Building the Installer
 
-### 1. Build all binaries first
+### Quick Start
 
 ```bash
-# From repository root
-make windows-all
-```
+# 1. Build all Windows components first
+make -f Makefile.windows windows-all
 
-This will create:
-- `dist/windows/pinsharesvc.exe` - Windows service wrapper
-- `dist/windows/pinshare.exe` - PinShare backend
-- `dist/windows/pinshare-tray.exe` - System tray application
-- `dist/windows/ipfs.exe` - IPFS Kubo daemon
-- `dist/windows/ui/` - React UI static files
-
-### 2. Run the installer build script
-
-```cmd
+# 2. Build the installer
 cd installer
+
+# On Windows:
 build-wix6.bat
+
+# On Linux/macOS:
+./build-wix6.sh
 ```
 
-This will:
-1. Harvest UI files using WiX heat.exe
-2. Compile WiX sources
-3. Link to create MSI package
-4. Output: `dist/PinShare-Setup.msi`
-
-## Manual Build Steps
+### Manual Build
 
 If you prefer to build manually:
 
-```cmd
-cd installer
+```powershell
+# From installer directory
+dotnet build PinShare.wixproj -c Release
 
-# Harvest UI files
-heat.exe dir "..\dist\windows\ui" -cg UIComponents -dr UIFolder -gg -g1 -sf -srd -var var.UISourceDir -out UIComponents.wxs
-
-# Compile
-candle.exe -ext WixUIExtension -ext WixUtilExtension -dUISourceDir="..\dist\windows\ui" Product.wxs UIComponents.wxs
-
-# Link
-light.exe -ext WixUIExtension -ext WixUtilExtension -out PinShare-Setup.msi Product.wixobj UIComponents.wixobj
+# Output: bin/Release/PinShare-Setup.msi
 ```
 
-## Installer Features
+## Project Structure
 
-The installer will:
+```
+installer/
+├── PinShare.wixproj         # MSBuild SDK-style project file
+├── Package.wxs              # Main installer definition (WiX 6 format)
+├── build-wix6.bat           # Automated build script (Windows)
+├── build-wix6.sh            # Automated build script (Linux/macOS)
+├── license.rtf              # License agreement
+└── icon.ico                 # Application icon (optional)
+```
 
-1. **Install binaries** to `C:\Program Files\PinShare\`
+## Configuration
+
+### Version and Product Info
+
+Edit `Package.wxs`:
+```xml
+<?define ProductName = "PinShare" ?>
+<?define ProductVersion = "1.0.0" ?>
+<?define Manufacturer = "PinShare Contributors" ?>
+<?define UpgradeCode = "YOUR-GUID-HERE" ?>
+```
+
+**Generate new GUID:**
+```powershell
+[guid]::NewGuid()
+```
+
+### Ports and Settings
+
+Edit registry values in `Package.wxs`:
+```xml
+<RegistryValue Name="UIPort" Type="integer" Value="8888" />
+<RegistryValue Name="PinShareAPIPort" Type="integer" Value="9090" />
+```
+
+## Testing the Installer
+
+### Install
+
+```powershell
+# Normal install (UI)
+msiexec /i bin\Release\PinShare-Setup.msi
+
+# With logging
+msiexec /i bin\Release\PinShare-Setup.msi /l*v install.log
+
+# Silent install
+msiexec /i bin\Release\PinShare-Setup.msi /quiet /qn
+```
+
+### Uninstall
+
+```powershell
+# Normal uninstall (UI)
+msiexec /x bin\Release\PinShare-Setup.msi
+
+# Silent uninstall
+msiexec /x bin\Release\PinShare-Setup.msi /quiet /qn
+```
+
+### Verify Installation
+
+```powershell
+# Check service is installed
+sc query PinShareService
+
+# Check registry
+reg query "HKLM\SOFTWARE\PinShare"
+
+# Check files
+dir "C:\Program Files\PinShare"
+dir "C:\ProgramData\PinShare"
+```
+
+## What the Installer Does
+
+1. ✅ Installs binaries to `C:\Program Files\PinShare\`
    - pinsharesvc.exe
    - pinshare.exe
    - pinshare-tray.exe
    - ipfs.exe
-   - UI files
+   - ui/ (React app)
 
-2. **Create data directory** at `C:\ProgramData\PinShare\`
+2. ✅ Creates data directories in `C:\ProgramData\PinShare\`
    - logs/
    - ipfs/
    - pinshare/
@@ -76,116 +150,149 @@ The installer will:
    - cache/
    - rejected/
 
-3. **Install Windows service** (PinShareService)
-   - Set to start automatically
-   - Configure recovery options
+3. ✅ Configures registry at `HKLM\SOFTWARE\PinShare`
+   - Ports, paths, settings
 
-4. **Create registry entries** at `HKLM\SOFTWARE\PinShare`
-   - Installation paths
-   - Port configurations
-   - Default settings
+4. ✅ Installs Windows service
+   - Runs `pinsharesvc.exe install`
+   - Sets to auto-start
 
-5. **Add to startup**
-   - System tray application in user startup folder
+5. ✅ Starts the service
+   - Runs `pinsharesvc.exe start`
 
-6. **Create shortcuts** in Start Menu
-   - Open PinShare UI
-   - Uninstall PinShare
+6. ✅ Adds system tray to startup
+   - Creates shortcut in Startup folder
 
-## Testing the Installer
-
-1. **Install**
-   ```cmd
-   msiexec /i PinShare-Setup.msi
-   ```
-
-2. **Install with logging**
-   ```cmd
-   msiexec /i PinShare-Setup.msi /l*v install.log
-   ```
-
-3. **Uninstall**
-   ```cmd
-   msiexec /x PinShare-Setup.msi
-   ```
-
-## Customization
-
-### Changing the UpgradeCode
-
-Edit `Product.wxs`:
-```xml
-<?define UpgradeCode = "YOUR-GUID-HERE" ?>
-```
-
-Generate a new GUID:
-```powershell
-[guid]::NewGuid()
-```
-
-### Adding More Files
-
-Use WiX heat.exe to harvest file lists, or manually add components to Product.wxs.
-
-### Changing Default Ports
-
-Edit the registry values in `Product.wxs`:
-```xml
-<RegistryValue Name="UIPort" Type="integer" Value="8888" />
-```
-
-## Code Signing (Optional)
-
-To sign the installer:
-
-```cmd
-signtool sign /f certificate.pfx /p password /t http://timestamp.digicert.com PinShare-Setup.msi
-```
+7. ✅ Creates Start Menu shortcuts
+   - "Open PinShare UI"
+   - "Uninstall PinShare"
 
 ## Troubleshooting
 
-**Error: "candle.exe is not recognized"**
-- Add WiX bin directory to PATH
-- Default location: `C:\Program Files (x86)\WiX Toolset v3.x\bin`
+### Error: ".NET SDK not found"
 
-**Error: "UI files not found"**
-- Build the React UI first: `cd pinshare-ui && npm run build`
-
-**Error: "IPFS binary not found"**
-- Download from: https://dist.ipfs.tech/kubo/
-- Extract ipfs.exe to `dist/windows/`
-
-**Service fails to start after installation**
-- Check Windows Event Viewer → Application logs
-- Check `C:\ProgramData\PinShare\logs\service.log`
-- Verify all binaries are present and not blocked by antivirus
-
-## Architecture
-
-The installer creates this structure:
-
+Install .NET SDK 6.0 or later:
+```powershell
+winget install Microsoft.DotNet.SDK.8
 ```
-C:\Program Files\PinShare\
-├── pinsharesvc.exe       # Service wrapper
-├── pinshare.exe          # Backend binary
-├── pinshare-tray.exe     # Tray application
-├── ipfs.exe              # IPFS daemon
-├── icon.ico
-└── ui\                   # React static files
-    ├── index.html
-    ├── assets\
-    └── ...
 
-C:\ProgramData\PinShare\
-├── config.json
-├── logs\
-├── ipfs\                 # IPFS repository
-├── pinshare\             # Database, metadata
-├── upload\
-├── cache\
-└── rejected\
+### Error: "wix: command not found"
+
+Install WiX .NET tool:
+```powershell
+dotnet tool install --global wix
+
+# If it says already installed but still not found:
+# Add to PATH: %USERPROFILE%\.dotnet\tools
 ```
+
+### Error: "binaries not found"
+
+Build the Windows components first:
+```bash
+make -f Makefile.windows windows-all
+```
+
+### Error: "UI files not found"
+
+Build the React UI:
+```bash
+cd pinshare-ui
+npm install
+npm run build
+```
+
+### Build succeeds but MSI doesn't work
+
+Check the build log for warnings:
+```powershell
+dotnet build PinShare.wixproj -v detailed
+```
+
+Common issues:
+- Missing file references in Package.wxs
+- Invalid registry keys
+- Custom action failures
+
+## Advanced Usage
+
+### Custom Build Configuration
+
+Edit `PinShare.wixproj`:
+
+```xml
+<PropertyGroup>
+  <OutputName>PinShare-Setup-v1.0.0</OutputName>
+  <ProductVersion>1.0.0</ProductVersion>
+  <Platform>x64</Platform>
+</PropertyGroup>
+```
+
+### Add More Files
+
+For binaries:
+```xml
+<Component Id="MyNewComponent" Bitness="always64">
+  <File Id="MyNewFile"
+        Name="mynewfile.exe"
+        Source="..\dist\windows\mynewfile.exe" />
+</Component>
+```
+
+For directories (auto-harvested):
+```xml
+<ItemGroup>
+  <HarvestDirectory Include="..\dist\windows\plugins">
+    <ComponentGroupName>PluginComponents</ComponentGroupName>
+    <DirectoryRefId>PluginsFolder</DirectoryRefId>
+  </HarvestDirectory>
+</ItemGroup>
+```
+
+### Code Signing
+
+Sign the MSI after building:
+
+```powershell
+# Sign with certificate
+signtool sign `
+  /f certificate.pfx `
+  /p password `
+  /t http://timestamp.digicert.com `
+  bin\Release\PinShare-Setup.msi
+```
+
+## CI/CD Integration
+
+### GitHub Actions
+
+```yaml
+- name: Install .NET SDK
+  uses: actions/setup-dotnet@v3
+  with:
+    dotnet-version: '8.0.x'
+
+- name: Install WiX
+  run: dotnet tool install --global wix
+
+- name: Build Installer
+  run: |
+    cd installer
+    dotnet build PinShare.wixproj -c Release
+
+- name: Upload MSI
+  uses: actions/upload-artifact@v3
+  with:
+    name: installer
+    path: installer/bin/Release/*.msi
+```
+
+## Resources
+
+- **WiX Documentation**: https://docs.firegiant.com/
+- **WiX 6 on NuGet**: https://www.nuget.org/packages/wix
+- **.NET Tool**: https://learn.microsoft.com/en-us/dotnet/core/tools/global-tools
 
 ## License
 
-Same license as PinShare (MIT)
+Same as PinShare - MIT License.

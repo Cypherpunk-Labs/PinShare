@@ -8,24 +8,43 @@ This implementation provides a native Windows experience for PinShare, wrapping 
 
 ### Architecture
 
+#### Process Hierarchy
+
 ```mermaid
 flowchart TB
-    subgraph SCM["Windows Service Manager"]
-        subgraph SVC["PinShareService (Auto-start Windows Service)"]
-            IPFS["IPFS Daemon<br/>(subprocess)"]
-            PS["PinShare Backend<br/>(subprocess)"]
-            IPFS --> PS
+    subgraph WSM["Windows Service Manager<br/>(runs at system startup)"]
+    end
 
-            subgraph HC["Health Checker (30s intervals)"]
-                HC1["Monitors IPFS and PinShare"]
-                HC2["Auto-restart on failure (3 attempts)"]
-            end
+    subgraph SVC["pinsharesvc.exe (Windows Service)<br/>PinShareService"]
+        direction TB
+        SVC_DESC["• Runs as SYSTEM account (no user login required)<br/>• Manages child processes (keeps them alive)<br/>• Monitors health & auto-restarts crashed processes"]
+
+        subgraph Children[" "]
+            direction LR
+            IPFS["<b>ipfs.exe</b><br/>(child process)<br/><br/>• IPFS daemon<br/>• Port 5001 (API)<br/>• Port 4001 (swarm)<br/>• Port 8080 (gw)"]
+            PS["<b>pinshare.exe</b><br/>(child process)<br/><br/>• libp2p host<br/>• PubSub messaging<br/>• File watcher<br/>• API on port 9090"]
         end
     end
 
-    TRAY["System Tray Application (Startup)<br/>• Start/Stop/Restart service<br/>• View status and logs<br/>• Quick access to settings"]
+    subgraph TRAY["pinshare-tray.exe (User Process)<br/>(runs at user login via Startup folder)"]
+        TRAY_DESC["• Runs in USER context (per-user, after login)<br/>• System tray icon for user interaction<br/>• NOT managed by service - completely independent<br/>• Talks to service via HTTP APIs"]
+    end
 
-    SCM <--> TRAY
+    WSM --> SVC
+    PS -->|"connects to"| IPFS
+```
+
+#### Data Flow
+
+```mermaid
+flowchart TD
+    User["User clicks tray icon"]
+    User --> Tray["pinshare-tray.exe"]
+    Tray -->|"HTTP"| SVC["pinsharesvc.exe<br/>(port 8888)"]
+    SVC -->|"proxy"| PS["pinshare.exe API<br/>(port 9090)"]
+    SVC --> IPFS["ipfs.exe<br/>(port 5001)"]
+    PS --> Libp2p["libp2p network"]
+    IPFS --> IPFSNet["IPFS network"]
 ```
 
 ## Components
@@ -383,22 +402,24 @@ To run multiple PinShare instances on one machine:
 
 **Backup:**
 ```powershell
+# Replace <your-backup-path> with your desired backup location
 Stop-Service PinShareService
-Copy-Item "C:\ProgramData\PinShare" "D:\Backup\PinShare" -Recurse
+Copy-Item "C:\ProgramData\PinShare" "<your-backup-path>\PinShare" -Recurse
 Start-Service PinShareService
 ```
 
 **Restore:**
 ```powershell
+# Replace <your-backup-path> with your backup location
 Stop-Service PinShareService
 Remove-Item "C:\ProgramData\PinShare" -Recurse -Force
-Copy-Item "D:\Backup\PinShare" "C:\ProgramData\PinShare" -Recurse
+Copy-Item "<your-backup-path>\PinShare" "C:\ProgramData\PinShare" -Recurse
 Start-Service PinShareService
 ```
 
 ## Documentation
 
-- **Installation Guide:** [README.md](README.md)
+- **Installation Guide:** [README.md#installation](README.md#installation)
 - **Build Guide:** [BUILD.md](BUILD.md)
 - **Installer README:** [../../installer/README.md](../../installer/README.md)
 
@@ -495,8 +516,8 @@ Same as PinShare - MIT License.
 
 ## Support
 
-- **Issues:** https://github.com/Episk-pos/PinShare/issues
-- **Documentation:** https://github.com/Episk-pos/PinShare/tree/infra/refactor/docs/windows
+- **Issues:** https://github.com/Cypherpunk-Labs/PinShare/issues
+- **Documentation:** https://github.com/Cypherpunk-Labs/PinShare/tree/main/docs/windows
 - **Logs:** `C:\ProgramData\PinShare\logs\`
 
 ---

@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Cypherpunk-Labs/PinShare/internal/winservice"
+	"pinshare/internal/winservice"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
 )
@@ -161,8 +161,8 @@ func (s *pinshareService) initialize() error {
 
 // waitForIPFS waits for IPFS daemon to be ready
 func (s *pinshareService) waitForIPFS() error {
-	timeout := time.After(30 * time.Second)
-	ticker := time.NewTicker(1 * time.Second)
+	timeout := time.After(winservice.IPFSStartTimeout)
+	ticker := time.NewTicker(winservice.HealthCheckPoll)
 	defer ticker.Stop()
 
 	for {
@@ -180,8 +180,8 @@ func (s *pinshareService) waitForIPFS() error {
 // waitForPinShare waits for PinShare API to be ready
 func (s *pinshareService) waitForPinShare() error {
 	// PinShare needs time to initialize libp2p, DHT, and connect to peers
-	timeout := time.After(60 * time.Second)
-	ticker := time.NewTicker(1 * time.Second)
+	timeout := time.After(winservice.PinShareStartTimeout)
+	ticker := time.NewTicker(winservice.HealthCheckPoll)
 	defer ticker.Stop()
 
 	for {

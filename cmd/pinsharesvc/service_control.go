@@ -3,13 +3,64 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
-	"github.com/Cypherpunk-Labs/PinShare/internal/winservice"
+	"pinshare/internal/winservice"
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 )
+
+// getCurrentUserSID returns the SID string for the current user.
+// This is used to grant service control permissions to the installing user.
+func getCurrentUserSID() (string, error) {
+	token := windows.GetCurrentProcessToken()
+	tokenUser, err := token.GetTokenUser()
+	if err != nil {
+		return "", fmt.Errorf("failed to get token user: %w", err)
+	}
+	return tokenUser.User.Sid.String(), nil
+}
+
+// setServiceDACL modifies the service security descriptor to allow the specified
+// user SID to start/stop the service without administrator privileges.
+// This enables the tray application to control the service without UAC prompts.
+func setServiceDACL(serviceName, userSID string) error {
+	// Get current security descriptor using sc.exe sdshow
+	getCmd := exec.Command("sc.exe", "sdshow", serviceName)
+	output, err := getCmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to get service security descriptor: %w", err)
+	}
+
+	currentSD := strings.TrimSpace(string(output))
+
+	// Build ACE (Access Control Entry) for user:
+	// A = Allow
+	// RPWPDTLO = SERVICE_START | SERVICE_STOP | SERVICE_PAUSE_CONTINUE |
+	//            SERVICE_INTERROGATE | SERVICE_QUERY_STATUS | SERVICE_QUERY_CONFIG
+	// Format: (A;;RPWPDTLO;;;user-sid)
+	userACE := fmt.Sprintf("(A;;RPWPDTLO;;;%s)", userSID)
+
+	// Insert user ACE into DACL after "D:"
+	// Existing format typically: D:(A;;...)(A;;...)S:(AU;...)
+	if !strings.Contains(currentSD, "D:") {
+		return fmt.Errorf("unexpected security descriptor format: missing DACL")
+	}
+
+	newSD := strings.Replace(currentSD, "D:", "D:"+userACE, 1)
+
+	// Set the new security descriptor using sc.exe sdset
+	setCmd := exec.Command("sc.exe", "sdset", serviceName, newSD)
+	if output, err := setCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to set service security descriptor: %w\nOutput: %s", err, output)
+	}
+
+	return nil
+}
 
 // installService installs PinShare as a Windows service
 func installService() error {
@@ -56,21 +107,35 @@ func installService() error {
 	recoveryActions := []mgr.RecoveryAction{
 		{
 			Type:  mgr.ServiceRestart,
-			Delay: 5 * time.Second,
+			Delay: winservice.RecoveryDelayFirst,
 		},
 		{
 			Type:  mgr.ServiceRestart,
-			Delay: 10 * time.Second,
+			Delay: winservice.RecoveryDelaySecond,
 		},
 		{
 			Type:  mgr.ServiceRestart,
-			Delay: 30 * time.Second,
+			Delay: winservice.RecoveryDelayThird,
 		},
 	}
 
-	if err := service.SetRecoveryActions(recoveryActions, 60); err != nil {
+	if err := service.SetRecoveryActions(recoveryActions, winservice.RecoveryResetPeriod); err != nil {
 		// Non-fatal, just log
 		fmt.Printf("Warning: Failed to set recovery actions: %v\n", err)
+	}
+
+	// Get current user SID and set DACL to allow user control without UAC
+	userSID, err := getCurrentUserSID()
+	if err != nil {
+		fmt.Printf("Warning: Failed to get user SID: %v\n", err)
+		fmt.Println("Service control will require administrator privileges")
+	} else {
+		if err := setServiceDACL(winservice.ServiceName, userSID); err != nil {
+			fmt.Printf("Warning: Failed to set service DACL: %v\n", err)
+			fmt.Println("Service control will require administrator privileges")
+		} else {
+			fmt.Println("Service permissions configured for user control (no UAC required)")
+		}
 	}
 
 	// Install event log source

@@ -10,19 +10,22 @@ import (
 	"syscall"
 	"time"
 
+	"pinshare/internal/winservice"
 	"golang.org/x/sys/windows/svc/debug"
 )
 
 type ProcessManager struct {
-	config          *ServiceConfig
-	eventLog        debug.Log
+	config   *ServiceConfig
+	eventLog debug.Log
+
+	// processMu protects the process state fields below
+	processMu       sync.Mutex
 	ipfsCmd         *exec.Cmd
 	pinshareCmd     *exec.Cmd
 	ipfsLogFile     *os.File
 	pinshareLogFile *os.File
 	ipfsExited      chan struct{} // closed when IPFS process exits
 	pinshareExited  chan struct{} // closed when PinShare process exits
-	mu              sync.Mutex
 }
 
 func NewProcessManager(config *ServiceConfig, eventLog debug.Log) *ProcessManager {
@@ -34,18 +37,18 @@ func NewProcessManager(config *ServiceConfig, eventLog debug.Log) *ProcessManage
 
 // StartIPFS starts the IPFS daemon
 func (pm *ProcessManager) StartIPFS(ctx context.Context) error {
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
+	pm.processMu.Lock()
+	defer pm.processMu.Unlock()
 
 	// Check if IPFS binary exists
 	if _, err := os.Stat(pm.config.IPFSBinary); os.IsNotExist(err) {
 		return fmt.Errorf("IPFS binary not found at %s", pm.config.IPFSBinary)
 	}
 
-	// Initialize IPFS repo if it doesn't exist
-	repoPath := pm.config.GetIPFSRepoPath()
-	if _, err := os.Stat(filepath.Join(repoPath, "config")); os.IsNotExist(err) {
-		pm.logInfo("Initializing IPFS repository...")
+	// Initialize IPFS data directory if it doesn't exist
+	ipfsDataPath := pm.config.GetIPFSDataPath()
+	if _, err := os.Stat(filepath.Join(ipfsDataPath, "config")); os.IsNotExist(err) {
+		pm.logInfo("Initializing IPFS...")
 		if err := pm.initializeIPFS(); err != nil {
 			return fmt.Errorf("failed to initialize IPFS: %w", err)
 		}
@@ -62,7 +65,7 @@ func (pm *ProcessManager) StartIPFS(ctx context.Context) error {
 	// Create command
 	pm.ipfsCmd = exec.CommandContext(ctx, pm.config.IPFSBinary, "daemon")
 	pm.ipfsCmd.Env = append(os.Environ(),
-		fmt.Sprintf("IPFS_PATH=%s", repoPath),
+		fmt.Sprintf("IPFS_PATH=%s", ipfsDataPath),
 	)
 	pm.ipfsCmd.Stdout = logFile
 	pm.ipfsCmd.Stderr = logFile
@@ -87,13 +90,13 @@ func (pm *ProcessManager) StartIPFS(ctx context.Context) error {
 	return nil
 }
 
-// initializeIPFS initializes a new IPFS repository
+// initializeIPFS initializes IPFS in the data directory
 func (pm *ProcessManager) initializeIPFS() error {
-	repoPath := pm.config.GetIPFSRepoPath()
+	ipfsDataPath := pm.config.GetIPFSDataPath()
 
 	cmd := exec.Command(pm.config.IPFSBinary, "init")
 	cmd.Env = append(os.Environ(),
-		fmt.Sprintf("IPFS_PATH=%s", repoPath),
+		fmt.Sprintf("IPFS_PATH=%s", ipfsDataPath),
 	)
 
 	output, err := cmd.CombinedOutput()
@@ -101,7 +104,7 @@ func (pm *ProcessManager) initializeIPFS() error {
 		return fmt.Errorf("ipfs init failed: %w\nOutput: %s", err, string(output))
 	}
 
-	pm.logInfo("IPFS repository initialized successfully")
+	pm.logInfo("IPFS initialized successfully")
 
 	// Configure IPFS settings
 	if err := pm.configureIPFS(); err != nil {
@@ -113,8 +116,8 @@ func (pm *ProcessManager) initializeIPFS() error {
 
 // configureIPFS configures IPFS settings
 func (pm *ProcessManager) configureIPFS() error {
-	repoPath := pm.config.GetIPFSRepoPath()
-	env := append(os.Environ(), fmt.Sprintf("IPFS_PATH=%s", repoPath))
+	ipfsDataPath := pm.config.GetIPFSDataPath()
+	env := append(os.Environ(), fmt.Sprintf("IPFS_PATH=%s", ipfsDataPath))
 
 	// Set API port
 	if err := pm.runIPFSConfig(env, "Addresses.API", fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", pm.config.IPFSAPIPort)); err != nil {
@@ -149,8 +152,8 @@ func (pm *ProcessManager) runIPFSConfig(env []string, key, value string) error {
 
 // StartPinShare starts the PinShare backend
 func (pm *ProcessManager) StartPinShare(ctx context.Context) error {
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
+	pm.processMu.Lock()
+	defer pm.processMu.Unlock()
 
 	// Check if PinShare binary exists
 	if _, err := os.Stat(pm.config.PinShareBinary); os.IsNotExist(err) {
@@ -262,8 +265,8 @@ func (pm *ProcessManager) monitorProcess(ctx context.Context, cmd *exec.Cmd, nam
 
 // StopIPFS stops the IPFS daemon
 func (pm *ProcessManager) StopIPFS() error {
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
+	pm.processMu.Lock()
+	defer pm.processMu.Unlock()
 
 	if pm.ipfsCmd == nil || pm.ipfsCmd.Process == nil {
 		return nil
@@ -287,7 +290,7 @@ func (pm *ProcessManager) StopIPFS() error {
 	// This avoids calling Wait() twice which causes a race condition
 	if pm.ipfsExited != nil {
 		select {
-		case <-time.After(10 * time.Second):
+		case <-time.After(winservice.ProcessShutdownTimeout):
 			pm.logError("IPFS shutdown timeout", nil)
 		case <-pm.ipfsExited:
 			// Process exited, monitor goroutine has called Wait()
@@ -307,8 +310,8 @@ func (pm *ProcessManager) StopIPFS() error {
 
 // StopPinShare stops the PinShare backend
 func (pm *ProcessManager) StopPinShare() error {
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
+	pm.processMu.Lock()
+	defer pm.processMu.Unlock()
 
 	if pm.pinshareCmd == nil || pm.pinshareCmd.Process == nil {
 		return nil
@@ -332,7 +335,7 @@ func (pm *ProcessManager) StopPinShare() error {
 	// This avoids calling Wait() twice which causes a race condition
 	if pm.pinshareExited != nil {
 		select {
-		case <-time.After(10 * time.Second):
+		case <-time.After(winservice.ProcessShutdownTimeout):
 			pm.logError("PinShare shutdown timeout", nil)
 		case <-pm.pinshareExited:
 			// Process exited, monitor goroutine has called Wait()
@@ -355,7 +358,7 @@ func (pm *ProcessManager) RestartIPFS(ctx context.Context) error {
 	if err := pm.StopIPFS(); err != nil {
 		return err
 	}
-	time.Sleep(2 * time.Second)
+	time.Sleep(winservice.ServiceRestartDelay)
 	return pm.StartIPFS(ctx)
 }
 
@@ -364,7 +367,7 @@ func (pm *ProcessManager) RestartPinShare(ctx context.Context) error {
 	if err := pm.StopPinShare(); err != nil {
 		return err
 	}
-	time.Sleep(2 * time.Second)
+	time.Sleep(winservice.ServiceRestartDelay)
 	return pm.StartPinShare(ctx)
 }
 

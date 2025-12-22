@@ -418,7 +418,7 @@ Quick start (Git Bash):
 # - WiX Toolset (for installer only)
 
 # Clone repository
-git clone https://github.com/Episk-pos/PinShare.git
+git clone https://github.com/Cypherpunk-Labs/PinShare.git
 cd PinShare
 
 # Build all components
@@ -427,8 +427,8 @@ cd PinShare
 
 ## Support
 
-- **Issues**: https://github.com/Episk-pos/PinShare/issues
-- **Documentation**: https://github.com/Episk-pos/PinShare/docs
+- **Issues**: https://github.com/Cypherpunk-Labs/PinShare/issues
+- **Documentation**: https://github.com/Cypherpunk-Labs/PinShare/docs
 - **Logs**: `C:\ProgramData\PinShare\logs`
 
 ## License

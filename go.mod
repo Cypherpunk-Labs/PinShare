@@ -2,7 +2,7 @@ module pinshare
 
 go 1.24.0
 
-toolchain go1.24.5
+toolchain go1.24.3
 
 require (
 	github.com/chromedp/chromedp v0.13.6
