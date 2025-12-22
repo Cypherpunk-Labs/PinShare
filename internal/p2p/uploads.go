@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"fmt"
+	"path/filepath"
 	"pinshare/internal/psfs"
 	"pinshare/internal/store"
 	"strings"
@@ -45,7 +46,7 @@ func ProcessUploads(folderPath string) {
 
 // processFile handles a single file upload. Returns true if the file was successfully added.
 func processFile(folderPath, f string) bool {
-	filePath := folderPath + "/" + f
+	filePath := filepath.Join(folderPath, f)
 
 	// Validate file type
 	valid, err := psfs.ValidateFileType(filePath)

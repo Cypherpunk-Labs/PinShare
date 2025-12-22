@@ -17,11 +17,22 @@ echo ===============================================
 echo.
 
 REM Check if .NET is installed
+REM First try direct PATH, then check common install locations
 dotnet --version >nul 2>&1
 if errorlevel 1 (
-    echo ERROR: .NET SDK not found
-    echo Please install .NET SDK 6.0 or later from https://dotnet.microsoft.com/download
-    exit /b 1
+    REM Not in PATH, check common locations
+    if exist "C:\Program Files\dotnet\dotnet.exe" (
+        set "PATH=C:\Program Files\dotnet;%PATH%"
+        echo Found .NET SDK in Program Files, added to PATH
+    ) else if exist "%USERPROFILE%\.dotnet\dotnet.exe" (
+        set "PATH=%USERPROFILE%\.dotnet;%PATH%"
+        echo Found .NET SDK in user profile, added to PATH
+    ) else (
+        echo ERROR: .NET SDK not found
+        echo Please install .NET SDK 6.0 or later from https://dotnet.microsoft.com/download
+        echo After installation, restart your terminal or run: refreshenv
+        exit /b 1
+    )
 )
 
 REM Check if WiX tool is installed

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"pinshare/internal/winservice"
+
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"

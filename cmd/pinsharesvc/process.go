@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"pinshare/internal/winservice"
+
 	"golang.org/x/sys/windows/svc/debug"
 )
 

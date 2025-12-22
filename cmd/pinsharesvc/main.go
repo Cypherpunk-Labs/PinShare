@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"pinshare/internal/winservice"
+
 	"golang.org/x/sys/windows/svc"
 )
 

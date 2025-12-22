@@ -1,7 +1,27 @@
 # Makefile for building PinShare Windows distribution
-# This can be run from Linux with cross-compilation tools or from Windows
+# This Makefile is cross-platform: it can be run from Linux/macOS (with cross-compilation)
+# or from Windows (using Git Bash or similar POSIX shell)
 
-.PHONY: all clean windows-backend windows-service windows-tray copy-resources download-ipfs windows-all installer help check-deps install-deps dev-service dev-tray test-windows
+.PHONY: all clean windows-backend windows-service windows-tray copy-resources download-ipfs windows-all installer help check-deps install-deps dev-service dev-tray test-windows check-platform
+
+# Platform detection
+UNAME_S := $(shell uname -s 2>/dev/null || echo Windows)
+
+# Platform check target - prints info about the current platform
+check-platform:
+ifeq ($(findstring MINGW,$(UNAME_S)),MINGW)
+	@echo "Platform: Windows (Git Bash/MinGW)"
+else ifeq ($(findstring MSYS,$(UNAME_S)),MSYS)
+	@echo "Platform: Windows (MSYS)"
+else ifeq ($(findstring CYGWIN,$(UNAME_S)),CYGWIN)
+	@echo "Platform: Windows (Cygwin)"
+else ifeq ($(UNAME_S),Linux)
+	@echo "Platform: Linux (cross-compiling for Windows)"
+else ifeq ($(UNAME_S),Darwin)
+	@echo "Platform: macOS (cross-compiling for Windows)"
+else
+	@echo "Platform: Unknown ($(UNAME_S))"
+endif
 
 # Configuration
 GOOS := windows
@@ -105,20 +125,23 @@ windows-all: windows-backend windows-service windows-tray copy-resources downloa
 	@echo "Next step: Build installer with 'make -f Makefile.windows installer'"
 	@echo ""
 
-# Build Windows MSI installer (requires WiX on Windows or Wine)
+# Build Windows MSI installer (requires WiX 6 via .NET tool)
 installer: windows-all
 	@echo "Building Windows installer..."
-	@if command -v candle.exe >/dev/null 2>&1; then \
-		echo "WiX detected, building MSI..."; \
-		cd $(INSTALLER_DIR) && ./build-wix6.bat; \
+	@if command -v wix >/dev/null 2>&1 || command -v wix.exe >/dev/null 2>&1; then \
+		echo "WiX 6 detected, building MSI..."; \
+		cd $(INSTALLER_DIR) && cmd.exe //c build-wix6.bat; \
+	elif command -v dotnet >/dev/null 2>&1 || command -v dotnet.exe >/dev/null 2>&1; then \
+		echo ".NET detected, WiX will be installed if needed..."; \
+		cd $(INSTALLER_DIR) && cmd.exe //c build-wix6.bat; \
 	else \
 		echo ""; \
-		echo "ERROR: WiX Toolset not found!"; \
+		echo "ERROR: .NET SDK not found!"; \
 		echo ""; \
 		echo "To build the installer:"; \
-		echo "1. Install WiX Toolset from https://wixtoolset.org/"; \
-		echo "2. On Windows, run: cd installer && build-wix6.bat"; \
-		echo "3. Or manually run WiX commands (see installer/README.md)"; \
+		echo "1. Install .NET SDK 6+ from https://dotnet.microsoft.com/download"; \
+		echo "2. WiX 6 will be installed automatically via: dotnet tool install --global wix"; \
+		echo "3. On Windows, run: cd installer && build-wix6.bat"; \
 		echo ""; \
 		exit 1; \
 	fi

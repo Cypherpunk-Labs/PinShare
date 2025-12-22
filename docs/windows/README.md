@@ -57,11 +57,11 @@ When PinShare first starts:
 
 ### Sharing Files
 
-1. Copy or move files to the uploads folder (default: `C:\ProgramData\PinShare\upload`)
+1. Copy or move files to the upload folder (default: `C:\ProgramData\PinShare\upload`)
 2. Files are automatically:
    - Scanned for malware (if configured)
    - Added to IPFS
-   - File metadata is shared with peers via libp2p
+   - Metadata is shared with peers via libp2p PubSub
 
 ## Configuration
 
@@ -77,7 +77,7 @@ PinShare uses these default settings:
 | IPFS Swarm | 4001 | IPFS P2P port (public) |
 | libp2p Port | 50001 | PinShare P2P port (public) |
 
-**Note:** The API ports (9090, 5001, 8080) are bound to localhost by default and are not exposed to the network.
+**Note:** The API ports (9090, 5001, 8080) are bound to localhost (127.0.0.1) by default and are not exposed to the network. They will be needed for the future web UI integration.
 
 ### Changing Configuration
 
@@ -126,13 +126,13 @@ C:\ProgramData\PinShare\
 ├── ipfs\                # IPFS repository
 ├── pinshare\
 │   ├── metadata.json    # File metadata
-│   └── identity.key     # libp2p identity (keep secure)
+│   └── identity.key     # libp2p identity (keep secure!)
 ├── upload\              # Upload directory
 ├── cache\               # File cache
 └── rejected\            # Rejected files
 ```
 
-**Security Note:** The `identity.key` file contains the libp2p private key. Keep this file secure and backed up.
+**Security Note:** The `identity.key` file contains the libp2p private key (protobuf-encoded). This key identifies your node on the network. Keep this file secure and backed up. On Windows, the `C:\ProgramData\PinShare` directory inherits SYSTEM/Administrators permissions by default, restricting access to privileged users.
 
 ## Using PinShare
 
@@ -194,12 +194,20 @@ pinsharesvc.exe debug
 - Port **4001** - IPFS swarm (P2P file sharing)
 - Port **50001** - PinShare libp2p (peer discovery)
 
-To add firewall rules:
+To add firewall rules (run in Git Bash as Administrator):
 
-```powershell
-# Run as Administrator
-New-NetFirewallRule -DisplayName "IPFS Swarm" -Direction Inbound -Protocol TCP -LocalPort 4001 -Action Allow
-New-NetFirewallRule -DisplayName "PinShare P2P" -Direction Inbound -Protocol TCP -LocalPort 50001 -Action Allow
+```bash
+# Add firewall rules using PowerShell
+powershell -Command "New-NetFirewallRule -DisplayName 'IPFS Swarm' -Direction Inbound -Protocol TCP -LocalPort 4001 -Action Allow"
+powershell -Command "New-NetFirewallRule -DisplayName 'PinShare P2P' -Direction Inbound -Protocol TCP -LocalPort 50001 -Action Allow"
+```
+
+**Testing port reachability** (from another machine or using online port checkers):
+
+```bash
+# Test if ports are accessible
+nc -zv your-public-ip 4001
+nc -zv your-public-ip 50001
 ```
 
 ### Security Scanning
@@ -277,19 +285,19 @@ ipfs.exe --repo-dir="C:\ProgramData\PinShare\ipfs" repo gc
 
 ```bash
 # Service log
-cat "C:\ProgramData\PinShare\logs\service.log"
+cat "/c/ProgramData/PinShare/logs/service.log"
 
 # IPFS log
-cat "C:\ProgramData\PinShare\logs\ipfs.log"
+cat "/c/ProgramData/PinShare/logs/ipfs.log"
 
 # PinShare log
-cat "C:\ProgramData\PinShare\logs\pinshare.log"
+cat "/c/ProgramData/PinShare/logs/pinshare.log"
 ```
 
-**Enable debug mode:**
+**Enable debug mode (Git Bash):**
 
-1. Stop the service
-2. Run in console mode (Git Bash):
+1. Stop the service: `net stop PinShareService`
+2. Run in console mode:
    ```bash
    cd "/c/Program Files/PinShare"
    ./pinsharesvc.exe debug
@@ -299,7 +307,7 @@ cat "C:\ProgramData\PinShare\logs\pinshare.log"
 **Tail logs (Git Bash):**
 
 ```bash
-tail -f "C:\ProgramData\PinShare\logs\service.log"
+tail -f "/c/ProgramData/PinShare/logs/service.log"
 ```
 
 ## Uninstallation
@@ -329,6 +337,12 @@ rmdir /s "C:\ProgramData\PinShare"
 ```
 
 ## Advanced Topics
+
+### Windows 11 Compatibility
+
+PinShare is fully compatible with Windows 11. The installer includes enhanced service startup logic to handle Windows 11's stricter security policies.
+
+For technical details about Windows 11 specific improvements, see [Windows 11 Compatibility Guide](WINDOWS11_COMPATIBILITY.md).
 
 ### Running Multiple Instances
 
@@ -384,7 +398,7 @@ net start PinShareService
 
 **Public P2P Ports:**
 
-For PinShare to work optimally with other peers, the following ports should be publicly accessible:
+For PinShare to work optimally with other peers, the following ports must be publicly accessible:
 
 | Port | Protocol | Purpose |
 |------|----------|---------|
@@ -394,17 +408,9 @@ For PinShare to work optimally with other peers, the following ports should be p
 **Options for public access:**
 - **UPnP** - Automatically opens ports if your router supports it
 - **Port forwarding** - Manually configure your router to forward these ports
-- **NAT traversal** - PinShare uses relay servers as fallback
+- **NAT traversal** - PinShare uses relay servers as fallback when direct connections fail
 
-**Testing port reachability:**
-
-```bash
-# From another machine or use online port checkers
-nc -zv your-public-ip 4001
-nc -zv your-public-ip 50001
-```
-
-**Note:** The API ports (5001, 8080, 9090) should remain bound to localhost for security.
+**Note:** The API ports (5001, 8080, 9090) are bound to localhost by default and should remain so for security.
 
 ## Building from Source
 
@@ -413,9 +419,7 @@ See [BUILD.md](BUILD.md) for complete build instructions.
 Quick start (Git Bash):
 
 ```bash
-# Install dependencies
-# - Go 1.24+
-# - WiX Toolset (for installer only)
+# Prerequisites: Go 1.24+, Git Bash
 
 # Clone repository
 git clone https://github.com/Cypherpunk-Labs/PinShare.git
@@ -428,7 +432,7 @@ cd PinShare
 ## Support
 
 - **Issues**: https://github.com/Cypherpunk-Labs/PinShare/issues
-- **Documentation**: https://github.com/Cypherpunk-Labs/PinShare/docs
+- **Documentation**: https://github.com/Cypherpunk-Labs/PinShare/tree/main/docs
 - **Logs**: `C:\ProgramData\PinShare\logs`
 
 ## License

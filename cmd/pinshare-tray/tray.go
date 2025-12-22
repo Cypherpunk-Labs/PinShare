@@ -8,27 +8,39 @@ import (
 	"time"
 
 	"pinshare/internal/winservice"
+
 	"github.com/getlantern/systray"
 	"golang.org/x/sys/windows"
 )
 
+const (
+	// healthCheckTimeout is the HTTP timeout for health check requests
+	healthCheckTimeout = 2 * time.Second
+
+	// serviceActionDelay is the delay after starting/stopping service before checking status
+	serviceActionDelay = 1 * time.Second
+
+	// serviceRestartDelay is the delay between stop and start during restart
+	serviceRestartDelay = 2 * time.Second
+)
+
 type Tray struct {
 	// Menu items
-	menuOpenUI        *systray.MenuItem
-	menuStatus        *systray.MenuItem
-	menuIPFSStatus    *systray.MenuItem
+	menuOpenUI         *systray.MenuItem
+	menuStatus         *systray.MenuItem
+	menuIPFSStatus     *systray.MenuItem
 	menuPinShareStatus *systray.MenuItem
-	menuPeersStatus   *systray.MenuItem
-	menuSeparator1    *systray.MenuItem
-	menuStart         *systray.MenuItem
-	menuStop          *systray.MenuItem
-	menuRestart       *systray.MenuItem
-	menuSeparator2    *systray.MenuItem
-	menuSettings      *systray.MenuItem
-	menuLogs          *systray.MenuItem
-	menuAbout         *systray.MenuItem
-	menuSeparator3    *systray.MenuItem
-	menuExit          *systray.MenuItem
+	menuPeersStatus    *systray.MenuItem
+	menuSeparator1     *systray.MenuItem
+	menuStart          *systray.MenuItem
+	menuStop           *systray.MenuItem
+	menuRestart        *systray.MenuItem
+	menuSeparator2     *systray.MenuItem
+	menuSettings       *systray.MenuItem
+	menuLogs           *systray.MenuItem
+	menuAbout          *systray.MenuItem
+	menuSeparator3     *systray.MenuItem
+	menuExit           *systray.MenuItem
 
 	// State
 	serviceRunning bool
@@ -139,7 +151,7 @@ func (t *Tray) handleStartService() {
 		log.Printf("Failed to start service: %v", err)
 		showError("PinShare", fmt.Sprintf("Failed to start service:\n\n%v", err))
 	} else {
-		time.Sleep(1 * time.Second)
+		time.Sleep(serviceActionDelay)
 		t.updateStatus()
 	}
 }
@@ -150,7 +162,7 @@ func (t *Tray) handleStopService() {
 		log.Printf("Failed to stop service: %v", err)
 		showError("PinShare", fmt.Sprintf("Failed to stop service:\n\n%v", err))
 	} else {
-		time.Sleep(1 * time.Second)
+		time.Sleep(serviceActionDelay)
 		t.updateStatus()
 	}
 }
@@ -165,14 +177,14 @@ func (t *Tray) handleRestartService() {
 	}
 
 	// Wait a bit
-	time.Sleep(2 * time.Second)
+	time.Sleep(serviceRestartDelay)
 
 	// Start again
 	if err := startService(); err != nil {
 		log.Printf("Failed to start service: %v", err)
 		showError("PinShare", fmt.Sprintf("Failed to start service:\n\n%v", err))
 	} else {
-		time.Sleep(1 * time.Second)
+		time.Sleep(serviceActionDelay)
 		t.updateStatus()
 	}
 }
@@ -221,7 +233,7 @@ func (t *Tray) handleAbout() {
 	showMessage("About PinShare",
 		"PinShare - Decentralized IPFS Pinning Service\n"+
 			"Version 1.0\n\n"+
-			"GitHub: https://github.com/Cypherpunk-Labs/PinShare")
+			"https://github.com/Cypherpunk-Labs/PinShare")
 }
 
 // UpdateStatusLoop periodically updates the status
@@ -411,7 +423,7 @@ func getServiceStatus() (winservice.ServiceState, error) {
 func checkIPFSHealth() bool {
 	config := getConfig()
 	client := &http.Client{
-		Timeout: 2 * time.Second,
+		Timeout: healthCheckTimeout,
 	}
 
 	// IPFS version endpoint requires POST
@@ -429,7 +441,7 @@ func checkIPFSHealth() bool {
 func checkPinShareHealth() bool {
 	config := getConfig()
 	client := &http.Client{
-		Timeout: 2 * time.Second,
+		Timeout: healthCheckTimeout,
 	}
 
 	url := fmt.Sprintf("http://localhost:%d/api/health", config.PinShareAPIPort)

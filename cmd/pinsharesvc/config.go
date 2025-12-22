@@ -11,6 +11,9 @@ import (
 	"pinshare/internal/winservice"
 )
 
+// EncryptionKeyLength is the length in bytes for generated encryption keys
+const EncryptionKeyLength = 32
+
 type ServiceConfig struct {
 	// Installation paths
 	InstallDirectory string `json:"install_directory"`
@@ -21,16 +24,16 @@ type ServiceConfig struct {
 	PinShareBinary string `json:"pinshare_binary"`
 
 	// Ports
-	IPFSAPIPort      int `json:"ipfs_api_port"`
-	IPFSGatewayPort  int `json:"ipfs_gateway_port"`
-	IPFSSwarmPort    int `json:"ipfs_swarm_port"`
-	PinShareAPIPort  int `json:"pinshare_api_port"`
-	PinShareP2PPort  int `json:"pinshare_p2p_port"`
-	UIPort           int `json:"ui_port"` // Reserved for future web UI integration
+	IPFSAPIPort     int `json:"ipfs_api_port"`
+	IPFSGatewayPort int `json:"ipfs_gateway_port"`
+	IPFSSwarmPort   int `json:"ipfs_swarm_port"`
+	PinShareAPIPort int `json:"pinshare_api_port"`
+	PinShareP2PPort int `json:"pinshare_p2p_port"`
+	UIPort          int `json:"ui_port"` // Reserved for future web UI integration
 
 	// PinShare configuration
-	OrgName    string `json:"org_name"`
-	GroupName  string `json:"group_name"`
+	OrgName   string `json:"org_name"`
+	GroupName string `json:"group_name"`
 
 	// Feature flags
 	SkipVirusTotal bool `json:"skip_virus_total"`
@@ -49,12 +52,11 @@ type ServiceConfig struct {
 // LoadConfig loads configuration from JSON file
 func LoadConfig() (*ServiceConfig, error) {
 	config, err := loadFromFile()
-	if err == nil {
-		return config, nil
+	if err != nil {
+		// Use defaults if config file doesn't exist or can't be read
+		return getDefaultConfig()
 	}
-
-	// Use defaults if config file doesn't exist
-	return getDefaultConfig()
+	return config, nil
 }
 
 // loadFromFile loads configuration from JSON file
@@ -101,12 +103,12 @@ func getDefaultConfig() (*ServiceConfig, error) {
 		IPFSBinary:       filepath.Join(installDir, "ipfs.exe"),
 		PinShareBinary:   filepath.Join(installDir, "pinshare.exe"),
 
-		IPFSAPIPort:      winservice.DefaultIPFSAPIPort,
-		IPFSGatewayPort:  winservice.DefaultIPFSGatewayPort,
-		IPFSSwarmPort:    winservice.DefaultIPFSSwarmPort,
-		PinShareAPIPort:  winservice.DefaultPinShareAPIPort,
-		PinShareP2PPort:  winservice.DefaultPinShareP2PPort,
-		UIPort:           winservice.DefaultUIPort,
+		IPFSAPIPort:     winservice.DefaultIPFSAPIPort,
+		IPFSGatewayPort: winservice.DefaultIPFSGatewayPort,
+		IPFSSwarmPort:   winservice.DefaultIPFSSwarmPort,
+		PinShareAPIPort: winservice.DefaultPinShareAPIPort,
+		PinShareP2PPort: winservice.DefaultPinShareP2PPort,
+		UIPort:          winservice.DefaultUIPort,
 
 		OrgName:   "MyOrganization",
 		GroupName: "MyGroup",
@@ -234,9 +236,9 @@ func (c *ServiceConfig) SaveToFile() error {
 	return nil
 }
 
-// generateEncryptionKey generates a cryptographically secure random 32-byte encryption key
+// generateEncryptionKey generates a cryptographically secure random encryption key
 func generateEncryptionKey() string {
-	bytes := make([]byte, 32)
+	bytes := make([]byte, EncryptionKeyLength)
 	if _, err := rand.Read(bytes); err != nil {
 		// If random generation fails, panic as this is a critical security requirement
 		panic(fmt.Sprintf("failed to generate encryption key: %v", err))

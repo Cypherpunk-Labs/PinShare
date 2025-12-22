@@ -11,19 +11,20 @@ import (
 	"time"
 
 	"pinshare/internal/winservice"
+
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
 )
 
 type pinshareService struct {
-	config          *ServiceConfig
-	processManager  *ProcessManager
-	uiServer        *UIServer
-	healthChecker   *HealthChecker
-	eventLog        debug.Log
-	ctx             context.Context
-	cancel          context.CancelFunc
-	wg              sync.WaitGroup
+	config         *ServiceConfig
+	processManager *ProcessManager
+	uiServer       *UIServer
+	healthChecker  *HealthChecker
+	eventLog       debug.Log
+	ctx            context.Context
+	cancel         context.CancelFunc
+	wg             sync.WaitGroup
 }
 
 // Execute implements the svc.Handler interface
