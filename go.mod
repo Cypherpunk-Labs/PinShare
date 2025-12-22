@@ -163,11 +163,13 @@ require (
 require (
 	github.com/getkin/kin-openapi v0.132.0
 	github.com/getlantern/systray v1.2.2
+	github.com/milkpirate/upnp v0.0.0-20221125180929-8bd6dd2e6c12
 	github.com/oapi-codegen/runtime v1.1.2
 )
 
 require (
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/getlantern/context v0.0.0-20190109183933-c447772a6520 // indirect
 	github.com/getlantern/errors v0.0.0-20190325191628-abdb3e3e36f7 // indirect
 	github.com/getlantern/golog v0.0.0-20190830074920-4ef2e798c2d7 // indirect
