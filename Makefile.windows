@@ -87,6 +87,8 @@ windows-service: $(DIST_DIR)
 # Build Windows system tray application
 windows-tray: $(DIST_DIR)
 	@echo "Building Windows system tray application..."
+	@echo "Generating resource file from manifest..."
+	@cd cmd/pinshare-tray && go run github.com/akavel/rsrc@latest -manifest pinshare-tray.manifest -o rsrc.syso 2>/dev/null || true
 	GOOS=$(GOOS) GOARCH=$(GOARCH) \
 		go build -ldflags "$(LDFLAGS) -H windowsgui" \
 		-o $(DIST_DIR)/pinshare-tray.exe ./cmd/pinshare-tray

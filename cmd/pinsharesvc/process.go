@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -35,6 +36,62 @@ func NewProcessManager(config *ServiceConfig, eventLog debug.Log) *ProcessManage
 		eventLog: eventLog,
 	}
 }
+
+// CleanupOrphanedProcesses kills any orphaned IPFS or PinShare processes and removes stale lock files.
+// This should be called before starting the service to ensure a clean state.
+func (pm *ProcessManager) CleanupOrphanedProcesses() {
+	pm.logInfo("Checking for orphaned processes...")
+
+	// Kill any orphaned ipfs.exe processes
+	pm.killOrphanedProcess("ipfs.exe", "IPFS")
+
+	// Kill any orphaned pinshare.exe processes
+	pm.killOrphanedProcess("pinshare.exe", "PinShare")
+
+	// Remove stale IPFS lock file if it exists
+	ipfsLockFile := filepath.Join(pm.config.GetIPFSDataPath(), "repo.lock")
+	if _, err := os.Stat(ipfsLockFile); err == nil {
+		pm.logInfo(fmt.Sprintf("Removing stale IPFS lock file: %s", ipfsLockFile))
+		if err := os.Remove(ipfsLockFile); err != nil {
+			pm.logError("Failed to remove IPFS lock file", err)
+		}
+	}
+
+	// Longer delay to ensure processes are fully terminated and file handles released
+	// Windows can take a while to release file handles after process termination
+	time.Sleep(2 * time.Second)
+	pm.logInfo("Orphaned process cleanup complete")
+}
+
+// killOrphanedProcess finds and kills any running instances of a process by name
+func (pm *ProcessManager) killOrphanedProcess(processName, displayName string) {
+	// Use tasklist to check if the process is running
+	checkCmd := exec.Command("tasklist", "/FI", fmt.Sprintf("IMAGENAME eq %s", processName), "/NH", "/FO", "CSV")
+	output, err := checkCmd.Output()
+	if err != nil {
+		// tasklist failed, skip this check
+		return
+	}
+
+	// Check if the process is in the output (CSV format: "process.exe","PID",...)
+	outputStr := string(output)
+	if !strings.Contains(outputStr, processName) {
+		// Process not running
+		return
+	}
+
+	pm.logInfo(fmt.Sprintf("Found orphaned %s process, terminating...", displayName))
+
+	// Kill all instances of the process using taskkill
+	// /F = Force, /T = Tree (kill child processes), /IM = Image name
+	killCmd := exec.Command("taskkill", "/F", "/T", "/IM", processName)
+	if output, err := killCmd.CombinedOutput(); err != nil {
+		pm.logError(fmt.Sprintf("Failed to kill orphaned %s: %s", displayName, string(output)), err)
+	} else {
+		pm.logInfo(fmt.Sprintf("Orphaned %s process terminated", displayName))
+	}
+}
+
 
 // StartIPFS starts the IPFS daemon
 func (pm *ProcessManager) StartIPFS(ctx context.Context) error {

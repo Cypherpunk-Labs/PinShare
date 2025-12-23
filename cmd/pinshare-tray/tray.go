@@ -510,7 +510,14 @@ func startServiceDirect() error {
 // startServiceElevated starts the service using sc.exe with UAC elevation
 func startServiceElevated() error {
 	log.Printf("Starting service %s with elevation...", winservice.ServiceName)
-	return runElevated("sc.exe", fmt.Sprintf("start %s", winservice.ServiceName))
+
+	err := runElevated("sc.exe", fmt.Sprintf("start %s", winservice.ServiceName))
+	if err != nil {
+		return err
+	}
+
+	// ShellExecute is async, so we need to poll until the service is actually running
+	return waitForServiceState(windows.SERVICE_RUNNING, 60*time.Second)
 }
 
 // stopService stops the service, trying direct API first, then falling back to UAC elevation
@@ -561,14 +568,23 @@ func stopServiceDirect() error {
 		return fmt.Errorf("failed to stop service: %w", err)
 	}
 
-	log.Printf("Service stop initiated")
-	return nil
+	log.Printf("Service stop initiated, waiting for stop to complete...")
+
+	// Wait for the service to fully stop
+	return waitForServiceState(windows.SERVICE_STOPPED, 30*time.Second)
 }
 
 // stopServiceElevated stops the service using sc.exe with UAC elevation
 func stopServiceElevated() error {
 	log.Printf("Stopping service %s with elevation...", winservice.ServiceName)
-	return runElevated("sc.exe", fmt.Sprintf("stop %s", winservice.ServiceName))
+
+	err := runElevated("sc.exe", fmt.Sprintf("stop %s", winservice.ServiceName))
+	if err != nil {
+		return err
+	}
+
+	// ShellExecute is async, so we need to poll until the service is actually stopped
+	return waitForServiceState(windows.SERVICE_STOPPED, 30*time.Second)
 }
 
 // runElevated runs a command with UAC elevation using ShellExecute
@@ -582,6 +598,38 @@ func runElevated(executable, args string) error {
 		return fmt.Errorf("failed to execute with elevation: %w", err)
 	}
 	return nil
+}
+
+// waitForServiceState polls until the service reaches the desired state or times out
+func waitForServiceState(desiredState uint32, timeout time.Duration) error {
+	scmHandle, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
+	if err != nil {
+		return fmt.Errorf("failed to connect to service manager: %w", err)
+	}
+	defer windows.CloseServiceHandle(scmHandle)
+
+	serviceNamePtr, _ := windows.UTF16PtrFromString(winservice.ServiceName)
+	svcHandle, err := windows.OpenService(scmHandle, serviceNamePtr, windows.SERVICE_QUERY_STATUS)
+	if err != nil {
+		return fmt.Errorf("failed to open service: %w", err)
+	}
+	defer windows.CloseServiceHandle(svcHandle)
+
+	deadline := time.Now().Add(timeout)
+	pollInterval := 500 * time.Millisecond
+
+	for time.Now().Before(deadline) {
+		var status windows.SERVICE_STATUS
+		if err := windows.QueryServiceStatus(svcHandle, &status); err == nil {
+			if status.CurrentState == desiredState {
+				log.Printf("Service reached desired state")
+				return nil
+			}
+		}
+		time.Sleep(pollInterval)
+	}
+
+	return fmt.Errorf("timeout waiting for service to reach desired state")
 }
 
 // isAccessDenied checks if an error is an "access denied" error

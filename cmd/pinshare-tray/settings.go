@@ -1,11 +1,7 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"syscall"
 	"unsafe"
 )
@@ -17,58 +13,24 @@ const (
 	IDNO            = 7
 )
 
-// showSettingsDialog launches the PowerShell settings dialog.
+// showSettingsDialog launches the walk-based settings dialog.
 // Returns true if settings were changed and saved, false if cancelled.
 func showSettingsDialog() (changed bool, err error) {
-	// Get path to settings.ps1 (same directory as executable)
-	exePath, err := os.Executable()
+	log.Println("Opening settings dialog...")
+
+	saved, err := ShowSettingsDialogWalk()
 	if err != nil {
-		return false, fmt.Errorf("failed to get executable path: %w", err)
+		log.Printf("Settings dialog error: %v", err)
+		return false, err
 	}
 
-	scriptPath := filepath.Join(filepath.Dir(exePath), "resources", "settings.ps1")
-
-	// Check if script exists
-	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
-		return false, fmt.Errorf("settings script not found: %s", scriptPath)
+	if saved {
+		log.Println("Settings saved successfully")
+	} else {
+		log.Println("Settings dialog cancelled by user")
 	}
 
-	log.Printf("Launching settings dialog from: %s", scriptPath)
-
-	// Launch PowerShell with the settings script
-	// -ExecutionPolicy Bypass: Allow running the script
-	// -NoProfile: Don't load user profile (faster startup)
-	// -WindowStyle Hidden: Hide the PowerShell console window (WinForms dialog will still show)
-	// -File: Run the script file
-	cmd := exec.Command("powershell.exe",
-		"-ExecutionPolicy", "Bypass",
-		"-NoProfile",
-		"-WindowStyle", "Hidden",
-		"-File", scriptPath)
-
-	err = cmd.Run()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			exitCode := exitErr.ExitCode()
-			switch exitCode {
-			case 1:
-				// Exit code 1 = user cancelled, not an error
-				log.Println("Settings dialog cancelled by user")
-				return false, nil
-			case 2:
-				// Exit code 2 = error occurred (already shown to user)
-				log.Println("Settings dialog encountered an error")
-				return false, nil
-			default:
-				return false, fmt.Errorf("settings dialog error: exit code %d", exitCode)
-			}
-		}
-		return false, fmt.Errorf("failed to run settings dialog: %w", err)
-	}
-
-	// Exit code 0 = settings were saved successfully
-	log.Println("Settings saved successfully")
-	return true, nil
+	return saved, nil
 }
 
 // showConfirmDialog shows a Yes/No confirmation dialog and returns true if Yes was clicked.

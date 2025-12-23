@@ -84,6 +84,10 @@ echo.
 
 REM Build system tray application
 echo Building system tray application...
+echo Generating manifest resource file...
+pushd "%SCRIPT_DIR%cmd\pinshare-tray"
+go run github.com/akavel/rsrc@latest -manifest pinshare-tray.manifest -o rsrc.syso 2>nul
+popd
 go build -ldflags "-s -w -H windowsgui" -o "%DIST_DIR%\pinshare-tray.exe" "%SCRIPT_DIR%cmd\pinshare-tray"
 if errorlevel 1 (
     echo ERROR: Failed to build pinshare-tray.exe

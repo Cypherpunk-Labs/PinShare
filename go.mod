@@ -163,6 +163,7 @@ require (
 require (
 	github.com/getkin/kin-openapi v0.132.0
 	github.com/getlantern/systray v1.2.2
+	github.com/lxn/walk v0.0.0-20210112085537-c389da54e794
 	github.com/milkpirate/upnp v0.0.0-20221125180929-8bd6dd2e6c12
 	github.com/oapi-codegen/runtime v1.1.2
 )
@@ -180,6 +181,7 @@ require (
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
+	github.com/lxn/win v0.0.0-20210218163916-a377121e959e // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037 // indirect
@@ -189,5 +191,6 @@ require (
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	golang.org/x/telemetry v0.0.0-20250908211612-aef8a434d053 // indirect
 	golang.org/x/time v0.14.0 // indirect
+	gopkg.in/Knetic/govaluate.v3 v3.0.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

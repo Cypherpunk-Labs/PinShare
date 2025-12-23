@@ -105,6 +105,9 @@ func (s *pinshareService) initialize() error {
 	// Initialize process manager
 	s.processManager = NewProcessManager(s.config, s.eventLog)
 
+	// Clean up any orphaned processes from previous runs
+	s.processManager.CleanupOrphanedProcesses()
+
 	// Initialize health checker before starting processes (needed for health checks during startup)
 	s.logInfo("Initializing health checker...")
 	s.healthChecker = NewHealthChecker(s.config, s.processManager, s.eventLog)
