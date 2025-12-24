@@ -7,6 +7,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"strconv"
 
 	"pinshare/internal/p2p"
 	"pinshare/internal/store"
@@ -275,8 +277,10 @@ func Start(ctx context.Context, node host.Host) {
 	mux.Handle("/", apiHandler)
 	mux.Handle("/metrics", promhttp.Handler())
 
-	// Check if port 8080 is in use. If so, increment until an open port is found.
-	var port int = 9090
+	// Get port from PORT environment variable, default to 9090
+	port := getAPIPort()
+
+	// Check if port is in use. If so, increment until an open port is found.
 	for {
 		addr := fmt.Sprintf("0.0.0.0:%d", port)
 		conn, err := net.Listen("tcp", addr)
@@ -298,4 +302,17 @@ func Start(ctx context.Context, node host.Host) {
 	log.Printf("[INFO] Starting API server on %s", addr)
 	// And we serve HTTP until the world ends.
 	log.Fatal(s.ListenAndServe())
+}
+
+// getAPIPort returns the API port from PORT env var or default 9090
+func getAPIPort() int {
+	portStr := os.Getenv("PORT")
+	if portStr == "" {
+		return 9090
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil || port <= 0 {
+		return 9090
+	}
+	return port
 }

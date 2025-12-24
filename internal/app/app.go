@@ -304,7 +304,7 @@ func checkDependanciesAndEnableSecurityPath(appconf *config.AppConfig) bool {
 
 	//>> IPFS + CMD Line
 	// whereis ipfs
-	// ping localhost:5001
+	// ping localhost:IPFS_API port (default 5001)
 	var requirementsMet bool = true
 	if commandExists("ipfs") {
 		fmt.Println("[CHECK] ipfs cmd found")
@@ -312,7 +312,8 @@ func checkDependanciesAndEnableSecurityPath(appconf *config.AppConfig) bool {
 		fmt.Println("[ERROR] ipfs cmd Missing")
 		requirementsMet = false
 	}
-	if checkPort("localhost", 5001) {
+	ipfsPort := getIPFSAPIPort()
+	if checkPort("localhost", ipfsPort) {
 		fmt.Println("[CHECK] ipfs daemon running")
 	} else {
 		fmt.Println("[ERROR] ipfs daemon not running")
@@ -391,6 +392,25 @@ func checkPort(host string, port int) bool {
 	}
 	conn.Close()
 	return true
+}
+
+// getIPFSAPIPort returns the IPFS API port from IPFS_API env var or default 5001
+func getIPFSAPIPort() int {
+	ipfsAPI := os.Getenv("IPFS_API")
+	if ipfsAPI == "" {
+		return 5001
+	}
+	// Parse port from URL like "http://localhost:5002"
+	var port int
+	_, err := fmt.Sscanf(ipfsAPI, "http://localhost:%d", &port)
+	if err != nil || port == 0 {
+		// Try without http://
+		_, err = fmt.Sscanf(ipfsAPI, "localhost:%d", &port)
+		if err != nil || port == 0 {
+			return 5001
+		}
+	}
+	return port
 }
 
 func checkWebsite(url string) bool {
