@@ -67,14 +67,14 @@
         <!-- Startup Section -->
         <Control Id="StartupHeader" Type="Text" X="15" Y="275" Width="370" Height="12" Text="{\PinShare_Font_Bold}Startup Options" />
 
-        <!-- Start service after install -->
-        <Control Id="StartServiceCheck" Type="CheckBox" X="15" Y="291" Width="185" Height="17" Property="START_SERVICE_NOW" CheckBoxValue="1" Text="Start service after install" />
-
         <!-- Start tray after install -->
-        <Control Id="StartTrayCheck" Type="CheckBox" X="200" Y="291" Width="185" Height="17" Property="START_TRAY_NOW" CheckBoxValue="1" Text="Start system tray app" />
+        <Control Id="StartTrayCheck" Type="CheckBox" X="15" Y="291" Width="185" Height="17" Property="START_TRAY_NOW" CheckBoxValue="1" Text="Start system tray app" />
 
-        <!-- Auto-start on boot note -->
-        <Control Id="AutoStartNote" Type="Text" X="15" Y="312" Width="370" Height="15" Text="Service and tray app will auto-start on system boot." />
+        <!-- Auto-start service on boot -->
+        <Control Id="ServiceAutoStartCheck" Type="CheckBox" X="200" Y="291" Width="185" Height="17" Property="SERVICE_AUTO_START" CheckBoxValue="1" Text="Auto-start service on boot" />
+
+        <!-- Tray auto-start on login -->
+        <Control Id="TrayAutoStartCheck" Type="CheckBox" X="15" Y="309" Width="370" Height="17" Property="TRAY_AUTO_START" CheckBoxValue="1" Text="Start tray app automatically when you log in" />
 
         <!-- Navigation buttons -->
         <Control Id="Back" Type="PushButton" X="210" Y="353" Width="56" Height="17" Text="!(loc.WixUIBack)">

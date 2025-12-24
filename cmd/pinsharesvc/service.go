@@ -37,6 +37,10 @@ func (s *pinshareService) Execute(args []string, changeReq <-chan svc.ChangeRequ
 	// Initialize service
 	if err := s.initialize(); err != nil {
 		s.logError("Failed to initialize service", err)
+		// Clean up any processes that were started during failed initialization
+		if s.processManager != nil {
+			s.processManager.StopAll()
+		}
 		return true, 1
 	}
 

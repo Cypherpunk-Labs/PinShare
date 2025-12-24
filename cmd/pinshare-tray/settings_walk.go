@@ -82,14 +82,10 @@ type SettingsDialog struct {
 	logLevelCombo *walk.ComboBox
 }
 
-// loadFullConfig loads the complete configuration from config.json
+// loadFullConfig loads the complete configuration from config.json in user's LOCALAPPDATA
 func loadFullConfig() (*FullConfig, string, error) {
-	programData := os.Getenv("PROGRAMDATA")
-	if programData == "" {
-		programData = `C:\ProgramData`
-	}
-
-	configPath := filepath.Join(programData, "PinShare", "config.json")
+	dataDir := getUserDataDirectory()
+	configPath := filepath.Join(dataDir, "config.json")
 
 	config := &FullConfig{
 		// Defaults

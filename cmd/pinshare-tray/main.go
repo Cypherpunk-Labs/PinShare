@@ -1,16 +1,27 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/getlantern/systray"
 	"golang.org/x/sys/windows"
 )
+
+// SessionMarker contains user session information for the service to find user data
+type SessionMarker struct {
+	LocalAppData string    `json:"local_app_data"`
+	Username     string    `json:"username"`
+	Timestamp    time.Time `json:"timestamp"`
+}
 
 var (
 	user32           = syscall.NewLazyDLL("user32.dll")
@@ -27,6 +38,93 @@ const (
 	MB_ICONWARNING     = 0x00000030
 )
 
+// ensureUserDataDirectories creates all required directories in user's LOCALAPPDATA
+// and grants SYSTEM account full access so the Windows service can read/write them
+func ensureUserDataDirectories() error {
+	dataDir := getUserDataDirectory()
+
+	dirs := []string{
+		dataDir,
+		filepath.Join(dataDir, "ipfs"),
+		filepath.Join(dataDir, "pinshare"),
+		filepath.Join(dataDir, "upload"),
+		filepath.Join(dataDir, "cache"),
+		filepath.Join(dataDir, "rejected"),
+		filepath.Join(dataDir, "logs"),
+	}
+
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+	}
+
+	// Grant SYSTEM account full access to the data directory
+	// This is required because the Windows service runs as SYSTEM
+	if err := grantSystemAccess(dataDir); err != nil {
+		log.Printf("Warning: Failed to grant SYSTEM access: %v", err)
+		// Continue anyway - service might still work if permissions allow
+	}
+
+	log.Printf("User data directories ensured at: %s", dataDir)
+	return nil
+}
+
+// grantSystemAccess uses icacls to grant the SYSTEM account full access to a directory
+// This allows the Windows service (running as SYSTEM) to access user data
+func grantSystemAccess(dir string) error {
+	// Use icacls to grant SYSTEM full control with inheritance
+	// /grant SYSTEM:(OI)(CI)F = Full control, Object Inherit, Container Inherit
+	cmd := exec.Command("icacls", dir, "/grant", "SYSTEM:(OI)(CI)F", "/T", "/Q")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("icacls failed: %w\nOutput: %s", err, output)
+	}
+	log.Printf("Granted SYSTEM access to: %s", dir)
+	return nil
+}
+
+// writeSessionMarker writes session info to ProgramData for the service to read
+func writeSessionMarker() error {
+	programData := os.Getenv("PROGRAMDATA")
+	if programData == "" {
+		programData = `C:\ProgramData`
+	}
+
+	// Ensure ProgramData\PinShare exists for the marker file
+	markerDir := filepath.Join(programData, "PinShare")
+	if err := os.MkdirAll(markerDir, 0755); err != nil {
+		return err
+	}
+
+	localAppData := os.Getenv("LOCALAPPDATA")
+	if localAppData == "" {
+		userProfile := os.Getenv("USERPROFILE")
+		if userProfile != "" {
+			localAppData = filepath.Join(userProfile, "AppData", "Local")
+		}
+	}
+
+	marker := SessionMarker{
+		LocalAppData: localAppData,
+		Username:     os.Getenv("USERNAME"),
+		Timestamp:    time.Now(),
+	}
+
+	data, err := json.MarshalIndent(marker, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	markerPath := filepath.Join(markerDir, "session.json")
+	if err := os.WriteFile(markerPath, data, 0644); err != nil {
+		return err
+	}
+
+	log.Printf("Session marker written: %s (user: %s)", markerPath, marker.Username)
+	return nil
+}
+
 func main() {
 	// Ensure we're running on Windows
 	if runtime.GOOS != "windows" {
@@ -37,6 +135,16 @@ func main() {
 }
 
 func onReady() {
+	// Ensure user data directories exist (in LOCALAPPDATA)
+	if err := ensureUserDataDirectories(); err != nil {
+		log.Printf("Warning: Failed to create data directories: %v", err)
+	}
+
+	// Write session marker so service knows where user data is
+	if err := writeSessionMarker(); err != nil {
+		log.Printf("Warning: Failed to write session marker: %v", err)
+	}
+
 	// Set up the tray icon
 	iconData, err := loadIcon()
 	if err != nil {

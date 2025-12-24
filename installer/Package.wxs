@@ -40,10 +40,11 @@
     <Property Id="ENABLE_CACHE" Value="1" Secure="yes" />
     <Property Id="ARCHIVE_NODE" Value="0" Secure="yes" />
     <Property Id="LOG_LEVEL" Value="info" Secure="yes" />
-    <!-- Upload directory - defaults to ProgramData\PinShare\upload -->
-    <Property Id="UPLOAD_DIR" Value="C:\ProgramData\PinShare\upload" Secure="yes" />
+    <!-- Upload directory - default to user's LOCALAPPDATA\PinShare\upload -->
+    <SetProperty Id="UPLOAD_DIR" Value="[LocalAppDataFolder]PinShare\upload" Before="CostFinalize" Sequence="ui" Condition="NOT UPLOAD_DIR" />
     <!-- Startup options: 1 = yes, 0 = no -->
-    <Property Id="START_SERVICE_NOW" Value="1" Secure="yes" />
+    <!-- Note: Service is Manual start - tray app controls when it runs -->
+    <Property Id="START_SERVICE_NOW" Value="0" Secure="yes" />
     <Property Id="START_TRAY_NOW" Value="1" Secure="yes" />
     <Property Id="SERVICE_AUTO_START" Value="1" Secure="yes" />
     <Property Id="TRAY_AUTO_START" Value="1" Secure="yes" />
@@ -83,9 +84,18 @@
                   Return="ignore" />
 
     <!-- Install/Uninstall use our exe - brief console flash is acceptable -->
+    <!-- InstallService: manual start (tray controls service lifecycle) -->
     <CustomAction Id="InstallService"
                   FileRef="PinShareSvcExe"
                   ExeCommand="install"
+                  Execute="deferred"
+                  Return="check"
+                  Impersonate="no" />
+
+    <!-- InstallServiceAutoStart: automatic start on boot -->
+    <CustomAction Id="InstallServiceAutoStart"
+                  FileRef="PinShareSvcExe"
+                  ExeCommand="install --auto-start"
                   Execute="deferred"
                   Return="check"
                   Impersonate="no" />
@@ -110,12 +120,14 @@
       <Custom Action="StopService" Before="RemoveFiles" Condition="Installed AND NOT UPGRADINGPRODUCTCODE" />
       <Custom Action="UninstallService" Before="RemoveFiles" Condition="Installed AND NOT UPGRADINGPRODUCTCODE" />
 
-      <!-- Always install service on fresh install -->
-      <Custom Action="InstallService" After="InstallFiles" Condition="NOT Installed" />
+      <!-- Install service on fresh install - choose manual or auto-start based on checkbox -->
+      <Custom Action="InstallService" After="InstallFiles" Condition="NOT Installed AND SERVICE_AUTO_START&lt;&gt;1" />
+      <Custom Action="InstallServiceAutoStart" After="InstallFiles" Condition="NOT Installed AND SERVICE_AUTO_START=1" />
 
       <!-- Start service using PowerShell script with retry logic -->
       <!-- This works reliably on both Windows 10 and Windows 11 -->
-      <Custom Action="StartServicePS" After="InstallService" Condition="NOT Installed AND START_SERVICE_NOW=1" />
+      <!-- Start immediately if auto-start is enabled, or if user checked START_SERVICE_NOW -->
+      <Custom Action="StartServicePS" After="InstallServiceAutoStart" Condition="NOT Installed AND (SERVICE_AUTO_START=1 OR START_SERVICE_NOW=1)" />
 
       <!-- Start tray application if START_TRAY_NOW=1 -->
       <Custom Action="StartTray" After="StartServicePS" Condition="NOT Installed AND START_TRAY_NOW=1" />
@@ -146,15 +158,10 @@
       </Directory>
     </StandardDirectory>
 
+    <!-- Minimal ProgramData folder for session marker file only -->
+    <!-- User data directories are now created in %LOCALAPPDATA%\PinShare by the tray app -->
     <StandardDirectory Id="CommonAppDataFolder">
-      <Directory Id="DataFolder" Name="PinShare">
-        <Directory Id="LogsFolder" Name="logs" />
-        <Directory Id="IPFSDataFolder" Name="ipfs" />
-        <Directory Id="PinShareDataFolder" Name="pinshare" />
-        <Directory Id="UploadFolder" Name="upload" />
-        <Directory Id="CacheFolder" Name="cache" />
-        <Directory Id="RejectedFolder" Name="rejected" />
-      </Directory>
+      <Directory Id="DataFolder" Name="PinShare" />
     </StandardDirectory>
 
     <StandardDirectory Id="ProgramMenuFolder">
@@ -270,15 +277,12 @@
   </Fragment>
   -->
 
-  <!-- Data directories -->
+  <!-- Minimal ProgramData directory for session marker -->
+  <!-- User data directories (ipfs, logs, upload, cache, rejected, pinshare) are -->
+  <!-- now created in %LOCALAPPDATA%\PinShare by the tray application on startup -->
   <Fragment>
     <Component Id="DataDirectories" Directory="DataFolder" Bitness="always64">
-      <CreateFolder Directory="LogsFolder" />
-      <CreateFolder Directory="IPFSDataFolder" />
-      <CreateFolder Directory="PinShareDataFolder" />
-      <CreateFolder Directory="UploadFolder" />
-      <CreateFolder Directory="CacheFolder" />
-      <CreateFolder Directory="RejectedFolder" />
+      <CreateFolder />
 
       <!-- Registry key used as KeyPath for WiX component tracking (required for proper uninstall) -->
       <RegistryValue Root="HKCU"

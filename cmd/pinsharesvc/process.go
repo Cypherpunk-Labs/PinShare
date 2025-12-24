@@ -48,18 +48,30 @@ func (pm *ProcessManager) CleanupOrphanedProcesses() {
 	// Kill any orphaned pinshare.exe processes
 	pm.killOrphanedProcess("pinshare.exe", "PinShare")
 
-	// Remove stale IPFS lock file if it exists
-	ipfsLockFile := filepath.Join(pm.config.GetIPFSDataPath(), "repo.lock")
-	if _, err := os.Stat(ipfsLockFile); err == nil {
-		pm.logInfo(fmt.Sprintf("Removing stale IPFS lock file: %s", ipfsLockFile))
-		if err := os.Remove(ipfsLockFile); err != nil {
-			pm.logError("Failed to remove IPFS lock file", err)
-		}
-	}
-
 	// Longer delay to ensure processes are fully terminated and file handles released
 	// Windows can take a while to release file handles after process termination
 	time.Sleep(2 * time.Second)
+
+	// Remove stale IPFS lock file if it exists (after delay to ensure handles are released)
+	ipfsLockFile := filepath.Join(pm.config.GetIPFSDataPath(), "repo.lock")
+	if _, err := os.Stat(ipfsLockFile); err == nil {
+		pm.logInfo(fmt.Sprintf("Removing stale IPFS lock file: %s", ipfsLockFile))
+		// Try multiple times with delays - Windows file handle release can be slow
+		for attempt := 1; attempt <= 3; attempt++ {
+			if err := os.Remove(ipfsLockFile); err != nil {
+				if attempt < 3 {
+					pm.logInfo(fmt.Sprintf("Lock file removal attempt %d failed, retrying...", attempt))
+					time.Sleep(1 * time.Second)
+				} else {
+					pm.logError("Failed to remove IPFS lock file after 3 attempts", err)
+				}
+			} else {
+				pm.logInfo("IPFS lock file removed successfully")
+				break
+			}
+		}
+	}
+
 	pm.logInfo("Orphaned process cleanup complete")
 }
 
@@ -109,6 +121,13 @@ func (pm *ProcessManager) StartIPFS(ctx context.Context) error {
 		pm.logInfo("Initializing IPFS...")
 		if err := pm.initializeIPFS(); err != nil {
 			return fmt.Errorf("failed to initialize IPFS: %w", err)
+		}
+	} else {
+		// IPFS already initialized - ensure ports match config.json
+		pm.logInfo("Syncing IPFS configuration with service config...")
+		if err := pm.configureIPFS(); err != nil {
+			pm.logError("Failed to sync IPFS config", err)
+			// Continue anyway - IPFS may still work with old ports
 		}
 	}
 
@@ -172,10 +191,14 @@ func (pm *ProcessManager) initializeIPFS() error {
 	return nil
 }
 
-// configureIPFS configures IPFS settings
+// configureIPFS configures IPFS settings from PinShare config.json
+// This must be called when IPFS is NOT running (no repo.lock)
 func (pm *ProcessManager) configureIPFS() error {
 	ipfsDataPath := pm.config.GetIPFSDataPath()
 	env := append(os.Environ(), fmt.Sprintf("IPFS_PATH=%s", ipfsDataPath))
+
+	pm.logInfo(fmt.Sprintf("Configuring IPFS ports: API=%d, Gateway=%d, Swarm=%d",
+		pm.config.IPFSAPIPort, pm.config.IPFSGatewayPort, pm.config.IPFSSwarmPort))
 
 	// Set API port
 	if err := pm.runIPFSConfig(env, "Addresses.API", fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", pm.config.IPFSAPIPort)); err != nil {
@@ -187,11 +210,16 @@ func (pm *ProcessManager) configureIPFS() error {
 		return err
 	}
 
-	// Set Swarm port
-	if err := pm.runIPFSConfig(env, "Addresses.Swarm", fmt.Sprintf("[\"/ip4/0.0.0.0/tcp/%d\", \"/ip6/::/tcp/%d\"]", pm.config.IPFSSwarmPort, pm.config.IPFSSwarmPort)); err != nil {
+	// Set Swarm port - include all transport protocols (TCP, UDP/QUIC, WebRTC, WebTransport)
+	// Must use --json flag since this is a JSON array
+	port := pm.config.IPFSSwarmPort
+	swarmAddrs := fmt.Sprintf(`["/ip4/0.0.0.0/tcp/%d", "/ip6/::/tcp/%d", "/ip4/0.0.0.0/udp/%d/webrtc-direct", "/ip4/0.0.0.0/udp/%d/quic-v1", "/ip4/0.0.0.0/udp/%d/quic-v1/webtransport", "/ip6/::/udp/%d/webrtc-direct", "/ip6/::/udp/%d/quic-v1", "/ip6/::/udp/%d/quic-v1/webtransport"]`,
+		port, port, port, port, port, port, port, port)
+	if err := pm.runIPFSConfigJSON(env, "Addresses.Swarm", swarmAddrs); err != nil {
 		return err
 	}
 
+	pm.logInfo("IPFS configuration updated successfully")
 	return nil
 }
 
@@ -203,6 +231,19 @@ func (pm *ProcessManager) runIPFSConfig(env []string, key, value string) error {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("ipfs config %s failed: %w\nOutput: %s", key, err, string(output))
+	}
+
+	return nil
+}
+
+// runIPFSConfigJSON runs an IPFS config command with --json flag for array/object values
+func (pm *ProcessManager) runIPFSConfigJSON(env []string, key, jsonValue string) error {
+	cmd := exec.Command(pm.config.IPFSBinary, "config", "--json", key, jsonValue)
+	cmd.Env = env
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("ipfs config --json %s failed: %w\nOutput: %s", key, err, string(output))
 	}
 
 	return nil
@@ -409,6 +450,19 @@ func (pm *ProcessManager) StopPinShare() error {
 	pm.pinshareCmd = nil
 	pm.logInfo("PinShare backend stopped")
 	return nil
+}
+
+// StopAll stops all managed processes (PinShare first, then IPFS)
+func (pm *ProcessManager) StopAll() {
+	// Stop PinShare first since it depends on IPFS
+	if err := pm.StopPinShare(); err != nil {
+		pm.logError("Error stopping PinShare during cleanup", err)
+	}
+
+	// Then stop IPFS
+	if err := pm.StopIPFS(); err != nil {
+		pm.logError("Error stopping IPFS during cleanup", err)
+	}
 }
 
 // RestartIPFS restarts the IPFS daemon

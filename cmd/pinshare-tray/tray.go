@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -216,12 +216,8 @@ func (t *Tray) handleSettings() {
 
 // handleViewLogs opens the log directory
 func (t *Tray) handleViewLogs() {
-	// Get data directory from environment or default
-	programData := os.Getenv("PROGRAMDATA")
-	if programData == "" {
-		programData = "C:\\ProgramData"
-	}
-	logDir := fmt.Sprintf("%s\\PinShare\\logs", programData)
+	dataDir := getUserDataDirectory()
+	logDir := filepath.Join(dataDir, "logs")
 
 	if err := openBrowser(logDir); err != nil {
 		log.Printf("Failed to open log directory: %v", err)

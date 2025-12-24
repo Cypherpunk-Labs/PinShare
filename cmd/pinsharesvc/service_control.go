@@ -64,7 +64,9 @@ func setServiceDACL(serviceName, userSID string) error {
 }
 
 // installService installs PinShare as a Windows service
-func installService() error {
+// If autoStart is true, the service will start automatically on boot.
+// If false (default), the service starts manually (tray app controls it).
+func installService(autoStart bool) error {
 	exePath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("failed to get executable path: %w", err)
@@ -80,20 +82,51 @@ func installService() error {
 	// Check if service already exists
 	service, err := manager.OpenService(winservice.ServiceName)
 	if err == nil {
+		// Service already exists - update the start type if needed
+		fmt.Printf("Service %s already exists, updating configuration...\n", winservice.ServiceName)
+
+		// Determine desired start type
+		var desiredStartType uint32 = mgr.StartManual
+		if autoStart {
+			desiredStartType = mgr.StartAutomatic
+		}
+
+		// Get current config to update
+		currentConfig, err := service.Config()
+		if err != nil {
+			service.Close()
+			return fmt.Errorf("failed to get service config: %w", err)
+		}
+
+		// Update start type if different
+		if currentConfig.StartType != desiredStartType {
+			currentConfig.StartType = desiredStartType
+			if err := service.UpdateConfig(currentConfig); err != nil {
+				service.Close()
+				return fmt.Errorf("failed to update service config: %w", err)
+			}
+			startTypeName := "Manual"
+			if autoStart {
+				startTypeName = "Automatic"
+			}
+			fmt.Printf("Service start type updated to: %s\n", startTypeName)
+		}
+
 		service.Close()
-		// Service already exists - this is fine for reinstall/upgrade scenarios where
-		// the MSI installer runs the install command but the service is already registered.
-		// We skip re-registration to preserve the existing service configuration and avoid
-		// errors from attempting to create a duplicate service entry.
-		fmt.Printf("Service %s already exists, skipping installation\n", winservice.ServiceName)
 		return nil
+	}
+
+	// Determine start type based on autoStart flag
+	var startType uint32 = mgr.StartManual
+	if autoStart {
+		startType = mgr.StartAutomatic
 	}
 
 	// Create Windows service configuration
 	winSvcConfig := mgr.Config{
 		DisplayName:  winservice.ServiceDisplayName,
 		Description:  winservice.ServiceDescription,
-		StartType:    mgr.StartAutomatic,
+		StartType:    startType,
 		ErrorControl: mgr.ErrorNormal,
 	}
 

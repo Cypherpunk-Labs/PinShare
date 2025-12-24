@@ -17,7 +17,23 @@ type TrayConfig struct {
 // Global config instance
 var appConfig *TrayConfig
 
-// loadConfig loads configuration from config.json
+// getUserDataDirectory returns the user's PinShare data directory
+func getUserDataDirectory() string {
+	localAppData := os.Getenv("LOCALAPPDATA")
+	if localAppData == "" {
+		// Fall back to constructing from USERPROFILE
+		userProfile := os.Getenv("USERPROFILE")
+		if userProfile != "" {
+			localAppData = filepath.Join(userProfile, "AppData", "Local")
+		} else {
+			// Last resort
+			localAppData = `C:\Users\Default\AppData\Local`
+		}
+	}
+	return filepath.Join(localAppData, "PinShare")
+}
+
+// loadConfig loads configuration from config.json in user's LOCALAPPDATA
 // Falls back to defaults if config file doesn't exist or can't be read
 func loadConfig() *TrayConfig {
 	config := &TrayConfig{
@@ -25,12 +41,8 @@ func loadConfig() *TrayConfig {
 		PinShareAPIPort: winservice.DefaultPinShareAPIPort,
 	}
 
-	programData := os.Getenv("PROGRAMDATA")
-	if programData == "" {
-		programData = `C:\ProgramData`
-	}
-
-	configPath := filepath.Join(programData, "PinShare", "config.json")
+	dataDir := getUserDataDirectory()
+	configPath := filepath.Join(dataDir, "config.json")
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {

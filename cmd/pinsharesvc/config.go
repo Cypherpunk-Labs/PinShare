@@ -7,9 +7,67 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"pinshare/internal/winservice"
 )
+
+// SessionMarker contains user session information written by the tray app
+// This allows the SYSTEM service to find the current user's data directory
+type SessionMarker struct {
+	LocalAppData string    `json:"local_app_data"`
+	Username     string    `json:"username"`
+	Timestamp    time.Time `json:"timestamp"`
+}
+
+// getSessionMarkerPath returns the path to the session marker file
+func getSessionMarkerPath() string {
+	programData := os.Getenv("PROGRAMDATA")
+	if programData == "" {
+		programData = `C:\ProgramData`
+	}
+	return filepath.Join(programData, "PinShare", "session.json")
+}
+
+// loadSessionMarker reads the session marker written by the tray app
+func loadSessionMarker() (*SessionMarker, error) {
+	markerPath := getSessionMarkerPath()
+	data, err := os.ReadFile(markerPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read session marker: %w", err)
+	}
+
+	marker := &SessionMarker{}
+	if err := json.Unmarshal(data, marker); err != nil {
+		return nil, fmt.Errorf("failed to parse session marker: %w", err)
+	}
+
+	return marker, nil
+}
+
+// getUserDataDirectory returns the user's data directory from the session marker
+// Falls back to LOCALAPPDATA env var if running in user context (e.g., debug mode)
+func getUserDataDirectory() (string, error) {
+	// First try to read session marker (for SYSTEM service context)
+	marker, err := loadSessionMarker()
+	if err == nil && marker.LocalAppData != "" {
+		return filepath.Join(marker.LocalAppData, "PinShare"), nil
+	}
+
+	// Fall back to LOCALAPPDATA (for user context, e.g., debug mode)
+	localAppData := os.Getenv("LOCALAPPDATA")
+	if localAppData != "" {
+		return filepath.Join(localAppData, "PinShare"), nil
+	}
+
+	// Last resort: try to construct from USERPROFILE
+	userProfile := os.Getenv("USERPROFILE")
+	if userProfile != "" {
+		return filepath.Join(userProfile, "AppData", "Local", "PinShare"), nil
+	}
+
+	return "", fmt.Errorf("cannot determine user data directory: no session marker and LOCALAPPDATA not set")
+}
 
 // EncryptionKeyLength is the length in bytes for generated encryption keys
 const EncryptionKeyLength = 32
@@ -59,14 +117,14 @@ func LoadConfig() (*ServiceConfig, error) {
 	return config, nil
 }
 
-// loadFromFile loads configuration from JSON file
+// loadFromFile loads configuration from JSON file in user's LOCALAPPDATA
 func loadFromFile() (*ServiceConfig, error) {
-	programData := os.Getenv("PROGRAMDATA")
-	if programData == "" {
-		programData = `C:\ProgramData`
+	dataDir, err := getUserDataDirectory()
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine data directory: %w", err)
 	}
 
-	configPath := filepath.Join(programData, "PinShare", "config.json")
+	configPath := filepath.Join(dataDir, "config.json")
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
@@ -84,18 +142,18 @@ func loadFromFile() (*ServiceConfig, error) {
 
 // getDefaultConfig returns a configuration with default values
 func getDefaultConfig() (*ServiceConfig, error) {
-	programData := os.Getenv("PROGRAMDATA")
-	if programData == "" {
-		programData = `C:\ProgramData`
-	}
-
 	programFiles := os.Getenv("PROGRAMFILES")
 	if programFiles == "" {
 		programFiles = `C:\Program Files`
 	}
 
 	installDir := filepath.Join(programFiles, "PinShare")
-	dataDir := filepath.Join(programData, "PinShare")
+
+	// Get user data directory from session marker or LOCALAPPDATA
+	dataDir, err := getUserDataDirectory()
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine data directory: %w", err)
+	}
 
 	config := &ServiceConfig{
 		InstallDirectory: installDir,
@@ -161,11 +219,16 @@ func (c *ServiceConfig) applyDefaults() {
 
 	// Set default paths if not specified
 	if c.DataDirectory == "" {
-		programData := os.Getenv("PROGRAMDATA")
-		if programData == "" {
-			programData = `C:\ProgramData`
+		dataDir, err := getUserDataDirectory()
+		if err != nil {
+			// Fall back to a reasonable default
+			localAppData := os.Getenv("LOCALAPPDATA")
+			if localAppData == "" {
+				localAppData = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local")
+			}
+			dataDir = filepath.Join(localAppData, "PinShare")
 		}
-		c.DataDirectory = filepath.Join(programData, "PinShare")
+		c.DataDirectory = dataDir
 	}
 
 	if c.InstallDirectory == "" {
