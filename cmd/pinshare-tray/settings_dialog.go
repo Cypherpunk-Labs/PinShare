@@ -16,6 +16,27 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// Settings dialog constants
+const (
+	// Default organization and group names for new installations
+	defaultOrgName   = "MyOrganization"
+	defaultGroupName = "MyGroup"
+
+	// Default log level
+	defaultLogLevel = "info"
+
+	// Elevated copy operation timeouts
+	elevatedCopyMaxWait    = 30 * time.Second
+	elevatedCopyPollInterval = 500 * time.Millisecond
+
+	// Lock file removal settings
+	lockFileRemovalMaxAttempts = 3
+	lockFileRemovalRetryDelay  = 1 * time.Second
+)
+
+// logLevels defines the available log levels in order
+var logLevels = []string{"debug", "info", "warn", "error"}
+
 // FullConfig holds all configuration values from config.json
 type FullConfig struct {
 	// Installation paths (read-only)
@@ -95,12 +116,12 @@ func loadFullConfig() (*FullConfig, string, error) {
 		PinShareAPIPort: winservice.DefaultPinShareAPIPort,
 		PinShareP2PPort: winservice.DefaultPinShareP2PPort,
 		UIPort:          winservice.DefaultUIPort,
-		OrgName:         "MyOrganization",
-		GroupName:       "MyGroup",
+		OrgName:         defaultOrgName,
+		GroupName:       defaultGroupName,
 		SkipVirusTotal:  false,
 		EnableCache:     true,
 		ArchiveNode:     false,
-		LogLevel:        "info",
+		LogLevel:        defaultLogLevel,
 	}
 
 	data, err := os.ReadFile(configPath)
@@ -134,13 +155,13 @@ func loadFullConfig() (*FullConfig, string, error) {
 		config.UIPort = winservice.DefaultUIPort
 	}
 	if config.OrgName == "" {
-		config.OrgName = "MyOrganization"
+		config.OrgName = defaultOrgName
 	}
 	if config.GroupName == "" {
-		config.GroupName = "MyGroup"
+		config.GroupName = defaultGroupName
 	}
 	if config.LogLevel == "" {
-		config.LogLevel = "info"
+		config.LogLevel = defaultLogLevel
 	}
 
 	return config, configPath, nil
@@ -170,8 +191,7 @@ func (sd *SettingsDialog) saveConfig() error {
 	}
 
 	if idx := sd.logLevelCombo.CurrentIndex(); idx >= 0 {
-		levels := []string{"debug", "info", "warn", "error"}
-		sd.config.LogLevel = levels[idx]
+		sd.config.LogLevel = logLevels[idx]
 	}
 
 	// Serialize to JSON
@@ -248,14 +268,12 @@ func saveConfigElevated(srcPath, dstPath string) error {
 	}
 
 	// ShellExecute returns immediately, so poll for the file to be updated
-	// Wait up to 30 seconds for UAC prompt + copy operation
+	// Wait for UAC prompt + copy operation
 	log.Printf("Waiting for elevated copy to complete...")
-	maxWait := 30 * time.Second
-	pollInterval := 500 * time.Millisecond
-	deadline := time.Now().Add(maxWait)
+	deadline := time.Now().Add(elevatedCopyMaxWait)
 
 	for time.Now().Before(deadline) {
-		time.Sleep(pollInterval)
+		time.Sleep(elevatedCopyPollInterval)
 
 		// Check if destination was updated
 		dstInfo, err := os.Stat(dstPath)
@@ -329,7 +347,7 @@ func ShowSettingsDialogWalk() (bool, error) {
 	var saved bool
 
 	logLevelIndex := 1 // default to "info"
-	for i, level := range []string{"debug", "info", "warn", "error"} {
+	for i, level := range logLevels {
 		if config.LogLevel == level {
 			logLevelIndex = i
 			break
@@ -524,7 +542,7 @@ func ShowSettingsDialogWalk() (bool, error) {
 							Label{Text: "Log Level:"},
 							ComboBox{
 								AssignTo:     &sd.logLevelCombo,
-								Model:        []string{"debug", "info", "warn", "error"},
+								Model:        logLevels,
 								CurrentIndex: logLevelIndex,
 							},
 							Label{},

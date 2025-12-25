@@ -89,6 +89,6 @@ func runDebugMode() error {
 	fmt.Println("Running PinShare in debug mode...")
 	fmt.Println("Press Ctrl+C to stop")
 
-	service := &pinshareService{}
+	service := new(pinshareService)
 	return service.runInteractive()
 }

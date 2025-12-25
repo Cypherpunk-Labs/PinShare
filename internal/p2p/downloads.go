@@ -2,6 +2,8 @@ package p2p
 
 import (
 	"fmt"
+	"path/filepath"
+
 	"pinshare/internal/psfs"
 	"pinshare/internal/store"
 )
@@ -12,7 +14,7 @@ func ProcessDownload(metadata store.BaseMetadata) (bool, error) {
 		return false, nil
 	}
 
-	fmt.Println("[INFO] File Security checking CID: " + metadata.IPFSCID + " with SHA256: " + metadata.FileSHA256)
+	fmt.Printf("[INFO] File Security checking CID: %s with SHA256: %s\n", metadata.IPFSCID, metadata.FileSHA256)
 
 	fresult, err := performSecurityScan(metadata)
 	if err != nil {
@@ -20,36 +22,38 @@ func ProcessDownload(metadata store.BaseMetadata) (bool, error) {
 	}
 
 	if !fresult {
-		fmt.Println("[ERROR] File Security check failed for CID: " + metadata.IPFSCID + " with SHA256: " + metadata.FileSHA256)
+		fmt.Printf("[ERROR] File Security check failed for CID: %s with SHA256: %s\n", metadata.IPFSCID, metadata.FileSHA256)
 		return false, nil
 	}
 
-	// Validate file type
-	ftype, err := psfs.ValidateFileType(appconfInstance.CacheFolder + "/" + metadata.IPFSCID + "." + metadata.FileType)
+	// Validate file type using OS-agnostic path construction
+	cacheFilePath := filepath.Join(appconfInstance.CacheFolder, metadata.IPFSCID+"."+metadata.FileType)
+	ftype, err := psfs.ValidateFileType(cacheFilePath)
 	if err != nil {
 		return false, err
 	}
 
-	fmt.Println("[INFO] File Security type check passed for CID: " + metadata.IPFSCID + "." + metadata.FileType)
+	fmt.Printf("[INFO] File Security type check passed for CID: %s.%s\n", metadata.IPFSCID, metadata.FileType)
 
 	if !ftype {
 		return false, nil
 	}
 
 	psfs.PinFileIPFS(metadata.IPFSCID)
-	fmt.Println("[INFO] IPFS Pinned for CID: " + metadata.IPFSCID)
+	fmt.Printf("[INFO] IPFS Pinned for CID: %s\n", metadata.IPFSCID)
 	return true, nil
 }
 
 // performSecurityScan handles the security scanning based on the configured capability.
 func performSecurityScan(metadata store.BaseMetadata) (bool, error) {
 	capability := SecurityCapability(appconfInstance.SecurityCapability)
-	cachePath := appconfInstance.CacheFolder + "/" + metadata.IPFSCID + "." + metadata.FileType
+	// Use OS-agnostic path construction
+	cachePath := filepath.Join(appconfInstance.CacheFolder, metadata.IPFSCID+"."+metadata.FileType)
 
 	// Skip all security scanning if FFSkipVT is enabled
 	if appconfInstance.FFSkipVT {
 		fmt.Println("[INFO] Virus scanning disabled (FFSkipVT=true), skipping security check")
-		fmt.Println("[INFO] Fetching CID: " + metadata.IPFSCID)
+		fmt.Printf("[INFO] Fetching CID: %s\n", metadata.IPFSCID)
 		psfs.GetFileIPFS(metadata.IPFSCID, cachePath)
 		return true, nil
 	}
@@ -57,7 +61,7 @@ func performSecurityScan(metadata store.BaseMetadata) (bool, error) {
 	switch {
 	case capability.UsesClamAV():
 		// SecurityCapability 1, 2, 3: Use ClamAV
-		fmt.Println("[INFO] Fetching CID: " + metadata.IPFSCID)
+		fmt.Printf("[INFO] Fetching CID: %s\n", metadata.IPFSCID)
 		psfs.GetFileIPFS(metadata.IPFSCID, cachePath)
 		return psfs.ClamScanFileClean(cachePath)
 
@@ -67,12 +71,12 @@ func performSecurityScan(metadata store.BaseMetadata) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		fmt.Println("[INFO] Fetching CID: " + metadata.IPFSCID)
+		fmt.Printf("[INFO] Fetching CID: %s\n", metadata.IPFSCID)
 		psfs.GetFileIPFS(metadata.IPFSCID, cachePath)
 		return result, nil
 
 	default:
-		fmt.Println("[ERROR] Unknown security capability: ", appconfInstance.SecurityCapability)
+		fmt.Printf("[ERROR] Unknown security capability: %d\n", appconfInstance.SecurityCapability)
 		return false, nil
 	}
 }

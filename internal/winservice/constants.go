@@ -14,6 +14,10 @@ const (
 
 	// ServiceDescription is the description shown in Windows Services.
 	ServiceDescription = "PinShare - Decentralized IPFS pinning service with libp2p"
+
+	// Version is the current version of PinShare.
+	// This should be updated for each release.
+	Version = "0.1.3"
 )
 
 // Default port configuration - shared across all components

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -96,17 +97,25 @@ func (t *Tray) BuildMenu() {
 	// Exit
 	t.menuExit = systray.AddMenuItem("Exit", "Exit the PinShare tray application")
 
-	// Handle menu clicks
-	go t.handleMenuClicks()
-
 	// Initial status check
 	t.updateStatus()
 }
 
-// handleMenuClicks handles menu item clicks
-func (t *Tray) handleMenuClicks() {
+// StartMenuHandler starts the menu click handler goroutine.
+// Call this after BuildMenu with the context from your main function.
+func (t *Tray) StartMenuHandler(ctx context.Context) {
+	go t.handleMenuClicks(ctx)
+}
+
+// handleMenuClicks handles menu item clicks.
+// It accepts a context for graceful shutdown.
+func (t *Tray) handleMenuClicks(ctx context.Context) {
 	for {
 		select {
+		case <-ctx.Done():
+			log.Println("Menu handler shutting down...")
+			return
+
 		// TODO: Re-enable when UI is ready
 		// case <-t.menuOpenUI.ClickedCh:
 		// 	t.handleOpenUI()
@@ -168,26 +177,22 @@ func (t *Tray) handleStopService() {
 	}
 }
 
-// handleRestartService restarts the service
+// handleRestartService restarts the service by stopping and starting it.
 func (t *Tray) handleRestartService() {
-	// Stop first
+	// Stop first - reuse existing handler logic
 	if err := stopService(); err != nil {
 		log.Printf("Failed to stop service: %v", err)
 		showError("PinShare", fmt.Sprintf("Failed to stop service:\n\n%v", err))
 		return
 	}
+	time.Sleep(serviceActionDelay)
+	t.updateStatus()
 
-	// Wait a bit
+	// Wait before starting
 	time.Sleep(serviceRestartDelay)
 
-	// Start again
-	if err := startService(); err != nil {
-		log.Printf("Failed to start service: %v", err)
-		showError("PinShare", fmt.Sprintf("Failed to start service:\n\n%v", err))
-	} else {
-		time.Sleep(serviceActionDelay)
-		t.updateStatus()
-	}
+	// Start again - reuse existing handler logic
+	t.handleStartService()
 }
 
 // handleSettings opens the settings dialog
@@ -229,7 +234,7 @@ func (t *Tray) handleViewLogs() {
 func (t *Tray) handleAbout() {
 	showMessage("About PinShare",
 		"PinShare - Decentralized IPFS Pinning Service\n"+
-			"Version 1.0\n\n"+
+			"Version "+winservice.Version+"\n\n"+
 			"https://github.com/Cypherpunk-Labs/PinShare")
 }
 

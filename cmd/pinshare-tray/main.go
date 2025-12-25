@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -14,6 +15,12 @@ import (
 
 	"github.com/getlantern/systray"
 	"golang.org/x/sys/windows"
+)
+
+var (
+	// appCtx is the application-wide context for graceful shutdown
+	appCtx    context.Context
+	appCancel context.CancelFunc
 )
 
 // SessionMarker contains user session information for the service to find user data
@@ -135,6 +142,9 @@ func main() {
 }
 
 func onReady() {
+	// Create application context for graceful shutdown
+	appCtx, appCancel = context.WithCancel(context.Background())
+
 	// Ensure user data directories exist (in LOCALAPPDATA)
 	if err := ensureUserDataDirectories(); err != nil {
 		log.Printf("Warning: Failed to create data directories: %v", err)
@@ -164,6 +174,9 @@ func onReady() {
 	// Build menu
 	trayInstance.BuildMenu()
 
+	// Start menu click handler with context for graceful shutdown
+	trayInstance.StartMenuHandler(appCtx)
+
 	// Ensure service is running (start if stopped)
 	trayInstance.ensureServiceRunning()
 
@@ -173,6 +186,11 @@ func onReady() {
 
 func onExit() {
 	log.Println("PinShare tray application exiting")
+
+	// Cancel the application context to signal shutdown to goroutines
+	if appCancel != nil {
+		appCancel()
+	}
 
 	// Stop the service when tray exits
 	if err := stopService(); err != nil {

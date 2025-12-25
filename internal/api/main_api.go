@@ -19,6 +19,19 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// API server constants
+const (
+	// defaultAPIPort is the default port for the API server
+	defaultAPIPort = 9090
+
+	// envPort is the environment variable name for the API port
+	envPort = "PORT"
+
+	// API endpoints
+	healthEndpoint  = "/api/health"
+	metricsEndpoint = "/metrics"
+)
+
 // Server implements the ServerInterface.
 type Server struct{}
 
@@ -257,6 +270,11 @@ func GetNode() *host.Host {
 	return p2pNodeInstance
 }
 
+// Start initializes and starts the API server.
+//
+// TODO: Add support for configuring which network interface/IP to bind to.
+// Currently binds to 0.0.0.0 (all interfaces).
+// See: https://github.com/Cypherpunk-Labs/PinShare/issues/XX
 func Start(ctx context.Context, node host.Host) {
 	SetNode(&node)
 	server := NewServer()
@@ -268,16 +286,16 @@ func Start(ctx context.Context, node host.Host) {
 	mux := http.NewServeMux()
 
 	// Health check endpoint for service monitoring
-	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(healthEndpoint, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
 	mux.Handle("/", apiHandler)
-	mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle(metricsEndpoint, promhttp.Handler())
 
-	// Get port from PORT environment variable, default to 9090
+	// Get port from environment variable
 	port := getAPIPort()
 
 	// Check if port is in use. If so, increment until an open port is found.
@@ -304,15 +322,15 @@ func Start(ctx context.Context, node host.Host) {
 	log.Fatal(s.ListenAndServe())
 }
 
-// getAPIPort returns the API port from PORT env var or default 9090
+// getAPIPort returns the API port from PORT env var or default
 func getAPIPort() int {
-	portStr := os.Getenv("PORT")
+	portStr := os.Getenv(envPort)
 	if portStr == "" {
-		return 9090
+		return defaultAPIPort
 	}
 	port, err := strconv.Atoi(portStr)
 	if err != nil || port <= 0 {
-		return 9090
+		return defaultAPIPort
 	}
 	return port
 }

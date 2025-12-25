@@ -16,6 +16,26 @@ import (
 	"golang.org/x/sys/windows/svc/debug"
 )
 
+// Process management constants
+const (
+	// orphanCleanupDelay is the time to wait after killing orphaned processes
+	// before attempting to remove lock files. Windows can take time to release handles.
+	orphanCleanupDelay = 2 * time.Second
+
+	// lockFileRemovalRetryDelay is the delay between lock file removal attempts
+	lockFileRemovalRetryDelay = 1 * time.Second
+
+	// lockFileRemovalMaxAttempts is the maximum number of attempts to remove a lock file
+	lockFileRemovalMaxAttempts = 3
+
+	// Binary names for process management
+	ipfsBinaryName     = "ipfs.exe"
+	pinShareBinaryName = "pinshare.exe"
+
+	// Lock file name
+	ipfsLockFileName = "repo.lock"
+)
+
 type ProcessManager struct {
 	config   *ServiceConfig
 	eventLog debug.Log
@@ -42,37 +62,50 @@ func NewProcessManager(config *ServiceConfig, eventLog debug.Log) *ProcessManage
 func (pm *ProcessManager) CleanupOrphanedProcesses() {
 	pm.logInfo("Checking for orphaned processes...")
 
-	// Kill any orphaned ipfs.exe processes
-	pm.killOrphanedProcess("ipfs.exe", "IPFS")
+	// Kill any orphaned processes
+	pm.killOrphanedProcess(ipfsBinaryName, "IPFS")
+	pm.killOrphanedProcess(pinShareBinaryName, "PinShare")
 
-	// Kill any orphaned pinshare.exe processes
-	pm.killOrphanedProcess("pinshare.exe", "PinShare")
+	// Wait for processes to fully terminate and file handles to be released
+	time.Sleep(orphanCleanupDelay)
 
-	// Longer delay to ensure processes are fully terminated and file handles released
-	// Windows can take a while to release file handles after process termination
-	time.Sleep(2 * time.Second)
-
-	// Remove stale IPFS lock file if it exists (after delay to ensure handles are released)
-	ipfsLockFile := filepath.Join(pm.config.GetIPFSDataPath(), "repo.lock")
-	if _, err := os.Stat(ipfsLockFile); err == nil {
-		pm.logInfo(fmt.Sprintf("Removing stale IPFS lock file: %s", ipfsLockFile))
-		// Try multiple times with delays - Windows file handle release can be slow
-		for attempt := 1; attempt <= 3; attempt++ {
-			if err := os.Remove(ipfsLockFile); err != nil {
-				if attempt < 3 {
-					pm.logInfo(fmt.Sprintf("Lock file removal attempt %d failed, retrying...", attempt))
-					time.Sleep(1 * time.Second)
-				} else {
-					pm.logError("Failed to remove IPFS lock file after 3 attempts", err)
-				}
-			} else {
-				pm.logInfo("IPFS lock file removed successfully")
-				break
-			}
-		}
-	}
+	// Remove stale IPFS lock file if it exists
+	pm.removeStaleLockFile()
 
 	pm.logInfo("Orphaned process cleanup complete")
+}
+
+// killProcessByPID kills a process and its children using taskkill.
+// If taskkill fails, it falls back to process.Kill().
+func (pm *ProcessManager) killProcessByPID(pid int, name string) {
+	killCmd := exec.Command("taskkill", "/F", "/T", "/PID", fmt.Sprintf("%d", pid))
+	if output, err := killCmd.CombinedOutput(); err != nil {
+		pm.logError(fmt.Sprintf("taskkill failed for %s (PID %d): %s", name, pid, string(output)), err)
+	}
+}
+
+// removeStaleLockFile attempts to remove the IPFS lock file with retries.
+func (pm *ProcessManager) removeStaleLockFile() {
+	ipfsLockFile := filepath.Join(pm.config.GetIPFSDataPath(), ipfsLockFileName)
+	if _, err := os.Stat(ipfsLockFile); err != nil {
+		return // Lock file doesn't exist
+	}
+
+	pm.logInfo(fmt.Sprintf("Removing stale IPFS lock file: %s", ipfsLockFile))
+
+	for attempt := 1; attempt <= lockFileRemovalMaxAttempts; attempt++ {
+		if err := os.Remove(ipfsLockFile); err != nil {
+			if attempt < lockFileRemovalMaxAttempts {
+				pm.logInfo(fmt.Sprintf("Lock file removal attempt %d failed, retrying...", attempt))
+				time.Sleep(lockFileRemovalRetryDelay)
+			} else {
+				pm.logError(fmt.Sprintf("Failed to remove IPFS lock file after %d attempts", lockFileRemovalMaxAttempts), err)
+			}
+		} else {
+			pm.logInfo("IPFS lock file removed successfully")
+			return
+		}
+	}
 }
 
 // killOrphanedProcess finds and kills any running instances of a process by name
@@ -191,8 +224,11 @@ func (pm *ProcessManager) initializeIPFS() error {
 	return nil
 }
 
-// configureIPFS configures IPFS settings from PinShare config.json
-// This must be called when IPFS is NOT running (no repo.lock)
+// configureIPFS configures IPFS settings from PinShare config.json.
+// This MUST be called when IPFS is NOT running (no repo.lock held).
+//
+// TODO: Add support for configuring which network interface/IP version to bind to.
+// See: https://github.com/Cypherpunk-Labs/PinShare/issues/XX
 func (pm *ProcessManager) configureIPFS() error {
 	ipfsDataPath := pm.config.GetIPFSDataPath()
 	env := append(os.Environ(), fmt.Sprintf("IPFS_PATH=%s", ipfsDataPath))
@@ -374,19 +410,15 @@ func (pm *ProcessManager) StopIPFS() error {
 	pm.logInfo("Stopping IPFS daemon...")
 	pid := pm.ipfsCmd.Process.Pid
 
-	// On Windows, use taskkill to properly terminate the process tree
-	// os.Interrupt doesn't work reliably for processes created with CREATE_NEW_PROCESS_GROUP
-	killCmd := exec.Command("taskkill", "/F", "/T", "/PID", fmt.Sprintf("%d", pid))
-	if output, err := killCmd.CombinedOutput(); err != nil {
-		pm.logError(fmt.Sprintf("taskkill failed for IPFS (PID %d): %s", pid, string(output)), err)
-		// Fallback to process.Kill()
-		if err := pm.ipfsCmd.Process.Kill(); err != nil {
-			pm.logError("Failed to kill IPFS process", err)
-		}
+	// Kill the process tree using taskkill
+	pm.killProcessByPID(pid, "IPFS")
+
+	// If taskkill failed, try direct kill as fallback
+	if pm.ipfsCmd.Process != nil {
+		_ = pm.ipfsCmd.Process.Kill()
 	}
 
 	// Wait for process to exit via the monitor goroutine (with timeout)
-	// This avoids calling Wait() twice which causes a race condition
 	if pm.ipfsExited != nil {
 		select {
 		case <-time.After(winservice.ProcessShutdownTimeout):
@@ -419,19 +451,15 @@ func (pm *ProcessManager) StopPinShare() error {
 	pm.logInfo("Stopping PinShare backend...")
 	pid := pm.pinshareCmd.Process.Pid
 
-	// On Windows, use taskkill to properly terminate the process tree
-	// os.Interrupt doesn't work reliably for processes created with CREATE_NEW_PROCESS_GROUP
-	killCmd := exec.Command("taskkill", "/F", "/T", "/PID", fmt.Sprintf("%d", pid))
-	if output, err := killCmd.CombinedOutput(); err != nil {
-		pm.logError(fmt.Sprintf("taskkill failed for PinShare (PID %d): %s", pid, string(output)), err)
-		// Fallback to process.Kill()
-		if err := pm.pinshareCmd.Process.Kill(); err != nil {
-			pm.logError("Failed to kill PinShare process", err)
-		}
+	// Kill the process tree using taskkill
+	pm.killProcessByPID(pid, "PinShare")
+
+	// If taskkill failed, try direct kill as fallback
+	if pm.pinshareCmd.Process != nil {
+		_ = pm.pinshareCmd.Process.Kill()
 	}
 
 	// Wait for process to exit via the monitor goroutine (with timeout)
-	// This avoids calling Wait() twice which causes a race condition
 	if pm.pinshareExited != nil {
 		select {
 		case <-time.After(winservice.ProcessShutdownTimeout):

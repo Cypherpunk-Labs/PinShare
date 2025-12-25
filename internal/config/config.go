@@ -6,6 +6,36 @@ import (
 	"time"
 )
 
+// Environment variable names for configuration
+const (
+	// Organization settings
+	EnvOrgName   = "PS_ORGNAME"
+	EnvGroupName = "PS_GROUPNAME"
+
+	// Path settings
+	EnvUploadFolder    = "PS_UPLOAD_FOLDER"
+	EnvCacheFolder     = "PS_CACHE_FOLDER"
+	EnvRejectFolder    = "PS_REJECT_FOLDER"
+	EnvMetadataFile    = "PS_METADATA_FILE"
+	EnvIdentityKeyFile = "PS_IDENTITY_KEY_FILE"
+
+	// Network settings
+	EnvLibp2pPort = "PS_LIBP2P_PORT"
+
+	// Feature flags
+	EnvFFArchiveNode             = "PS_FF_ARCHIVE_NODE"
+	EnvFFCache                   = "PS_FF_CACHE"
+	EnvFFMoveUpload              = "PS_FF_MOVE_UPLOAD"
+	EnvFFSendFileVT              = "PS_FF_SENDFILE_VT"
+	EnvFFSkipVT                  = "PS_FF_SKIP_VT"
+	EnvFFIgnoreUploadsInMetadata = "PS_FF_IGNORE_UPLOADS_IN_METADATA"
+	EnvFFP2Pcircuit              = "PS_FF_P2PCIRCUIT"
+	EnvFFTransportWS             = "PS_FF_TRNSPT_WS"
+	EnvFFTransportTCP            = "PS_FF_TRNSPT_TCP"
+	EnvFFTransportQUIC           = "PS_FF_TRNSPT_QUIC"
+	EnvFFTransportWEBRTC         = "PS_FF_TRNSPT_WEBRTC"
+)
+
 // Default values for configuration
 const (
 	defaultUploadFolder     = "./upload"
@@ -23,18 +53,17 @@ const (
 
 // Default values for Feature Flags
 const (
-	defaultFF                        = false // ENVVAR NAME
-	defaultFFArchiveNode             = false // PS_FF_ARCHIVE_NODE
-	defaultFFCache                   = false // PS_FF_CACHE
-	defaultFFMoveUpload              = false // PS_FF_MOVE_UPLOAD
-	defaultFFSendFileVT              = false // PS_FF_SENDFILE_VT
-	defaultFFSkipVT                  = false // PS_FF_SKIP_VT
-	defaultFFIgnoreUploadsInMetadata = true  // PS_FF_IGNORE_UPLOADS_IN_METADATA
-	defaultFFP2Pcircuit              = true  // PS_FF_P2PCIRCUIT
-	defaultFFTransportWS             = true  // PS_FF_TRNSPT_WS
-	defaultFFTransportTCP            = true  // PS_FF_TRNSPT_TCP
-	defaultFFTransportQUIC           = true  // PS_FF_TRNSPT_QUIC
-	defaultFFTransportWEBRTC         = true  // PS_FF_TRNSPT_WEBRTC
+	defaultFFArchiveNode             = false
+	defaultFFCache                   = false
+	defaultFFMoveUpload              = false
+	defaultFFSendFileVT              = false
+	defaultFFSkipVT                  = false
+	defaultFFIgnoreUploadsInMetadata = true
+	defaultFFP2Pcircuit              = true
+	defaultFFTransportWS             = true
+	defaultFFTransportTCP            = true
+	defaultFFTransportQUIC           = true
+	defaultFFTransportWEBRTC         = true
 )
 
 // AppConfig holds all configuration for the application.
@@ -129,68 +158,68 @@ func LoadConfig() (*AppConfig, error) {
 	}
 
 	// Load organization and group names
-	if err := parseStringEnv("PS_ORGNAME", &conf.OrgName); err != nil {
+	if err := parseStringEnv(EnvOrgName, &conf.OrgName); err != nil {
 		return nil, err
 	}
-	if err := parseStringEnv("PS_GROUPNAME", &conf.GroupName); err != nil {
+	if err := parseStringEnv(EnvGroupName, &conf.GroupName); err != nil {
 		return nil, err
 	}
 	conf.MetadataTopicID = "/" + conf.OrgName + "/" + conf.GroupName + conf.MetadataTopicID
 	conf.FilteringTopicID = "/" + conf.OrgName + "/" + conf.GroupName + conf.FilteringTopicID
 
 	// Environment variable config overrides
-	if err := parseStringEnv("PS_UPLOAD_FOLDER", &conf.UploadFolder); err != nil {
+	if err := parseStringEnv(EnvUploadFolder, &conf.UploadFolder); err != nil {
 		return nil, err
 	}
-	if err := parseStringEnv("PS_CACHE_FOLDER", &conf.CacheFolder); err != nil {
+	if err := parseStringEnv(EnvCacheFolder, &conf.CacheFolder); err != nil {
 		return nil, err
 	}
-	if err := parseStringEnv("PS_REJECT_FOLDER", &conf.RejectFolder); err != nil {
+	if err := parseStringEnv(EnvRejectFolder, &conf.RejectFolder); err != nil {
 		return nil, err
 	}
-	if err := parseStringEnv("PS_METADATA_FILE", &conf.MetaDataFile); err != nil {
+	if err := parseStringEnv(EnvMetadataFile, &conf.MetaDataFile); err != nil {
 		return nil, err
 	}
-	if err := parseStringEnv("PS_IDENTITY_KEY_FILE", &conf.IdentityKeyFile); err != nil {
+	if err := parseStringEnv(EnvIdentityKeyFile, &conf.IdentityKeyFile); err != nil {
 		return nil, err
 	}
 
-	if err := parseIntEnv("PS_LIBP2P_PORT", &conf.Libp2pPort); err != nil {
+	if err := parseIntEnv(EnvLibp2pPort, &conf.Libp2pPort); err != nil {
 		return nil, err
 	}
 
 	// Load feature flags
-	if err := parseBoolEnv("PS_FF_ARCHIVE_NODE", &conf.FFArchiveNode); err != nil {
+	if err := parseBoolEnv(EnvFFArchiveNode, &conf.FFArchiveNode); err != nil {
 		return nil, err
 	}
-	if err := parseBoolEnv("PS_FF_CACHE", &conf.FFCache); err != nil {
+	if err := parseBoolEnv(EnvFFCache, &conf.FFCache); err != nil {
 		return nil, err
 	}
-	if err := parseBoolEnv("PS_FF_MOVE_UPLOAD", &conf.FFMoveUpload); err != nil {
+	if err := parseBoolEnv(EnvFFMoveUpload, &conf.FFMoveUpload); err != nil {
 		return nil, err
 	}
-	if err := parseBoolEnv("PS_FF_SENDFILE_VT", &conf.FFSendFileVT); err != nil {
+	if err := parseBoolEnv(EnvFFSendFileVT, &conf.FFSendFileVT); err != nil {
 		return nil, err
 	}
-	if err := parseBoolEnv("PS_FF_SKIP_VT", &conf.FFSkipVT); err != nil {
+	if err := parseBoolEnv(EnvFFSkipVT, &conf.FFSkipVT); err != nil {
 		return nil, err
 	}
-	if err := parseBoolEnv("PS_FF_IGNORE_UPLOADS_IN_METADATA", &conf.FFIgnoreUploadsInMetadata); err != nil {
+	if err := parseBoolEnv(EnvFFIgnoreUploadsInMetadata, &conf.FFIgnoreUploadsInMetadata); err != nil {
 		return nil, err
 	}
-	if err := parseBoolEnv("PS_FF_P2PCIRCUIT", &conf.FFP2Pcircuit); err != nil {
+	if err := parseBoolEnv(EnvFFP2Pcircuit, &conf.FFP2Pcircuit); err != nil {
 		return nil, err
 	}
-	if err := parseBoolEnv("PS_FF_TRNSPT_WS", &conf.FFTransportWS); err != nil {
+	if err := parseBoolEnv(EnvFFTransportWS, &conf.FFTransportWS); err != nil {
 		return nil, err
 	}
-	if err := parseBoolEnv("PS_FF_TRNSPT_TCP", &conf.FFTransportTCP); err != nil {
+	if err := parseBoolEnv(EnvFFTransportTCP, &conf.FFTransportTCP); err != nil {
 		return nil, err
 	}
-	if err := parseBoolEnv("PS_FF_TRNSPT_QUIC", &conf.FFTransportQUIC); err != nil {
+	if err := parseBoolEnv(EnvFFTransportQUIC, &conf.FFTransportQUIC); err != nil {
 		return nil, err
 	}
-	if err := parseBoolEnv("PS_FF_TRNSPT_WEBRTC", &conf.FFTransportWEBRTC); err != nil {
+	if err := parseBoolEnv(EnvFFTransportWEBRTC, &conf.FFTransportWEBRTC); err != nil {
 		return nil, err
 	}
 
