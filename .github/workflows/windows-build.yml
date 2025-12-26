@@ -1,6 +1,10 @@
 name: Build Windows Installer
 
 on:
+  # TEMP: Enable PR trigger so this workflow runs in the PR that introduces it.
+  # TODO_IN_THIS_PR(@bryanchriswhite): Remove before merging to avoid running on every PR.
+  pull_request:
+  
   push:
     tags:
       - 'v*'
