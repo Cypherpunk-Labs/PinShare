@@ -179,19 +179,13 @@ func (t *Tray) handleStopService() {
 
 // handleRestartService restarts the service by stopping and starting it.
 func (t *Tray) handleRestartService() {
-	// Stop first - reuse existing handler logic
-	if err := stopService(); err != nil {
-		log.Printf("Failed to stop service: %v", err)
-		showError("PinShare", fmt.Sprintf("Failed to stop service:\n\n%v", err))
-		return
-	}
-	time.Sleep(serviceActionDelay)
-	t.updateStatus()
+	// Stop first using existing handler
+	t.handleStopService()
 
 	// Wait before starting
 	time.Sleep(serviceRestartDelay)
 
-	// Start again - reuse existing handler logic
+	// Start again using existing handler
 	t.handleStartService()
 }
 

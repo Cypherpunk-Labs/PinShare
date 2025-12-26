@@ -225,10 +225,10 @@ func (pm *ProcessManager) initializeIPFS() error {
 }
 
 // configureIPFS configures IPFS settings from PinShare config.json.
-// This MUST be called when IPFS is NOT running (no repo.lock held).
+// This MAY ONLY be called when IPFS is NOT running (no repo.lock held).
 //
 // TODO: Add support for configuring which network interface/IP version to bind to.
-// See: https://github.com/Cypherpunk-Labs/PinShare/issues/XX
+// See: https://github.com/Episk-pos/PinShare/issues/10
 func (pm *ProcessManager) configureIPFS() error {
 	ipfsDataPath := pm.config.GetIPFSDataPath()
 	env := append(os.Environ(), fmt.Sprintf("IPFS_PATH=%s", ipfsDataPath))
@@ -319,9 +319,9 @@ func (pm *ProcessManager) StartPinShare(ctx context.Context) error {
 		fmt.Sprintf("PS_ORGNAME=%s", pm.config.OrgName),
 		fmt.Sprintf("PS_GROUPNAME=%s", pm.config.GroupName),
 		fmt.Sprintf("PS_LIBP2P_PORT=%d", pm.config.PinShareP2PPort),
-		fmt.Sprintf("PS_UPLOAD_FOLDER=%s", filepath.Join(pm.config.DataDirectory, "upload")),
-		fmt.Sprintf("PS_CACHE_FOLDER=%s", filepath.Join(pm.config.DataDirectory, "cache")),
-		fmt.Sprintf("PS_REJECT_FOLDER=%s", filepath.Join(pm.config.DataDirectory, "rejected")),
+		fmt.Sprintf("PS_UPLOAD_FOLDER=%s", filepath.Join(pm.config.DataDirectory, dirUpload)),
+		fmt.Sprintf("PS_CACHE_FOLDER=%s", filepath.Join(pm.config.DataDirectory, dirCache)),
+		fmt.Sprintf("PS_REJECT_FOLDER=%s", filepath.Join(pm.config.DataDirectory, dirRejected)),
 		fmt.Sprintf("PS_METADATA_FILE=%s", filepath.Join(dataPath, "metadata.json")),
 		fmt.Sprintf("PS_IDENTITY_KEY_FILE=%s", filepath.Join(dataPath, "identity.key")),
 		fmt.Sprintf("PS_ENCRYPTION_KEY=%s", pm.config.EncryptionKey),

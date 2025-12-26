@@ -25,6 +25,9 @@ const (
 	defaultProgramData  = `C:\ProgramData`
 	defaultProgramFiles = `C:\Program Files`
 
+	// Application name used for directory paths
+	appName = "PinShare"
+
 	// Directory names within data directory
 	dirIPFS      = "ipfs"
 	dirPinShare  = "pinshare"
@@ -34,9 +37,9 @@ const (
 	dirLogs      = "logs"
 
 	// File names
-	configFileName     = "config.json"
-	sessionMarkerFile  = "session.json"
-	serviceLogFile     = "service.log"
+	configFileName    = "config.json"
+	sessionMarkerFile = "session.json"
+	serviceLogFile    = "service.log"
 
 	// Default organization settings
 	defaultOrgName   = "MyOrganization"
@@ -80,8 +83,6 @@ func loadSessionMarker() (*SessionMarker, error) {
 // getUserDataDirectory returns the user's data directory from the session marker
 // Falls back to LOCALAPPDATA env var if running in user context (e.g., debug mode)
 func getUserDataDirectory() (string, error) {
-	const appName = "PinShare"
-
 	// First try to read session marker (for SYSTEM service context)
 	marker, err := loadSessionMarker()
 	if err == nil && marker.LocalAppData != "" {
@@ -176,8 +177,6 @@ func loadFromFile() (*ServiceConfig, error) {
 
 // getDefaultConfig returns a configuration with default values
 func getDefaultConfig() (*ServiceConfig, error) {
-	const appName = "PinShare"
-
 	programFiles := os.Getenv(envProgramFiles)
 	if programFiles == "" {
 		programFiles = defaultProgramFiles
@@ -222,8 +221,6 @@ func getDefaultConfig() (*ServiceConfig, error) {
 
 // applyDefaults fills in missing configuration values with defaults
 func (c *ServiceConfig) applyDefaults() {
-	const appName = "PinShare"
-
 	if c.IPFSAPIPort == 0 {
 		c.IPFSAPIPort = winservice.DefaultIPFSAPIPort
 	}
@@ -257,16 +254,11 @@ func (c *ServiceConfig) applyDefaults() {
 
 	// Set default paths if not specified
 	if c.DataDirectory == "" {
-		dataDir, err := getUserDataDirectory()
-		if err != nil {
-			// Fall back to a reasonable default
-			localAppData := os.Getenv(envLocalAppData)
-			if localAppData == "" {
-				localAppData = filepath.Join(os.Getenv(envUserProfile), "AppData", "Local")
-			}
-			dataDir = filepath.Join(localAppData, appName)
+		// getUserDataDirectory already has comprehensive fallback logic,
+		// so if it fails, there's no reasonable default we can use
+		if dataDir, err := getUserDataDirectory(); err == nil {
+			c.DataDirectory = dataDir
 		}
-		c.DataDirectory = dataDir
 	}
 
 	if c.InstallDirectory == "" {

@@ -9,7 +9,8 @@ import (
 )
 
 func ProcessDownload(metadata store.BaseMetadata) (bool, error) {
-	if appconfInstance.SecurityCapability == int(SecurityCapabilityNone) {
+	capability := SecurityCapability(appconfInstance.SecurityCapability)
+	if capability == SecurityCapabilityNone {
 		fmt.Println("[ERROR] No security capability configured")
 		return false, nil
 	}

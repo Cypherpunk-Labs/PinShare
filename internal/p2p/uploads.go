@@ -13,28 +13,26 @@ import (
 // maxConcurrentUploads limits the number of files processed in parallel
 const maxConcurrentUploads = 4
 
+// ProcessUploads processes all files in the given folder for upload to IPFS.
+// Files are processed concurrently with a limit of maxConcurrentUploads simultaneous operations.
 func ProcessUploads(folderPath string) {
-	files, err := psfs.ListFiles(folderPath)
+	filenames, err := psfs.ListFiles(folderPath)
 	if err != nil {
 		return
 	}
 
 	var count int64
+	// wg tracks completion of all file processing goroutines.
+	// semaphore limits concurrent processing to maxConcurrentUploads to avoid
+	// overwhelming system resources (file handles, network connections, etc.).
 	var wg sync.WaitGroup
 	semaphore := make(chan struct{}, maxConcurrentUploads)
 
-	for _, f := range files {
+	for _, filename := range filenames {
 		wg.Add(1)
-		semaphore <- struct{}{} // Acquire semaphore slot
+		semaphore <- struct{}{} // Acquire semaphore slot (blocks if at capacity)
 
-		go func(filename string) {
-			defer wg.Done()
-			defer func() { <-semaphore }() // Release semaphore slot
-
-			if processFile(folderPath, filename) {
-				atomic.AddInt64(&count, 1)
-			}
-		}(f)
+		go processFileWithLimit(folderPath, filename, semaphore, &wg, &count)
 	}
 
 	wg.Wait()
@@ -44,28 +42,39 @@ func ProcessUploads(folderPath string) {
 	}
 }
 
+// processFileWithLimit wraps processFile with semaphore-based concurrency limiting.
+// It releases the semaphore slot and marks the WaitGroup as done when processing completes.
+func processFileWithLimit(folderPath, filename string, semaphore chan struct{}, wg *sync.WaitGroup, count *int64) {
+	defer wg.Done()
+	defer func() { <-semaphore }() // Release semaphore slot
+
+	if processFile(folderPath, filename) {
+		atomic.AddInt64(count, 1)
+	}
+}
+
 // processFile handles a single file upload. Returns true if the file was successfully added.
-func processFile(folderPath, f string) bool {
-	filePath := filepath.Join(folderPath, f)
+func processFile(folderPath, filename string) bool {
+	filePath := filepath.Join(folderPath, filename)
 
 	// Validate file type
 	valid, err := psfs.ValidateFileType(filePath)
 	if err != nil {
-		fmt.Println("[ERROR] func ValidateFileType() error " + err.Error())
+		fmt.Printf("[ERROR] func ValidateFileType() error: %v\n", err)
 		return false
 	}
 
 	if !valid {
-		handleInvalidFileType(folderPath, f)
+		handleInvalidFileType(folderPath, filename)
 		return false
 	}
 
-	fmt.Println("[INFO] File type valid for file: " + f)
+	fmt.Printf("[INFO] File type valid for file: %s\n", filename)
 
 	// Get file hash
 	fsha256, err := psfs.GetSHA256(filePath)
 	if err != nil {
-		fmt.Println("[ERROR] func GetSha256() error " + err.Error())
+		fmt.Printf("[ERROR] func GetSha256() error: %v\n", err)
 		return false
 	}
 
@@ -81,10 +90,10 @@ func processFile(folderPath, f string) bool {
 	}
 
 	if scanPassed {
-		return addFileToIPFS(folderPath, f, fsha256)
+		return addFileToIPFS(folderPath, filename, fsha256)
 	}
 
-	handleSecurityFailure(folderPath, f, fsha256)
+	handleSecurityFailure(folderPath, filename, fsha256)
 	return false
 }
 
@@ -110,7 +119,7 @@ func performUploadSecurityScan(filePath, fsha256 string) (bool, error) {
 		return false, nil
 	}
 
-	fmt.Println("[INFO] File Security checking file: " + filePath + " with SHA256: " + fsha256)
+	fmt.Printf("[INFO] File Security checking file: %s with SHA256: %s\n", filePath, fsha256)
 
 	// Skip all security scanning if FFSkipVT is enabled
 	if appconfInstance.FFSkipVT {
@@ -122,7 +131,7 @@ func performUploadSecurityScan(filePath, fsha256 string) (bool, error) {
 	case capability.UsesClamAV():
 		result, err := psfs.ClamScanFileClean(filePath)
 		if err != nil {
-			fmt.Println("[ERROR] (ClamScanFileClean) " + err.Error())
+			fmt.Printf("[ERROR] (ClamScanFileClean) %v\n", err)
 			return false, err
 		}
 		return result, nil
@@ -130,29 +139,29 @@ func performUploadSecurityScan(filePath, fsha256 string) (bool, error) {
 	case capability.UsesVirusTotalBrowser():
 		result, err := psfs.GetVirusTotalWSVerdictByHash(fsha256)
 		if err != nil {
-			fmt.Println("[ERROR] (GetVirusTotalVerdictByHash) " + err.Error())
+			fmt.Printf("[ERROR] (GetVirusTotalVerdictByHash) %v\n", err)
 			return false, err
 		}
 		return result, nil
 
 	default:
-		fmt.Println("[ERROR] Unknown security capability: ", appconfInstance.SecurityCapability)
+		fmt.Printf("[ERROR] Unknown security capability: %d\n", appconfInstance.SecurityCapability)
 		return false, nil
 	}
 }
 
 // addFileToIPFS adds a file to IPFS and the global store.
-func addFileToIPFS(folderPath, f, fsha256 string) bool {
-	filePath := folderPath + "/" + f
+func addFileToIPFS(folderPath, filename, fsha256 string) bool {
+	filePath := filepath.Join(folderPath, filename)
 
 	fcid := psfs.AddFileIPFS(filePath)
 	if fcid == "" {
 		return false
 	}
 
-	fmt.Println("[INFO] File: " + f + " ++added to IPFS with CID: " + fcid)
+	fmt.Printf("[INFO] File: %s ++added to IPFS with CID: %s\n", filename, fcid)
 
-	fileExtension, err := psfs.GetExtension(f)
+	fileExtension, err := psfs.GetExtension(filename)
 	if err != nil {
 		return false
 	}
@@ -164,15 +173,16 @@ func addFileToIPFS(folderPath, f, fsha256 string) bool {
 	}
 
 	if err := store.GlobalStore.AddFile(metadata); err != nil {
-		fmt.Printf("[ERROR] failed to add file to GlobalStore: %v \n", err)
+		fmt.Printf("[ERROR] failed to add file to GlobalStore: %v\n", err)
 		return false
 	}
 
-	fmt.Println("[INFO] File: " + f + " ++added to GlobalStore with CID: " + fcid)
+	fmt.Printf("[INFO] File: %s ++added to GlobalStore with CID: %s\n", filename, fcid)
 
 	if appconfInstance.FFMoveUpload {
-		if err := psfs.MoveFile(filePath, appconfInstance.CacheFolder+"/"+f); err != nil {
-			fmt.Println("[ERROR] Error moving file: ", err)
+		destPath := filepath.Join(appconfInstance.CacheFolder, filename)
+		if err := psfs.MoveFile(filePath, destPath); err != nil {
+			fmt.Printf("[ERROR] Error moving file: %v\n", err)
 		}
 	}
 
@@ -180,45 +190,47 @@ func addFileToIPFS(folderPath, f, fsha256 string) bool {
 }
 
 // handleSecurityFailure handles a file that failed security scanning.
-func handleSecurityFailure(folderPath, f, fsha256 string) {
-	filePath := folderPath + "/" + f
+func handleSecurityFailure(folderPath, filename, fsha256 string) {
+	filePath := filepath.Join(folderPath, filename)
 	capability := SecurityCapability(appconfInstance.SecurityCapability)
 
 	// Try to submit to VirusTotal if enabled
 	if appconfInstance.FFSendFileVT && capability.UsesVirusTotalBrowser() {
-		fmt.Println("[INFO] Submitting File to 3rd Party for Security check for file: " + f + " with SHA256: " + fsha256)
+		fmt.Printf("[INFO] Submitting File to 3rd Party for Security check for file: %s with SHA256: %s\n", filename, fsha256)
 
 		submitResult, err := psfs.SendFileToVirusTotalWS(filePath)
 		if err != nil {
-			fmt.Println("[ERROR] Error submitting file for security check: ", err)
+			fmt.Printf("[ERROR] Error submitting file for security check: %v\n", err)
 		}
 
 		if submitResult {
-			fmt.Println("[INFO] Submission Passed Security check for file: " + f + " with SHA256: " + fsha256)
+			fmt.Printf("[INFO] Submission Passed Security check for file: %s with SHA256: %s\n", filename, fsha256)
 			return
 		}
 
-		fmt.Println("[ERROR] File Security check failed for file: " + f + " with SHA256: " + fsha256)
-		moveToRejected(folderPath, f)
+		fmt.Printf("[ERROR] File Security check failed for file: %s with SHA256: %s\n", filename, fsha256)
+		moveToRejected(folderPath, filename)
 		return
 	}
 
-	fmt.Println("[ERROR] File Security check failed for file: " + f + " with SHA256: " + fsha256)
+	fmt.Printf("[ERROR] File Security check failed for file: %s with SHA256: %s\n", filename, fsha256)
 }
 
 // handleInvalidFileType handles a file with an invalid type.
-func handleInvalidFileType(folderPath, f string) {
-	fmt.Println("[ERROR] File type invalid for file: " + f)
-	moveToRejected(folderPath, f)
+func handleInvalidFileType(folderPath, filename string) {
+	fmt.Printf("[ERROR] File type invalid for file: %s\n", filename)
+	moveToRejected(folderPath, filename)
 }
 
 // moveToRejected moves a file to the rejected folder if FFMoveUpload is enabled.
-func moveToRejected(folderPath, f string) {
+func moveToRejected(folderPath, filename string) {
 	if !appconfInstance.FFMoveUpload {
 		return
 	}
 
-	if err := psfs.MoveFile(folderPath+"/"+f, appconfInstance.RejectFolder+"/"+f); err != nil {
-		fmt.Println("[ERROR] Error moving file: ", err)
+	srcPath := filepath.Join(folderPath, filename)
+	destPath := filepath.Join(appconfInstance.RejectFolder, filename)
+	if err := psfs.MoveFile(srcPath, destPath); err != nil {
+		fmt.Printf("[ERROR] Error moving file: %v\n", err)
 	}
 }

@@ -26,12 +26,24 @@ const (
 	defaultLogLevel = "info"
 
 	// Elevated copy operation timeouts
-	elevatedCopyMaxWait    = 30 * time.Second
+	elevatedCopyMaxWait      = 30 * time.Second
 	elevatedCopyPollInterval = 500 * time.Millisecond
 
 	// Lock file removal settings
 	lockFileRemovalMaxAttempts = 3
 	lockFileRemovalRetryDelay  = 1 * time.Second
+
+	// Dialog dimensions
+	dialogMinWidth  = 480
+	dialogMinHeight = 440
+	dialogWidth     = 500
+	dialogHeight    = 460
+	gridSpacing     = 10
+	gridColumns     = 3
+
+	// Port input constraints (standard TCP port range)
+	portMinValue = 1
+	portMaxValue = 65535
 )
 
 // logLevels defines the available log levels in order
@@ -357,8 +369,8 @@ func ShowSettingsDialogWalk() (bool, error) {
 	_, err = Dialog{
 		AssignTo: &sd.dlg,
 		Title:    "PinShare Settings",
-		MinSize:  Size{Width: 480, Height: 440},
-		Size:     Size{Width: 500, Height: 460},
+		MinSize:  Size{Width: dialogMinWidth, Height: dialogMinHeight},
+		Size:     Size{Width: dialogWidth, Height: dialogHeight},
 		Layout:   VBox{},
 		Children: []Widget{
 			TabWidget{
@@ -367,67 +379,67 @@ func ShowSettingsDialogWalk() (bool, error) {
 					// Tab 1: Network Ports
 					{
 						Title:  "Network Ports",
-						Layout: Grid{Columns: 3, Spacing: 10},
+						Layout: Grid{Columns: gridColumns, Spacing: gridSpacing},
 						Children: []Widget{
 							Label{Text: "IPFS API Port:"},
 							NumberEdit{
 								AssignTo: &sd.ipfsAPIPortEdit,
 								Value:    float64(config.IPFSAPIPort),
-								MinValue: 1,
-								MaxValue: 65535,
+								MinValue: portMinValue,
+								MaxValue: portMaxValue,
 								Decimals: 0,
 							},
-							Label{Text: "(default: 5001)", TextColor: walk.RGB(128, 128, 128)},
+							Label{Text: fmt.Sprintf("(default: %d)", winservice.DefaultIPFSAPIPort), TextColor: walk.RGB(128, 128, 128)},
 
 							Label{Text: "IPFS Gateway Port:"},
 							NumberEdit{
 								AssignTo: &sd.ipfsGatewayPortEdit,
 								Value:    float64(config.IPFSGatewayPort),
-								MinValue: 1,
-								MaxValue: 65535,
+								MinValue: portMinValue,
+								MaxValue: portMaxValue,
 								Decimals: 0,
 							},
-							Label{Text: "(default: 8080)", TextColor: walk.RGB(128, 128, 128)},
+							Label{Text: fmt.Sprintf("(default: %d)", winservice.DefaultIPFSGatewayPort), TextColor: walk.RGB(128, 128, 128)},
 
 							Label{Text: "IPFS Swarm Port:"},
 							NumberEdit{
 								AssignTo: &sd.ipfsSwarmPortEdit,
 								Value:    float64(config.IPFSSwarmPort),
-								MinValue: 1,
-								MaxValue: 65535,
+								MinValue: portMinValue,
+								MaxValue: portMaxValue,
 								Decimals: 0,
 							},
-							Label{Text: "(default: 4001)", TextColor: walk.RGB(128, 128, 128)},
+							Label{Text: fmt.Sprintf("(default: %d)", winservice.DefaultIPFSSwarmPort), TextColor: walk.RGB(128, 128, 128)},
 
 							Label{Text: "PinShare API Port:"},
 							NumberEdit{
 								AssignTo: &sd.pinshareAPIPortEdit,
 								Value:    float64(config.PinShareAPIPort),
-								MinValue: 1,
-								MaxValue: 65535,
+								MinValue: portMinValue,
+								MaxValue: portMaxValue,
 								Decimals: 0,
 							},
-							Label{Text: "(default: 9090)", TextColor: walk.RGB(128, 128, 128)},
+							Label{Text: fmt.Sprintf("(default: %d)", winservice.DefaultPinShareAPIPort), TextColor: walk.RGB(128, 128, 128)},
 
 							Label{Text: "PinShare P2P Port:"},
 							NumberEdit{
 								AssignTo: &sd.pinshareP2PPortEdit,
 								Value:    float64(config.PinShareP2PPort),
-								MinValue: 1,
-								MaxValue: 65535,
+								MinValue: portMinValue,
+								MaxValue: portMaxValue,
 								Decimals: 0,
 							},
-							Label{Text: "(default: 50001)", TextColor: walk.RGB(128, 128, 128)},
+							Label{Text: fmt.Sprintf("(default: %d)", winservice.DefaultPinShareP2PPort), TextColor: walk.RGB(128, 128, 128)},
 
 							Label{Text: "UI Port:"},
 							NumberEdit{
 								AssignTo: &sd.uiPortEdit,
 								Value:    float64(config.UIPort),
-								MinValue: 1,
-								MaxValue: 65535,
+								MinValue: portMinValue,
+								MaxValue: portMaxValue,
 								Decimals: 0,
 							},
-							Label{Text: "(default: 8888)", TextColor: walk.RGB(128, 128, 128)},
+							Label{Text: fmt.Sprintf("(default: %d)", winservice.DefaultUIPort), TextColor: walk.RGB(128, 128, 128)},
 
 							// Warning label spanning all columns
 							VSpacer{Size: 10},
