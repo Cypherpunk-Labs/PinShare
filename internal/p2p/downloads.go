@@ -9,7 +9,7 @@ import (
 )
 
 func ProcessDownload(metadata store.BaseMetadata) (bool, error) {
-	capability := SecurityCapability(appconfInstance.SecurityCapability)
+	capability := appconfInstance.SecurityCapability
 	if capability == SecurityCapabilityNone {
 		fmt.Println("[ERROR] No security capability configured")
 		return false, nil
@@ -47,7 +47,7 @@ func ProcessDownload(metadata store.BaseMetadata) (bool, error) {
 
 // performSecurityScan handles the security scanning based on the configured capability.
 func performSecurityScan(metadata store.BaseMetadata) (bool, error) {
-	capability := SecurityCapability(appconfInstance.SecurityCapability)
+	capability := appconfInstance.SecurityCapability
 	// Use OS-agnostic path construction
 	cachePath := filepath.Join(appconfInstance.CacheFolder, metadata.IPFSCID+"."+metadata.FileType)
 

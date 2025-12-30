@@ -21,9 +21,6 @@ const (
 
 	// serviceActionDelay is the delay after starting/stopping service before checking status
 	serviceActionDelay = 1 * time.Second
-
-	// serviceRestartDelay is the delay between stop and start during restart
-	serviceRestartDelay = 2 * time.Second
 )
 
 type Tray struct {
@@ -183,7 +180,7 @@ func (t *Tray) handleRestartService() {
 	t.handleStopService()
 
 	// Wait before starting
-	time.Sleep(serviceRestartDelay)
+	time.Sleep(winservice.ServiceRestartDelay)
 
 	// Start again using existing handler
 	t.handleStartService()
@@ -512,7 +509,7 @@ func startServiceElevated() error {
 	}
 
 	// ShellExecute is async, so we need to poll until the service is actually running
-	return waitForServiceState(windows.SERVICE_RUNNING, 60*time.Second)
+	return waitForServiceState(windows.SERVICE_RUNNING, winservice.ServiceStartTimeout)
 }
 
 // stopService stops the service, trying direct API first, then falling back to UAC elevation
@@ -566,7 +563,7 @@ func stopServiceDirect() error {
 	log.Printf("Service stop initiated, waiting for stop to complete...")
 
 	// Wait for the service to fully stop
-	return waitForServiceState(windows.SERVICE_STOPPED, 30*time.Second)
+	return waitForServiceState(windows.SERVICE_STOPPED, winservice.ServiceStopTimeout)
 }
 
 // stopServiceElevated stops the service using sc.exe with UAC elevation
@@ -579,7 +576,7 @@ func stopServiceElevated() error {
 	}
 
 	// ShellExecute is async, so we need to poll until the service is actually stopped
-	return waitForServiceState(windows.SERVICE_STOPPED, 30*time.Second)
+	return waitForServiceState(windows.SERVICE_STOPPED, winservice.ServiceStopTimeout)
 }
 
 // runElevated runs a command with UAC elevation using ShellExecute
@@ -611,7 +608,7 @@ func waitForServiceState(desiredState uint32, timeout time.Duration) error {
 	defer windows.CloseServiceHandle(svcHandle)
 
 	deadline := time.Now().Add(timeout)
-	pollInterval := 500 * time.Millisecond
+	pollInterval := winservice.ServicePollInterval
 
 	for time.Now().Before(deadline) {
 		var status windows.SERVICE_STATUS
@@ -666,7 +663,7 @@ func (t *Tray) ensureServiceRunning() {
 			showError("PinShare", fmt.Sprintf("Failed to start service:\n\n%v", err))
 		} else {
 			// Wait a moment and update status
-			time.Sleep(1 * time.Second)
+			time.Sleep(winservice.HealthCheckPoll)
 			t.updateStatus()
 		}
 	case winservice.StateStartPending:

@@ -402,19 +402,23 @@ To run multiple PinShare instances on one machine:
 
 **Backup:**
 ```powershell
-# Replace <your-backup-path> with your desired backup location
+# Example: Backup to D:\Backups with a timestamp
 Stop-Service PinShareService
-Copy-Item "C:\ProgramData\PinShare" "<your-backup-path>\PinShare" -Recurse
+$backupPath = "D:\Backups\PinShare-$(Get-Date -Format 'yyyy-MM-dd')"
+Copy-Item "C:\ProgramData\PinShare" $backupPath -Recurse
 Start-Service PinShareService
+Write-Host "Backup saved to: $backupPath"
 ```
 
 **Restore:**
 ```powershell
-# Replace <your-backup-path> with your backup location
+# Example: Restore from a specific backup (replace date with your backup date)
+$backupPath = "D:\Backups\PinShare-2024-01-15"
 Stop-Service PinShareService
 Remove-Item "C:\ProgramData\PinShare" -Recurse -Force
-Copy-Item "<your-backup-path>\PinShare" "C:\ProgramData\PinShare" -Recurse
+Copy-Item $backupPath "C:\ProgramData\PinShare" -Recurse
 Start-Service PinShareService
+Write-Host "Restored from: $backupPath"
 ```
 
 ## Documentation

@@ -113,7 +113,7 @@ func shouldProcessFile(fsha256 string) bool {
 
 // performUploadSecurityScan scans a file for security threats.
 func performUploadSecurityScan(filePath, fsha256 string) (bool, error) {
-	capability := SecurityCapability(appconfInstance.SecurityCapability)
+	capability := appconfInstance.SecurityCapability
 
 	if capability == SecurityCapabilityNone {
 		return false, nil
@@ -192,7 +192,7 @@ func addFileToIPFS(folderPath, filename, fsha256 string) bool {
 // handleSecurityFailure handles a file that failed security scanning.
 func handleSecurityFailure(folderPath, filename, fsha256 string) {
 	filePath := filepath.Join(folderPath, filename)
-	capability := SecurityCapability(appconfInstance.SecurityCapability)
+	capability := appconfInstance.SecurityCapability
 
 	// Try to submit to VirusTotal if enabled
 	if appconfInstance.FFSendFileVT && capability.UsesVirusTotalBrowser() {
