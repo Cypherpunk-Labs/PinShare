@@ -15,12 +15,12 @@ const (
 	IDCANCEL        = 2
 )
 
-// showSettingsDialog launches the walk-based settings dialog.
+// showSettingsDialog launches the settings dialog.
 // Returns true if settings were changed and saved, false if cancelled.
 func showSettingsDialog() (changed bool, err error) {
 	log.Println("Opening settings dialog...")
 
-	saved, err := ShowSettingsDialogWalk()
+	saved, err := showNativeSettingsDialog()
 	if err != nil {
 		log.Printf("Settings dialog error: %v", err)
 		return false, err

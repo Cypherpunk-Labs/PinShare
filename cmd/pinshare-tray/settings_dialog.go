@@ -83,7 +83,7 @@ type FullConfig struct {
 	LogFilePath string `json:"log_file_path,omitempty"`
 }
 
-// SettingsDialog manages the walk-based settings dialog
+// SettingsDialog manages the native Windows settings dialog
 type SettingsDialog struct {
 	config     *FullConfig
 	configPath string
@@ -343,9 +343,9 @@ func (sd *SettingsDialog) validate() error {
 	return nil
 }
 
-// ShowSettingsDialogWalk shows the walk-based settings dialog
-// Returns true if settings were changed and saved
-func ShowSettingsDialogWalk() (bool, error) {
+// showNativeSettingsDialog shows the native Windows settings dialog.
+// Returns true if settings were changed and saved.
+func showNativeSettingsDialog() (bool, error) {
 	config, configPath, err := loadFullConfig()
 	if err != nil {
 		return false, err
