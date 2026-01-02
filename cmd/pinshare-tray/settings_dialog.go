@@ -314,6 +314,273 @@ func isAccessDeniedError(err error) bool {
 		strings.Contains(errStr, "permission denied")
 }
 
+// createNetworkPortsTab creates the Network Ports tab page
+func (sd *SettingsDialog) createNetworkPortsTab(config *FullConfig) TabPage {
+	return TabPage{
+		Title:  "Network Ports",
+		Layout: Grid{Columns: gridColumns, Spacing: gridSpacing},
+		Children: []Widget{
+			Label{Text: "IPFS API Port:"},
+			NumberEdit{
+				AssignTo: &sd.ipfsAPIPortEdit,
+				Value:    float64(config.IPFSAPIPort),
+				MinValue: portMinValue,
+				MaxValue: portMaxValue,
+				Decimals: 0,
+			},
+			Label{Text: fmt.Sprintf("(default: %d)", winservice.DefaultIPFSAPIPort), TextColor: walk.RGB(128, 128, 128)},
+
+			Label{Text: "IPFS Gateway Port:"},
+			NumberEdit{
+				AssignTo: &sd.ipfsGatewayPortEdit,
+				Value:    float64(config.IPFSGatewayPort),
+				MinValue: portMinValue,
+				MaxValue: portMaxValue,
+				Decimals: 0,
+			},
+			Label{Text: fmt.Sprintf("(default: %d)", winservice.DefaultIPFSGatewayPort), TextColor: walk.RGB(128, 128, 128)},
+
+			Label{Text: "IPFS Swarm Port:"},
+			NumberEdit{
+				AssignTo: &sd.ipfsSwarmPortEdit,
+				Value:    float64(config.IPFSSwarmPort),
+				MinValue: portMinValue,
+				MaxValue: portMaxValue,
+				Decimals: 0,
+			},
+			Label{Text: fmt.Sprintf("(default: %d)", winservice.DefaultIPFSSwarmPort), TextColor: walk.RGB(128, 128, 128)},
+
+			Label{Text: "PinShare API Port:"},
+			NumberEdit{
+				AssignTo: &sd.pinshareAPIPortEdit,
+				Value:    float64(config.PinShareAPIPort),
+				MinValue: portMinValue,
+				MaxValue: portMaxValue,
+				Decimals: 0,
+			},
+			Label{Text: fmt.Sprintf("(default: %d)", winservice.DefaultPinShareAPIPort), TextColor: walk.RGB(128, 128, 128)},
+
+			Label{Text: "PinShare P2P Port:"},
+			NumberEdit{
+				AssignTo: &sd.pinshareP2PPortEdit,
+				Value:    float64(config.PinShareP2PPort),
+				MinValue: portMinValue,
+				MaxValue: portMaxValue,
+				Decimals: 0,
+			},
+			Label{Text: fmt.Sprintf("(default: %d)", winservice.DefaultPinShareP2PPort), TextColor: walk.RGB(128, 128, 128)},
+
+			Label{Text: "UI Port:"},
+			NumberEdit{
+				AssignTo: &sd.uiPortEdit,
+				Value:    float64(config.UIPort),
+				MinValue: portMinValue,
+				MaxValue: portMaxValue,
+				Decimals: 0,
+			},
+			Label{Text: fmt.Sprintf("(default: %d)", winservice.DefaultUIPort), TextColor: walk.RGB(128, 128, 128)},
+
+			// Warning label spanning all columns
+			VSpacer{Size: 10},
+			VSpacer{Size: 10},
+			VSpacer{Size: 10},
+			Label{
+				Text:       "Note: Changing ports requires a service restart.",
+				TextColor:  walk.RGB(255, 140, 0),
+				ColumnSpan: 3,
+			},
+		},
+	}
+}
+
+// createOrganizationTab creates the Organization tab page
+func (sd *SettingsDialog) createOrganizationTab(config *FullConfig) TabPage {
+	return TabPage{
+		Title:  "Organization",
+		Layout: Grid{Columns: 2, Spacing: 10},
+		Children: []Widget{
+			Label{Text: "Organization Name:"},
+			LineEdit{
+				AssignTo: &sd.orgNameEdit,
+				Text:     config.OrgName,
+			},
+
+			Label{Text: "Group Name:"},
+			LineEdit{
+				AssignTo: &sd.groupNameEdit,
+				Text:     config.GroupName,
+			},
+
+			VSpacer{Size: 10},
+			VSpacer{Size: 10},
+
+			Label{
+				Text:       "Organization and Group form the gossip topic for peer discovery.",
+				ColumnSpan: 2,
+			},
+			Label{
+				Text:       "All PinShare nodes with the same Organization and Group will",
+				ColumnSpan: 2,
+			},
+			Label{
+				Text:       "automatically discover and connect to each other.",
+				ColumnSpan: 2,
+			},
+		},
+	}
+}
+
+// createFeaturesTab creates the Features tab page
+func (sd *SettingsDialog) createFeaturesTab(config *FullConfig) TabPage {
+	return TabPage{
+		Title:  "Features",
+		Layout: VBox{Spacing: 10, MarginsZero: false},
+		Children: []Widget{
+			CheckBox{
+				AssignTo: &sd.skipVTCheckbox,
+				Text:     "Skip VirusTotal scanning",
+				Checked:  config.SkipVirusTotal,
+			},
+			Label{
+				Text:      "  Disable virus scanning for uploaded files",
+				TextColor: walk.RGB(128, 128, 128),
+			},
+
+			VSpacer{Size: 5},
+
+			CheckBox{
+				AssignTo: &sd.enableCacheCheckbox,
+				Text:     "Enable file caching",
+				Checked:  config.EnableCache,
+			},
+			Label{
+				Text:      "  Cache downloaded files locally for faster access",
+				TextColor: walk.RGB(128, 128, 128),
+			},
+
+			VSpacer{Size: 5},
+
+			CheckBox{
+				AssignTo: &sd.archiveNodeCheckbox,
+				Text:     "Archive node mode",
+				Checked:  config.ArchiveNode,
+			},
+			Label{
+				Text:      "  Pin all content shared by network peers (requires significant disk space)",
+				TextColor: walk.RGB(128, 128, 128),
+			},
+
+			VSpacer{},
+		},
+	}
+}
+
+// createSecurityTab creates the Security tab page
+func (sd *SettingsDialog) createSecurityTab(config *FullConfig, logLevelIndex int) TabPage {
+	return TabPage{
+		Title:  "Security",
+		Layout: Grid{Columns: 2, Spacing: 10},
+		Children: []Widget{
+			Label{Text: "VirusTotal API Token:"},
+			LineEdit{
+				AssignTo:     &sd.vtTokenEdit,
+				Text:         config.VirusTotalToken,
+				PasswordMode: true,
+			},
+			Label{},
+			Label{
+				Text:      "Get a free API key from virustotal.com",
+				TextColor: walk.RGB(128, 128, 128),
+			},
+
+			VSpacer{Size: 10},
+			VSpacer{Size: 10},
+
+			Label{Text: "Log Level:"},
+			ComboBox{
+				AssignTo:     &sd.logLevelCombo,
+				Model:        logLevels,
+				CurrentIndex: logLevelIndex,
+			},
+			Label{},
+			Label{
+				Text:      "debug = verbose, info = normal, warn/error = minimal",
+				TextColor: walk.RGB(128, 128, 128),
+			},
+		},
+	}
+}
+
+// createInfoTab creates the Info tab page (read-only)
+func (sd *SettingsDialog) createInfoTab(config *FullConfig, configPath string) TabPage {
+	return TabPage{
+		Title:  "Info",
+		Layout: Grid{Columns: 2, Spacing: 10},
+		Children: []Widget{
+			Label{Text: "Install Directory:"},
+			LineEdit{
+				Text:     config.InstallDirectory,
+				ReadOnly: true,
+			},
+
+			Label{Text: "Data Directory:"},
+			LineEdit{
+				Text:     config.DataDirectory,
+				ReadOnly: true,
+			},
+
+			Label{Text: "Config File:"},
+			LineEdit{
+				Text:     configPath,
+				ReadOnly: true,
+			},
+
+			VSpacer{Size: 10},
+			VSpacer{Size: 10},
+
+			Label{
+				Text:       "These paths are set during installation and cannot be changed here.",
+				TextColor:  walk.RGB(128, 128, 128),
+				ColumnSpan: 2,
+			},
+		},
+	}
+}
+
+// createButtonsBar creates the Save/Cancel buttons composite
+func (sd *SettingsDialog) createButtonsBar(saved *bool) Composite {
+	return Composite{
+		Layout: HBox{},
+		Children: []Widget{
+			HSpacer{},
+			PushButton{
+				AssignTo: &sd.saveButton,
+				Text:     "Save",
+				OnClicked: func() {
+					if err := sd.validate(); err != nil {
+						walk.MsgBox(sd.dlg, "Validation Error", err.Error(), walk.MsgBoxIconWarning)
+						return
+					}
+
+					if err := sd.saveConfig(); err != nil {
+						walk.MsgBox(sd.dlg, "Error", fmt.Sprintf("Failed to save settings: %v", err), walk.MsgBoxIconError)
+						return
+					}
+
+					*saved = true
+					sd.dlg.Accept()
+				},
+			},
+			PushButton{
+				Text: "Cancel",
+				OnClicked: func() {
+					sd.dlg.Cancel()
+				},
+			},
+		},
+	}
+}
+
 // validate checks that all fields have valid values
 func (sd *SettingsDialog) validate() error {
 	// Validate ports
@@ -376,262 +643,14 @@ func showNativeSettingsDialog() (bool, error) {
 			TabWidget{
 				AssignTo: &sd.tabWidget,
 				Pages: []TabPage{
-					// Tab 1: Network Ports
-					{
-						Title:  "Network Ports",
-						Layout: Grid{Columns: gridColumns, Spacing: gridSpacing},
-						Children: []Widget{
-							Label{Text: "IPFS API Port:"},
-							NumberEdit{
-								AssignTo: &sd.ipfsAPIPortEdit,
-								Value:    float64(config.IPFSAPIPort),
-								MinValue: portMinValue,
-								MaxValue: portMaxValue,
-								Decimals: 0,
-							},
-							Label{Text: fmt.Sprintf("(default: %d)", winservice.DefaultIPFSAPIPort), TextColor: walk.RGB(128, 128, 128)},
-
-							Label{Text: "IPFS Gateway Port:"},
-							NumberEdit{
-								AssignTo: &sd.ipfsGatewayPortEdit,
-								Value:    float64(config.IPFSGatewayPort),
-								MinValue: portMinValue,
-								MaxValue: portMaxValue,
-								Decimals: 0,
-							},
-							Label{Text: fmt.Sprintf("(default: %d)", winservice.DefaultIPFSGatewayPort), TextColor: walk.RGB(128, 128, 128)},
-
-							Label{Text: "IPFS Swarm Port:"},
-							NumberEdit{
-								AssignTo: &sd.ipfsSwarmPortEdit,
-								Value:    float64(config.IPFSSwarmPort),
-								MinValue: portMinValue,
-								MaxValue: portMaxValue,
-								Decimals: 0,
-							},
-							Label{Text: fmt.Sprintf("(default: %d)", winservice.DefaultIPFSSwarmPort), TextColor: walk.RGB(128, 128, 128)},
-
-							Label{Text: "PinShare API Port:"},
-							NumberEdit{
-								AssignTo: &sd.pinshareAPIPortEdit,
-								Value:    float64(config.PinShareAPIPort),
-								MinValue: portMinValue,
-								MaxValue: portMaxValue,
-								Decimals: 0,
-							},
-							Label{Text: fmt.Sprintf("(default: %d)", winservice.DefaultPinShareAPIPort), TextColor: walk.RGB(128, 128, 128)},
-
-							Label{Text: "PinShare P2P Port:"},
-							NumberEdit{
-								AssignTo: &sd.pinshareP2PPortEdit,
-								Value:    float64(config.PinShareP2PPort),
-								MinValue: portMinValue,
-								MaxValue: portMaxValue,
-								Decimals: 0,
-							},
-							Label{Text: fmt.Sprintf("(default: %d)", winservice.DefaultPinShareP2PPort), TextColor: walk.RGB(128, 128, 128)},
-
-							Label{Text: "UI Port:"},
-							NumberEdit{
-								AssignTo: &sd.uiPortEdit,
-								Value:    float64(config.UIPort),
-								MinValue: portMinValue,
-								MaxValue: portMaxValue,
-								Decimals: 0,
-							},
-							Label{Text: fmt.Sprintf("(default: %d)", winservice.DefaultUIPort), TextColor: walk.RGB(128, 128, 128)},
-
-							// Warning label spanning all columns
-							VSpacer{Size: 10},
-							VSpacer{Size: 10},
-							VSpacer{Size: 10},
-							Label{
-								Text:       "Note: Changing ports requires a service restart.",
-								TextColor:  walk.RGB(255, 140, 0),
-								ColumnSpan: 3,
-							},
-						},
-					},
-
-					// Tab 2: Organization
-					{
-						Title:  "Organization",
-						Layout: Grid{Columns: 2, Spacing: 10},
-						Children: []Widget{
-							Label{Text: "Organization Name:"},
-							LineEdit{
-								AssignTo: &sd.orgNameEdit,
-								Text:     config.OrgName,
-							},
-
-							Label{Text: "Group Name:"},
-							LineEdit{
-								AssignTo: &sd.groupNameEdit,
-								Text:     config.GroupName,
-							},
-
-							VSpacer{Size: 10},
-							VSpacer{Size: 10},
-
-							Label{
-								Text:       "Organization and Group form the gossip topic for peer discovery.",
-								ColumnSpan: 2,
-							},
-							Label{
-								Text:       "All PinShare nodes with the same Organization and Group will",
-								ColumnSpan: 2,
-							},
-							Label{
-								Text:       "automatically discover and connect to each other.",
-								ColumnSpan: 2,
-							},
-						},
-					},
-
-					// Tab 3: Features
-					{
-						Title:  "Features",
-						Layout: VBox{Spacing: 10, MarginsZero: false},
-						Children: []Widget{
-							CheckBox{
-								AssignTo: &sd.skipVTCheckbox,
-								Text:     "Skip VirusTotal scanning",
-								Checked:  config.SkipVirusTotal,
-							},
-							Label{
-								Text:      "  Disable virus scanning for uploaded files",
-								TextColor: walk.RGB(128, 128, 128),
-							},
-
-							VSpacer{Size: 5},
-
-							CheckBox{
-								AssignTo: &sd.enableCacheCheckbox,
-								Text:     "Enable file caching",
-								Checked:  config.EnableCache,
-							},
-							Label{
-								Text:      "  Cache downloaded files locally for faster access",
-								TextColor: walk.RGB(128, 128, 128),
-							},
-
-							VSpacer{Size: 5},
-
-							CheckBox{
-								AssignTo: &sd.archiveNodeCheckbox,
-								Text:     "Archive node mode",
-								Checked:  config.ArchiveNode,
-							},
-							Label{
-								Text:      "  Pin all content shared by network peers (requires significant disk space)",
-								TextColor: walk.RGB(128, 128, 128),
-							},
-
-							VSpacer{},
-						},
-					},
-
-					// Tab 4: Security
-					{
-						Title:  "Security",
-						Layout: Grid{Columns: 2, Spacing: 10},
-						Children: []Widget{
-							Label{Text: "VirusTotal API Token:"},
-							LineEdit{
-								AssignTo:     &sd.vtTokenEdit,
-								Text:         config.VirusTotalToken,
-								PasswordMode: true,
-							},
-							Label{},
-							Label{
-								Text:      "Get a free API key from virustotal.com",
-								TextColor: walk.RGB(128, 128, 128),
-							},
-
-							VSpacer{Size: 10},
-							VSpacer{Size: 10},
-
-							Label{Text: "Log Level:"},
-							ComboBox{
-								AssignTo:     &sd.logLevelCombo,
-								Model:        logLevels,
-								CurrentIndex: logLevelIndex,
-							},
-							Label{},
-							Label{
-								Text:      "debug = verbose, info = normal, warn/error = minimal",
-								TextColor: walk.RGB(128, 128, 128),
-							},
-						},
-					},
-
-					// Tab 5: Info (read-only)
-					{
-						Title:  "Info",
-						Layout: Grid{Columns: 2, Spacing: 10},
-						Children: []Widget{
-							Label{Text: "Install Directory:"},
-							LineEdit{
-								Text:     config.InstallDirectory,
-								ReadOnly: true,
-							},
-
-							Label{Text: "Data Directory:"},
-							LineEdit{
-								Text:     config.DataDirectory,
-								ReadOnly: true,
-							},
-
-							Label{Text: "Config File:"},
-							LineEdit{
-								Text:     configPath,
-								ReadOnly: true,
-							},
-
-							VSpacer{Size: 10},
-							VSpacer{Size: 10},
-
-							Label{
-								Text:       "These paths are set during installation and cannot be changed here.",
-								TextColor:  walk.RGB(128, 128, 128),
-								ColumnSpan: 2,
-							},
-						},
-					},
+					sd.createNetworkPortsTab(config),
+					sd.createOrganizationTab(config),
+					sd.createFeaturesTab(config),
+					sd.createSecurityTab(config, logLevelIndex),
+					sd.createInfoTab(config, configPath),
 				},
 			},
-
-			// Buttons
-			Composite{
-				Layout: HBox{},
-				Children: []Widget{
-					HSpacer{},
-					PushButton{
-						AssignTo: &sd.saveButton,
-						Text:     "Save",
-						OnClicked: func() {
-							if err := sd.validate(); err != nil {
-								walk.MsgBox(sd.dlg, "Validation Error", err.Error(), walk.MsgBoxIconWarning)
-								return
-							}
-
-							if err := sd.saveConfig(); err != nil {
-								walk.MsgBox(sd.dlg, "Error", fmt.Sprintf("Failed to save settings: %v", err), walk.MsgBoxIconError)
-								return
-							}
-
-							saved = true
-							sd.dlg.Accept()
-						},
-					},
-					PushButton{
-						Text: "Cancel",
-						OnClicked: func() {
-							sd.dlg.Cancel()
-						},
-					},
-				},
-			},
+			sd.createButtonsBar(&saved),
 		},
 	}.Run(nil)
 
