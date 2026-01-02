@@ -127,7 +127,7 @@ func main() {
 }
 
 func runService() {
-	err := svc.Run(winservice.ServiceName, &pinshareService{})
+	err := svc.Run(winservice.ServiceName, new(pinshareService))
 	if err != nil {
 		log.Fatalf("Service failed: %v", err)
 	}
