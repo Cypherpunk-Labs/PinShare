@@ -274,7 +274,7 @@ func GetNode() *host.Host {
 //
 // TODO: Add support for configuring which network interface/IP to bind to.
 // Currently binds to 0.0.0.0 (all interfaces).
-// See: https://github.com/Episk-pos/PinShare/issues/10
+// See: https://github.com/Cypherpunk-Labs/PinShare/issues/10
 func Start(ctx context.Context, node host.Host) {
 	SetNode(&node)
 	server := NewServer()

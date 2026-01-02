@@ -165,7 +165,7 @@ func (pm *ProcessManager) StartIPFS(ctx context.Context) error {
 	}
 
 	// Open log file
-	logPath := filepath.Join(pm.config.DataDirectory, "logs", "ipfs.log")
+	logPath := filepath.Join(pm.config.DataDirectory, dirLogs, "ipfs.log")
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open IPFS log file: %w", err)
@@ -228,7 +228,7 @@ func (pm *ProcessManager) initializeIPFS() error {
 // This MAY ONLY be called when IPFS is NOT running (no repo.lock held).
 //
 // TODO: Add support for configuring which network interface/IP version to bind to.
-// See: https://github.com/Episk-pos/PinShare/issues/10
+// See: https://github.com/Cypherpunk-Labs/PinShare/issues/10
 func (pm *ProcessManager) configureIPFS() error {
 	ipfsDataPath := pm.config.GetIPFSDataPath()
 	env := append(os.Environ(), fmt.Sprintf("IPFS_PATH=%s", ipfsDataPath))
@@ -296,7 +296,7 @@ func (pm *ProcessManager) StartPinShare(ctx context.Context) error {
 	}
 
 	// Open log file
-	logPath := filepath.Join(pm.config.DataDirectory, "logs", "pinshare.log")
+	logPath := filepath.Join(pm.config.DataDirectory, dirLogs, "pinshare.log")
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open PinShare log file: %w", err)

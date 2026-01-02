@@ -36,7 +36,7 @@ const (
 	// Default IPFS API port for health checks
 	// TODO: Add support for configuring which interface/IP to use for health checks.
 	// Currently uses localhost which works for local connections only.
-	// See: https://github.com/Episk-pos/PinShare/issues/10
+	// See: https://github.com/Cypherpunk-Labs/PinShare/issues/10
 	defaultIPFSAPIPort = 5001
 
 	// Environment variables

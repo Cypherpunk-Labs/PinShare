@@ -215,9 +215,8 @@ C:\ProgramData\PinShare\
 #### 1. Clone and checkout
 
 ```bash
-git clone https://github.com/Episk-pos/PinShare.git
+git clone https://github.com/Cypherpunk-Labs/PinShare.git
 cd PinShare
-git checkout infra/refactor
 ```
 
 #### 2. Build all components
