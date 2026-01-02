@@ -3,8 +3,11 @@ package winservice
 
 import "time"
 
-// Service identification
+// Application identity - shared across all components
 const (
+	// AppName is the application name used for directory paths and display.
+	AppName = "PinShare"
+
 	// ServiceName is the Windows service name used for registration and control.
 	// This must be consistent across all components (service, tray, etc.).
 	ServiceName = "PinShareService"
@@ -18,6 +21,39 @@ const (
 	// Version is the current version of PinShare.
 	// This should be updated for each release.
 	Version = "0.1.3"
+)
+
+// Directory names within the data directory
+const (
+	DirIPFS     = "ipfs"
+	DirPinShare = "pinshare"
+	DirUpload   = "upload"
+	DirCache    = "cache"
+	DirRejected = "rejected"
+	DirLogs     = "logs"
+)
+
+// File names
+const (
+	FileConfig     = "config.json"
+	FileSession    = "session.json"
+	FileServiceLog = "service.log"
+)
+
+// Environment variable names
+const (
+	EnvLocalAppData = "LOCALAPPDATA"
+	EnvUserProfile  = "USERPROFILE"
+	EnvProgramData  = "PROGRAMDATA"
+	EnvProgramFiles = "PROGRAMFILES"
+	EnvUsername     = "USERNAME"
+)
+
+// Default paths when environment variables are not available
+const (
+	DefaultLocalAppDataPath = `C:\Users\Default\AppData\Local`
+	DefaultProgramDataPath  = `C:\ProgramData`
+	DefaultProgramFilesPath = `C:\Program Files`
 )
 
 // Default port configuration - shared across all components

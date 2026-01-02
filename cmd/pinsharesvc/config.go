@@ -12,36 +12,8 @@ import (
 	"pinshare/internal/winservice"
 )
 
-// Environment variable names
+// Default organization settings (service-specific)
 const (
-	envProgramData  = "PROGRAMDATA"
-	envLocalAppData = "LOCALAPPDATA"
-	envUserProfile  = "USERPROFILE"
-	envProgramFiles = "PROGRAMFILES"
-)
-
-// Default paths and directories
-const (
-	defaultProgramData  = `C:\ProgramData`
-	defaultProgramFiles = `C:\Program Files`
-
-	// Application name used for directory paths
-	appName = "PinShare"
-
-	// Directory names within data directory
-	dirIPFS      = "ipfs"
-	dirPinShare  = "pinshare"
-	dirUpload    = "upload"
-	dirCache     = "cache"
-	dirRejected  = "rejected"
-	dirLogs      = "logs"
-
-	// File names
-	configFileName    = "config.json"
-	sessionMarkerFile = "session.json"
-	serviceLogFile    = "service.log"
-
-	// Default organization settings
 	defaultOrgName   = "MyOrganization"
 	defaultGroupName = "MyGroup"
 	defaultLogLevel  = "info"
@@ -57,11 +29,11 @@ type SessionMarker struct {
 
 // getSessionMarkerPath returns the path to the session marker file
 func getSessionMarkerPath() string {
-	programData := os.Getenv(envProgramData)
+	programData := os.Getenv(winservice.EnvProgramData)
 	if programData == "" {
-		programData = defaultProgramData
+		programData = winservice.DefaultProgramDataPath
 	}
-	return filepath.Join(programData, winservice.ServiceDisplayName, sessionMarkerFile)
+	return filepath.Join(programData, winservice.ServiceDisplayName, winservice.FileSession)
 }
 
 // loadSessionMarker reads the session marker written by the tray app
@@ -86,22 +58,22 @@ func getUserDataDirectory() (string, error) {
 	// First try to read session marker (for SYSTEM service context)
 	marker, err := loadSessionMarker()
 	if err == nil && marker.LocalAppData != "" {
-		return filepath.Join(marker.LocalAppData, appName), nil
+		return filepath.Join(marker.LocalAppData, winservice.AppName), nil
 	}
 
 	// Fall back to LOCALAPPDATA (for user context, e.g., debug mode)
-	localAppData := os.Getenv(envLocalAppData)
+	localAppData := os.Getenv(winservice.EnvLocalAppData)
 	if localAppData != "" {
-		return filepath.Join(localAppData, appName), nil
+		return filepath.Join(localAppData, winservice.AppName), nil
 	}
 
 	// Last resort: try to construct from USERPROFILE
-	userProfile := os.Getenv(envUserProfile)
+	userProfile := os.Getenv(winservice.EnvUserProfile)
 	if userProfile != "" {
-		return filepath.Join(userProfile, "AppData", "Local", appName), nil
+		return filepath.Join(userProfile, "AppData", "Local", winservice.AppName), nil
 	}
 
-	return "", fmt.Errorf("cannot determine user data directory: no session marker and %s not set", envLocalAppData)
+	return "", fmt.Errorf("cannot determine user data directory: no session marker and %s not set", winservice.EnvLocalAppData)
 }
 
 // EncryptionKeyLength is the length in bytes for generated encryption keys
@@ -159,7 +131,7 @@ func loadFromFile() (*ServiceConfig, error) {
 		return nil, fmt.Errorf("failed to determine data directory: %w", err)
 	}
 
-	configPath := filepath.Join(dataDir, configFileName)
+	configPath := filepath.Join(dataDir, winservice.FileConfig)
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
@@ -177,12 +149,12 @@ func loadFromFile() (*ServiceConfig, error) {
 
 // getDefaultConfig returns a configuration with default values
 func getDefaultConfig() (*ServiceConfig, error) {
-	programFiles := os.Getenv(envProgramFiles)
+	programFiles := os.Getenv(winservice.EnvProgramFiles)
 	if programFiles == "" {
-		programFiles = defaultProgramFiles
+		programFiles = winservice.DefaultProgramFilesPath
 	}
 
-	installDir := filepath.Join(programFiles, appName)
+	installDir := filepath.Join(programFiles, winservice.AppName)
 
 	// Get user data directory from session marker or LOCALAPPDATA
 	dataDir, err := getUserDataDirectory()
@@ -213,7 +185,7 @@ func getDefaultConfig() (*ServiceConfig, error) {
 		EncryptionKey: generateEncryptionKey(),
 
 		LogLevel:    defaultLogLevel,
-		LogFilePath: filepath.Join(dataDir, dirLogs, serviceLogFile),
+		LogFilePath: filepath.Join(dataDir, winservice.DirLogs, winservice.FileServiceLog),
 	}
 
 	return config, nil
@@ -262,11 +234,11 @@ func (c *ServiceConfig) applyDefaults() {
 	}
 
 	if c.InstallDirectory == "" {
-		programFiles := os.Getenv(envProgramFiles)
+		programFiles := os.Getenv(winservice.EnvProgramFiles)
 		if programFiles == "" {
-			programFiles = defaultProgramFiles
+			programFiles = winservice.DefaultProgramFilesPath
 		}
-		c.InstallDirectory = filepath.Join(programFiles, appName)
+		c.InstallDirectory = filepath.Join(programFiles, winservice.AppName)
 	}
 
 	if c.IPFSBinary == "" {
@@ -278,7 +250,7 @@ func (c *ServiceConfig) applyDefaults() {
 	}
 
 	if c.LogFilePath == "" {
-		c.LogFilePath = filepath.Join(c.DataDirectory, dirLogs, serviceLogFile)
+		c.LogFilePath = filepath.Join(c.DataDirectory, winservice.DirLogs, winservice.FileServiceLog)
 	}
 }
 
@@ -286,12 +258,12 @@ func (c *ServiceConfig) applyDefaults() {
 func (c *ServiceConfig) EnsureDirectories() error {
 	dirs := []string{
 		c.DataDirectory,
-		filepath.Join(c.DataDirectory, dirIPFS),
-		filepath.Join(c.DataDirectory, dirPinShare),
-		filepath.Join(c.DataDirectory, dirUpload),
-		filepath.Join(c.DataDirectory, dirCache),
-		filepath.Join(c.DataDirectory, dirRejected),
-		filepath.Join(c.DataDirectory, dirLogs),
+		filepath.Join(c.DataDirectory, winservice.DirIPFS),
+		filepath.Join(c.DataDirectory, winservice.DirPinShare),
+		filepath.Join(c.DataDirectory, winservice.DirUpload),
+		filepath.Join(c.DataDirectory, winservice.DirCache),
+		filepath.Join(c.DataDirectory, winservice.DirRejected),
+		filepath.Join(c.DataDirectory, winservice.DirLogs),
 	}
 
 	for _, dir := range dirs {
@@ -305,17 +277,17 @@ func (c *ServiceConfig) EnsureDirectories() error {
 
 // GetIPFSDataPath returns the IPFS data directory path
 func (c *ServiceConfig) GetIPFSDataPath() string {
-	return filepath.Join(c.DataDirectory, dirIPFS)
+	return filepath.Join(c.DataDirectory, winservice.DirIPFS)
 }
 
 // GetPinShareDataPath returns the PinShare data directory
 func (c *ServiceConfig) GetPinShareDataPath() string {
-	return filepath.Join(c.DataDirectory, dirPinShare)
+	return filepath.Join(c.DataDirectory, winservice.DirPinShare)
 }
 
 // SaveToFile saves the configuration to a JSON file
 func (c *ServiceConfig) SaveToFile() error {
-	configPath := filepath.Join(c.DataDirectory, configFileName)
+	configPath := filepath.Join(c.DataDirectory, winservice.FileConfig)
 
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {

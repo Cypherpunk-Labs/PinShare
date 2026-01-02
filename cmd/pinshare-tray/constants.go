@@ -1,8 +1,10 @@
 package main
 
-// Application identity
+import "pinshare/internal/winservice"
+
+// Tray-specific constants (aliases to shared constants for convenience)
 const (
-	appName    = "PinShare"
+	appName    = winservice.AppName
 	appTooltip = "PinShare - Decentralized IPFS Pinning"
 )
 
@@ -21,32 +23,29 @@ const (
 	IDCANCEL = 2
 )
 
-// Directory names within the data directory
+// Aliases to shared constants for package-level convenience
 const (
-	dirIPFS     = "ipfs"
-	dirPinShare = "pinshare"
-	dirUpload   = "upload"
-	dirCache    = "cache"
-	dirRejected = "rejected"
-	dirLogs     = "logs"
+	dirIPFS     = winservice.DirIPFS
+	dirPinShare = winservice.DirPinShare
+	dirUpload   = winservice.DirUpload
+	dirCache    = winservice.DirCache
+	dirRejected = winservice.DirRejected
+	dirLogs     = winservice.DirLogs
 )
 
-// File names
 const (
-	fileConfig  = "config.json"
-	fileSession = "session.json"
+	fileConfig  = winservice.FileConfig
+	fileSession = winservice.FileSession
 )
 
-// Environment variable names
 const (
-	envLocalAppData = "LOCALAPPDATA"
-	envUserProfile  = "USERPROFILE"
-	envProgramData  = "PROGRAMDATA"
-	envUsername     = "USERNAME"
+	envLocalAppData = winservice.EnvLocalAppData
+	envUserProfile  = winservice.EnvUserProfile
+	envProgramData  = winservice.EnvProgramData
+	envUsername     = winservice.EnvUsername
 )
 
-// Default paths when environment variables are not available
 const (
-	defaultLocalAppDataPath = `C:\Users\Default\AppData\Local`
-	defaultProgramDataPath  = `C:\ProgramData`
+	defaultLocalAppDataPath = winservice.DefaultLocalAppDataPath
+	defaultProgramDataPath  = winservice.DefaultProgramDataPath
 )

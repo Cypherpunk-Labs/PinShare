@@ -64,7 +64,7 @@ func (pm *ProcessManager) CleanupOrphanedProcesses() {
 
 	// Kill any orphaned processes
 	pm.killOrphanedProcess(ipfsBinaryName, "IPFS")
-	pm.killOrphanedProcess(pinShareBinaryName, appName)
+	pm.killOrphanedProcess(pinShareBinaryName, winservice.AppName)
 
 	// Wait for processes to fully terminate and file handles to be released
 	time.Sleep(orphanCleanupDelay)
@@ -165,7 +165,7 @@ func (pm *ProcessManager) StartIPFS(ctx context.Context) error {
 	}
 
 	// Open log file
-	logPath := filepath.Join(pm.config.DataDirectory, dirLogs, "ipfs.log")
+	logPath := filepath.Join(pm.config.DataDirectory, winservice.DirLogs, "ipfs.log")
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open IPFS log file: %w", err)
@@ -296,7 +296,7 @@ func (pm *ProcessManager) StartPinShare(ctx context.Context) error {
 	}
 
 	// Open log file
-	logPath := filepath.Join(pm.config.DataDirectory, dirLogs, "pinshare.log")
+	logPath := filepath.Join(pm.config.DataDirectory, winservice.DirLogs, "pinshare.log")
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open PinShare log file: %w", err)
@@ -319,9 +319,9 @@ func (pm *ProcessManager) StartPinShare(ctx context.Context) error {
 		fmt.Sprintf("PS_ORGNAME=%s", pm.config.OrgName),
 		fmt.Sprintf("PS_GROUPNAME=%s", pm.config.GroupName),
 		fmt.Sprintf("PS_LIBP2P_PORT=%d", pm.config.PinShareP2PPort),
-		fmt.Sprintf("PS_UPLOAD_FOLDER=%s", filepath.Join(pm.config.DataDirectory, dirUpload)),
-		fmt.Sprintf("PS_CACHE_FOLDER=%s", filepath.Join(pm.config.DataDirectory, dirCache)),
-		fmt.Sprintf("PS_REJECT_FOLDER=%s", filepath.Join(pm.config.DataDirectory, dirRejected)),
+		fmt.Sprintf("PS_UPLOAD_FOLDER=%s", filepath.Join(pm.config.DataDirectory, winservice.DirUpload)),
+		fmt.Sprintf("PS_CACHE_FOLDER=%s", filepath.Join(pm.config.DataDirectory, winservice.DirCache)),
+		fmt.Sprintf("PS_REJECT_FOLDER=%s", filepath.Join(pm.config.DataDirectory, winservice.DirRejected)),
 		fmt.Sprintf("PS_METADATA_FILE=%s", filepath.Join(dataPath, "metadata.json")),
 		fmt.Sprintf("PS_IDENTITY_KEY_FILE=%s", filepath.Join(dataPath, "identity.key")),
 		fmt.Sprintf("PS_ENCRYPTION_KEY=%s", pm.config.EncryptionKey),
@@ -372,7 +372,7 @@ func (pm *ProcessManager) StartPinShare(ctx context.Context) error {
 
 	// Create exit channel and monitor process in background
 	pm.pinshareExited = make(chan struct{})
-	go pm.monitorProcess(ctx, pm.pinshareCmd, appName, pm.pinshareExited)
+	go pm.monitorProcess(ctx, pm.pinshareCmd, winservice.AppName, pm.pinshareExited)
 
 	return nil
 }
@@ -452,7 +452,7 @@ func (pm *ProcessManager) StopPinShare() error {
 	pid := pm.pinshareCmd.Process.Pid
 
 	// Kill the process tree using taskkill
-	pm.killProcessByPID(pid, appName)
+	pm.killProcessByPID(pid, winservice.AppName)
 
 	// If taskkill failed, try direct kill as fallback
 	if pm.pinshareCmd.Process != nil {
