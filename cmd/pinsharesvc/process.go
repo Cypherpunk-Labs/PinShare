@@ -64,7 +64,7 @@ func (pm *ProcessManager) CleanupOrphanedProcesses() {
 
 	// Kill any orphaned processes
 	pm.killOrphanedProcess(ipfsBinaryName, "IPFS")
-	pm.killOrphanedProcess(pinShareBinaryName, "PinShare")
+	pm.killOrphanedProcess(pinShareBinaryName, appName)
 
 	// Wait for processes to fully terminate and file handles to be released
 	time.Sleep(orphanCleanupDelay)
@@ -372,7 +372,7 @@ func (pm *ProcessManager) StartPinShare(ctx context.Context) error {
 
 	// Create exit channel and monitor process in background
 	pm.pinshareExited = make(chan struct{})
-	go pm.monitorProcess(ctx, pm.pinshareCmd, "PinShare", pm.pinshareExited)
+	go pm.monitorProcess(ctx, pm.pinshareCmd, appName, pm.pinshareExited)
 
 	return nil
 }
@@ -452,7 +452,7 @@ func (pm *ProcessManager) StopPinShare() error {
 	pid := pm.pinshareCmd.Process.Pid
 
 	// Kill the process tree using taskkill
-	pm.killProcessByPID(pid, "PinShare")
+	pm.killProcessByPID(pid, appName)
 
 	// If taskkill failed, try direct kill as fallback
 	if pm.pinshareCmd.Process != nil {
