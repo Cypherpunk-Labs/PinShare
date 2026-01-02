@@ -101,6 +101,22 @@ The service exposes a RESTful API for management and queries. The API is defined
 -   **API Specification**: See `docs/spec/basemetadata.openapi.spec.yaml` for the full contract.
 -   The API server starts automatically when you run the main application.
 
+## Windows Installation
+
+PinShare includes a native Windows service with system tray integration for easy management.
+
+### Quick Start
+
+Download and run `PinShare-Setup.msi` from the [releases page](https://github.com/Cypherpunk-Labs/PinShare/releases).
+
+### Documentation
+
+- **[Quick Start Guide](docs/windows/QUICKSTART.md)** - Get up and running quickly
+- **[Installation & Usage](docs/windows/README.md)** - Complete Windows installation guide
+- **[Windows Service](docs/windows/SERVICE.md)** - Service wrapper architecture and management
+- **[Building from Source](docs/windows/BUILD.md)** - Build Windows binaries and installer
+- **[Testing Guide](docs/windows/TESTING.md)** - Testing procedures for Windows
+
 ## Security Considerations
 
 The integration with VirusTotal currently relies on **web scraping** using `chromedp`. This approach is inherently fragile and may break if VirusTotal changes its website's HTML structure or selectors. This is a known risk and a more robust API-based integration is a future goal.

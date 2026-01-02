@@ -1,0 +1,207 @@
+# Makefile for building PinShare Windows distribution
+# This Makefile is cross-platform: it can be run from Linux/macOS (with cross-compilation)
+# or from Windows (using Git Bash or similar POSIX shell)
+
+.PHONY: all clean windows-backend windows-service windows-tray copy-resources download-ipfs windows-all installer help check-deps install-deps dev-service dev-tray test-windows check-platform
+
+# Platform detection
+UNAME_S := $(shell uname -s 2>/dev/null || echo Windows)
+
+# Platform check target - prints info about the current platform
+check-platform:
+ifeq ($(findstring MINGW,$(UNAME_S)),MINGW)
+	@echo "Platform: Windows (Git Bash/MinGW)"
+else ifeq ($(findstring MSYS,$(UNAME_S)),MSYS)
+	@echo "Platform: Windows (MSYS)"
+else ifeq ($(findstring CYGWIN,$(UNAME_S)),CYGWIN)
+	@echo "Platform: Windows (Cygwin)"
+else ifeq ($(UNAME_S),Linux)
+	@echo "Platform: Linux (cross-compiling for Windows)"
+else ifeq ($(UNAME_S),Darwin)
+	@echo "Platform: macOS (cross-compiling for Windows)"
+else
+	@echo "Platform: Unknown ($(UNAME_S))"
+endif
+
+# Configuration
+GOOS := windows
+GOARCH := amd64
+CGO_ENABLED := 0
+
+# Directories
+DIST_DIR := dist/windows
+INSTALLER_DIR := installer
+
+# IPFS version
+IPFS_VERSION := v0.31.0
+IPFS_ARCHIVE := kubo_$(IPFS_VERSION)_windows-amd64.zip
+IPFS_URL := https://dist.ipfs.tech/kubo/$(IPFS_VERSION)/$(IPFS_ARCHIVE)
+
+# Build flags
+LDFLAGS := -s -w
+BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+VERSION := 1.0.0
+
+# All targets
+all: help
+
+help:
+	@echo "PinShare Windows Build System"
+	@echo "============================="
+	@echo ""
+	@echo "Available targets:"
+	@echo "  windows-all        Build all Windows components"
+	@echo "  windows-backend    Build PinShare backend for Windows"
+	@echo "  windows-service    Build Windows service wrapper"
+	@echo "  windows-tray       Build Windows system tray application"
+	@echo "  download-ipfs      Download IPFS Kubo binary for Windows"
+	@echo "  installer          Build Windows MSI installer (requires WiX)"
+	@echo "  check-deps         Check build dependencies"
+	@echo "  clean              Clean build artifacts"
+	@echo ""
+	@echo "Example: make -f Makefile.windows windows-all"
+	@echo ""
+
+# Create distribution directory
+$(DIST_DIR):
+	@echo "Creating distribution directory..."
+	@mkdir -p $(DIST_DIR)
+
+# Build PinShare backend for Windows
+windows-backend: $(DIST_DIR)
+	@echo "Building PinShare backend for Windows..."
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH) \
+		go build -ldflags "$(LDFLAGS) -X main.Version=$(VERSION) -X main.GitCommit=$(GIT_COMMIT) -X main.BuildDate=$(BUILD_DATE)" \
+		-o $(DIST_DIR)/pinshare.exe .
+	@echo "✓ Built: $(DIST_DIR)/pinshare.exe"
+
+# Build Windows service wrapper
+windows-service: $(DIST_DIR)
+	@echo "Building Windows service wrapper..."
+	GOOS=$(GOOS) GOARCH=$(GOARCH) \
+		go build -ldflags "$(LDFLAGS)" \
+		-o $(DIST_DIR)/pinsharesvc.exe ./cmd/pinsharesvc
+	@echo "✓ Built: $(DIST_DIR)/pinsharesvc.exe"
+
+# Build Windows system tray application
+windows-tray: $(DIST_DIR)
+	@echo "Building Windows system tray application..."
+	@echo "Generating resource file from manifest..."
+	@cd cmd/pinshare-tray && go run github.com/akavel/rsrc@latest -manifest pinshare-tray.manifest -o rsrc.syso 2>/dev/null || true
+	GOOS=$(GOOS) GOARCH=$(GOARCH) \
+		go build -ldflags "$(LDFLAGS) -H windowsgui" \
+		-o $(DIST_DIR)/pinshare-tray.exe ./cmd/pinshare-tray
+	@echo "✓ Built: $(DIST_DIR)/pinshare-tray.exe"
+
+# Download IPFS Kubo binary
+download-ipfs: $(DIST_DIR)
+	@echo "Downloading IPFS Kubo $(IPFS_VERSION) for Windows..."
+	@if [ ! -f "$(DIST_DIR)/ipfs.exe" ]; then \
+		echo "Fetching from $(IPFS_URL)..."; \
+		curl -L -o /tmp/$(IPFS_ARCHIVE) $(IPFS_URL); \
+		unzip -j /tmp/$(IPFS_ARCHIVE) "kubo/ipfs.exe" -d $(DIST_DIR)/; \
+		rm /tmp/$(IPFS_ARCHIVE); \
+		echo "✓ Downloaded: $(DIST_DIR)/ipfs.exe"; \
+	else \
+		echo "✓ IPFS already downloaded: $(DIST_DIR)/ipfs.exe"; \
+	fi
+
+# Copy tray resources
+copy-resources: $(DIST_DIR)
+	@echo "Copying tray application resources..."
+	@mkdir -p $(DIST_DIR)/resources
+	@cp -r cmd/pinshare-tray/resources/* $(DIST_DIR)/resources/ 2>/dev/null || true
+	@echo "✓ Copied: $(DIST_DIR)/resources/"
+
+# Build all Windows components
+windows-all: windows-backend windows-service windows-tray copy-resources download-ipfs
+	@echo ""
+	@echo "=========================================="
+	@echo "All Windows components built successfully!"
+	@echo "=========================================="
+	@echo ""
+	@echo "Distribution files:"
+	@ls -lh $(DIST_DIR)/*.exe
+	@echo ""
+	@echo "Next step: Build installer with 'make -f Makefile.windows installer'"
+	@echo ""
+
+# Build Windows MSI installer (requires WiX 6 via .NET tool)
+installer: windows-all
+	@echo "Building Windows installer..."
+	@if command -v wix >/dev/null 2>&1 || command -v wix.exe >/dev/null 2>&1; then \
+		echo "WiX 6 detected, building MSI..."; \
+		cd $(INSTALLER_DIR) && cmd.exe //c build-wix6.bat; \
+	elif command -v dotnet >/dev/null 2>&1 || command -v dotnet.exe >/dev/null 2>&1; then \
+		echo ".NET detected, WiX will be installed if needed..."; \
+		cd $(INSTALLER_DIR) && cmd.exe //c build-wix6.bat; \
+	else \
+		echo ""; \
+		echo "ERROR: .NET SDK not found!"; \
+		echo ""; \
+		echo "To build the installer:"; \
+		echo "1. Install .NET SDK 6+ from https://dotnet.microsoft.com/download"; \
+		echo "2. WiX 6 will be installed automatically via: dotnet tool install --global wix"; \
+		echo "3. On Windows, run: cd installer && build-wix6.bat"; \
+		echo ""; \
+		exit 1; \
+	fi
+
+# Clean build artifacts
+clean:
+	@echo "Cleaning build artifacts..."
+	@rm -rf $(DIST_DIR)
+	@rm -rf $(INSTALLER_DIR)/bin
+	@rm -rf $(INSTALLER_DIR)/obj
+	@rm -f $(INSTALLER_DIR)/*.wixobj
+	@rm -f $(INSTALLER_DIR)/*.wixpdb
+	@rm -f dist/PinShare-Setup.msi
+	@echo "✓ Cleaned"
+
+# Test Windows binaries (requires Wine on Linux)
+test-windows: windows-all
+	@echo "Testing Windows binaries..."
+	@if command -v wine64 >/dev/null 2>&1; then \
+		echo "Testing with Wine..."; \
+		wine64 $(DIST_DIR)/pinsharesvc.exe 2>&1 | head -5; \
+	else \
+		echo "Wine not found, skipping tests"; \
+		echo "To test on Linux, install Wine: sudo apt-get install wine64"; \
+	fi
+
+# Development: Build service only (faster iteration)
+dev-service: windows-service
+	@echo "Development build complete: $(DIST_DIR)/pinsharesvc.exe"
+
+# Development: Build tray only (faster iteration)
+dev-tray: windows-tray
+	@echo "Development build complete: $(DIST_DIR)/pinshare-tray.exe"
+
+# Check dependencies
+check-deps:
+	@echo "Checking build dependencies..."
+	@echo ""
+	@echo "Go version:"
+	@go version || echo "ERROR: Go not found"
+	@echo ""
+	@echo "Build tools:"
+	@which unzip >/dev/null 2>&1 && echo "✓ unzip found" || echo "⚠ unzip not found"
+	@which curl >/dev/null 2>&1 && echo "✓ curl found" || echo "⚠ curl not found"
+	@echo ""
+
+# Install build dependencies (Linux only)
+install-deps:
+	@echo "Installing build dependencies for Windows cross-compilation..."
+	@if [ "$(shell uname -s)" = "Linux" ]; then \
+		echo "Detected Linux, installing packages..."; \
+		sudo apt-get update; \
+		sudo apt-get install -y gcc-mingw-w64-x86-64 wine64 unzip curl; \
+		echo "✓ Dependencies installed"; \
+	else \
+		echo "This target is for Linux only"; \
+		echo "On Windows, install:"; \
+		echo "  - Go: https://golang.org/dl/"; \
+		echo "  - Git (includes Git Bash): https://git-scm.com/"; \
+		echo "  - WiX Toolset (for installer): https://wixtoolset.org/"; \
+	fi

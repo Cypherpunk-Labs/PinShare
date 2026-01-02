@@ -1,0 +1,43 @@
+<Project Sdk="WixToolset.Sdk/6.0.2">
+  <PropertyGroup>
+    <OutputName>PinShare-Setup</OutputName>
+    <OutputType>Package</OutputType>
+    <Platform>x64</Platform>
+    <!-- ProductVersion can be overridden via command line: -p:ProductVersion=1.2.3 -->
+    <ProductVersion Condition="'$(ProductVersion)' == ''">1.0.0</ProductVersion>
+  </PropertyGroup>
+
+  <!-- Pass version to WiX preprocessor -->
+  <PropertyGroup>
+    <DefineConstants>ProductVersion=$(ProductVersion)</DefineConstants>
+  </PropertyGroup>
+
+  <!-- WiX Extensions -->
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="6.*" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="6.*" />
+  </ItemGroup>
+
+  <!-- SDK automatically globs *.wxs files - no explicit Compile needed -->
+
+  <!-- TEMPORARILY DISABLED: UI will be added from infra/refactor branch later -->
+  <!--
+  <ItemGroup>
+    <HarvestDirectory Include="$(SolutionDir)..\dist\windows\ui">
+      <ComponentGroupName>UIComponents</ComponentGroupName>
+      <DirectoryRefId>UIFolder</DirectoryRefId>
+      <PreprocessorVariable>var.UISourceDir</PreprocessorVariable>
+      <SuppressFragments>true</SuppressFragments>
+      <SuppressRegistry>true</SuppressRegistry>
+      <SuppressRootDirectory>true</SuppressRootDirectory>
+    </HarvestDirectory>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <DefineConstants>
+      UISourceDir=$(SolutionDir)..\dist\windows\ui
+    </DefineConstants>
+  </PropertyGroup>
+  -->
+
+</Project>

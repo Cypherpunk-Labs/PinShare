@@ -25,6 +25,27 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
+// Application constants
+const (
+	// Timeouts and intervals
+	shutdownGracePeriod     = 1 * time.Second
+	statusUpdateInterval    = 30 * time.Second
+	bootstrapInitialDelay   = 1 * time.Second
+	healthCheckDialTimeout  = 5 * time.Second
+
+	// Default IPFS API port for health checks
+	// TODO: Add support for configuring which interface/IP to use for health checks.
+	// Currently uses localhost which works for local connections only.
+	// See: https://github.com/Episk-pos/PinShare/issues/10
+	defaultIPFSAPIPort = 5001
+
+	// Environment variables
+	envIPFSAPI = "IPFS_API"
+
+	// P2P security scanner port
+	p2pSecPort = 36939
+)
+
 var (
 	Node       host.Host
 	P2PManager *p2p.PubSubManager
@@ -90,7 +111,7 @@ func Start() {
 			}
 		}
 		cancel()
-		time.Sleep(1 * time.Second)
+		time.Sleep(shutdownGracePeriod)
 		os.Exit(0)
 	}()
 
@@ -170,10 +191,10 @@ func Start() {
 		fmt.Println("[INFO] PubSub Manager initialized.")
 
 		go func() {
-			time.Sleep(1 * time.Second)
+			time.Sleep(bootstrapInitialDelay)
 			fmt.Println("[INFO] Bootstrapping libp2p host against known peers (if any)...")
 			p2p.Bootstrap(ctx, Node)
-			ticker := time.NewTicker(30 * time.Second)
+			ticker := time.NewTicker(statusUpdateInterval)
 			defer ticker.Stop()
 			for {
 				select {
@@ -304,7 +325,7 @@ func checkDependanciesAndEnableSecurityPath(appconf *config.AppConfig) bool {
 
 	//>> IPFS + CMD Line
 	// whereis ipfs
-	// ping localhost:5001
+	// ping localhost:IPFS_API port (default 5001)
 	var requirementsMet bool = true
 	if commandExists("ipfs") {
 		fmt.Println("[CHECK] ipfs cmd found")
@@ -312,14 +333,23 @@ func checkDependanciesAndEnableSecurityPath(appconf *config.AppConfig) bool {
 		fmt.Println("[ERROR] ipfs cmd Missing")
 		requirementsMet = false
 	}
-	if checkPort("localhost", 5001) {
+	ipfsPort := getIPFSAPIPort()
+	if checkPort("localhost", ipfsPort) {
 		fmt.Println("[CHECK] ipfs daemon running")
 	} else {
 		fmt.Println("[ERROR] ipfs daemon not running")
 		requirementsMet = false
 	}
 
-	if checkPort("localhost", 36939) {
+	// If virus scanning is disabled via feature flag, skip security capability checks
+	if appconf.FFSkipVT {
+		fmt.Println("[INFO] Virus scanning disabled (PS_FF_SKIP_VT=true)")
+		appconf.SecurityCapability = 2 // Set to valid capability so scanning code paths work
+		fmt.Println("[INFO] Security Capability set to 2 (scanning bypassed)")
+		return requirementsMet
+	}
+
+	if checkPort("localhost", p2pSecPort) {
 		fmt.Println("[CHECK] P2P-Sec running")
 		appconf.SecurityCapability = 1
 		fmt.Println("[INFO] Security Capability set to 1")
@@ -375,14 +405,36 @@ func commandExists(cmd string) bool {
 	return err == nil
 }
 
+// checkPort tests if a TCP port is open on the given host.
+// Uses localhost for health checks - see TODO in constants for interface support.
 func checkPort(host string, port int) bool {
 	address := fmt.Sprintf("%s:%d", host, port)
-	conn, err := net.DialTimeout("tcp", address, 5*time.Second)
+	conn, err := net.DialTimeout("tcp", address, healthCheckDialTimeout)
 	if err != nil {
 		return false
 	}
 	conn.Close()
 	return true
+}
+
+// getIPFSAPIPort returns the IPFS API port from IPFS_API env var or default.
+// Parses URLs like "http://localhost:5002" or "localhost:5002".
+func getIPFSAPIPort() int {
+	ipfsAPI := os.Getenv(envIPFSAPI)
+	if ipfsAPI == "" {
+		return defaultIPFSAPIPort
+	}
+	// Parse port from URL like "http://localhost:5002"
+	var port int
+	_, err := fmt.Sscanf(ipfsAPI, "http://localhost:%d", &port)
+	if err != nil || port == 0 {
+		// Try without http://
+		_, err = fmt.Sscanf(ipfsAPI, "localhost:%d", &port)
+		if err != nil || port == 0 {
+			return defaultIPFSAPIPort
+		}
+	}
+	return port
 }
 
 func checkWebsite(url string) bool {

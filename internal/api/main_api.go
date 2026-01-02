@@ -7,6 +7,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"strconv"
 
 	"pinshare/internal/p2p"
 	"pinshare/internal/store"
@@ -15,6 +17,19 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+// API server constants
+const (
+	// defaultAPIPort is the default port for the API server
+	defaultAPIPort = 9090
+
+	// envPort is the environment variable name for the API port
+	envPort = "PORT"
+
+	// API endpoints
+	healthEndpoint  = "/api/health"
+	metricsEndpoint = "/metrics"
 )
 
 // Server implements the ServerInterface.
@@ -255,6 +270,11 @@ func GetNode() *host.Host {
 	return p2pNodeInstance
 }
 
+// Start initializes and starts the API server.
+//
+// TODO: Add support for configuring which network interface/IP to bind to.
+// Currently binds to 0.0.0.0 (all interfaces).
+// See: https://github.com/Episk-pos/PinShare/issues/10
 func Start(ctx context.Context, node host.Host) {
 	SetNode(&node)
 	server := NewServer()
@@ -264,11 +284,21 @@ func Start(ctx context.Context, node host.Host) {
 
 	// Create a new ServeMux to combine the API handler and metrics handler
 	mux := http.NewServeMux()
-	mux.Handle("/", apiHandler)
-	mux.Handle("/metrics", promhttp.Handler())
 
-	// Check if port 8080 is in use. If so, increment until an open port is found.
-	var port int = 9090
+	// Health check endpoint for service monitoring
+	mux.HandleFunc(healthEndpoint, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok"}`))
+	})
+
+	mux.Handle("/", apiHandler)
+	mux.Handle(metricsEndpoint, promhttp.Handler())
+
+	// Get port from environment variable
+	port := getAPIPort()
+
+	// Check if port is in use. If so, increment until an open port is found.
 	for {
 		addr := fmt.Sprintf("0.0.0.0:%d", port)
 		conn, err := net.Listen("tcp", addr)
@@ -290,4 +320,17 @@ func Start(ctx context.Context, node host.Host) {
 	log.Printf("[INFO] Starting API server on %s", addr)
 	// And we serve HTTP until the world ends.
 	log.Fatal(s.ListenAndServe())
+}
+
+// getAPIPort returns the API port from PORT env var or default
+func getAPIPort() int {
+	portStr := os.Getenv(envPort)
+	if portStr == "" {
+		return defaultAPIPort
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil || port <= 0 {
+		return defaultAPIPort
+	}
+	return port
 }

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+
+  <!-- Custom PinShare Configuration Dialog -->
+  <Fragment>
+    <UI Id="PinShareConfigUI">
+
+      <!-- Define custom text styles with unique IDs to avoid conflicts with WixUI -->
+      <TextStyle Id="PinShare_Font_Normal" FaceName="Tahoma" Size="8" />
+      <TextStyle Id="PinShare_Font_Bold" FaceName="Tahoma" Size="8" Bold="yes" />
+      <TextStyle Id="PinShare_Font_Title" FaceName="Tahoma" Size="9" Bold="yes" />
+
+      <!-- PinShare Configuration Dialog - Expanded for better UX -->
+      <Dialog Id="PinShareConfigDlg" Width="400" Height="380" Title="[ProductName] Configuration">
+        <!-- Banner -->
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="400" Height="44" TabSkip="no" Text="!(loc.InstallDirDlgBannerBitmap)" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="400" Height="0" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="344" Width="400" Height="0" />
+
+        <!-- Title -->
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes" NoPrefix="yes" Text="{\PinShare_Font_Title}Configuration" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="340" Height="15" Transparent="yes" NoPrefix="yes" Text="Configure PinShare for your organization." />
+
+        <!-- Network Identity Section -->
+        <Control Id="NetworkHeader" Type="Text" X="15" Y="52" Width="370" Height="12" Text="{\PinShare_Font_Bold}Network Identity" />
+        <Control Id="NetworkDesc" Type="Text" X="15" Y="65" Width="370" Height="16" Text="Organization and Group form the gossip topic for peer discovery." />
+
+        <!-- Organization Name -->
+        <Control Id="OrgNameLabel" Type="Text" X="15" Y="84" Width="80" Height="15" Text="Organization:" />
+        <Control Id="OrgNameEdit" Type="Edit" X="100" Y="82" Width="130" Height="18" Property="ORG_NAME" />
+
+        <!-- Group Name -->
+        <Control Id="GroupNameLabel" Type="Text" X="240" Y="84" Width="50" Height="15" Text="Group:" />
+        <Control Id="GroupNameEdit" Type="Edit" X="295" Y="82" Width="90" Height="18" Property="GROUP_NAME" />
+
+        <!-- Directories Section -->
+        <Control Id="DirsHeader" Type="Text" X="15" Y="106" Width="370" Height="12" Text="{\PinShare_Font_Bold}Directories" />
+
+        <!-- Upload Directory -->
+        <Control Id="UploadDirLabel" Type="Text" X="15" Y="122" Width="80" Height="15" Text="Upload folder:" />
+        <Control Id="UploadDirEdit" Type="Edit" X="100" Y="120" Width="285" Height="18" Property="UPLOAD_DIR" />
+
+        <!-- Ports Section -->
+        <Control Id="PortsHeader" Type="Text" X="15" Y="145" Width="370" Height="12" Text="{\PinShare_Font_Bold}Network Ports" />
+        <Control Id="PortsDesc" Type="Text" X="15" Y="158" Width="370" Height="16" Text="UI: Web interface | API: Backend REST API | P2P: Peer-to-peer sync" />
+
+        <!-- Ports Row -->
+        <Control Id="UIPortLabel" Type="Text" X="15" Y="177" Width="55" Height="15" Text="UI Port:" />
+        <Control Id="UIPortEdit" Type="Edit" X="75" Y="175" Width="50" Height="18" Property="UI_PORT" />
+
+        <Control Id="APIPortLabel" Type="Text" X="140" Y="177" Width="55" Height="15" Text="API Port:" />
+        <Control Id="APIPortEdit" Type="Edit" X="200" Y="175" Width="50" Height="18" Property="PINSHARE_API_PORT" />
+
+        <Control Id="P2PPortLabel" Type="Text" X="265" Y="177" Width="55" Height="15" Text="P2P Port:" />
+        <Control Id="P2PPortEdit" Type="Edit" X="325" Y="175" Width="55" Height="18" Property="PINSHARE_P2P_PORT" />
+
+        <!-- Features Section -->
+        <Control Id="FeaturesHeader" Type="Text" X="15" Y="200" Width="370" Height="12" Text="{\PinShare_Font_Bold}Features" />
+
+        <!-- Enable Cache checkbox -->
+        <Control Id="CacheCheck" Type="CheckBox" X="15" Y="234" Width="370" Height="17" Property="ENABLE_CACHE" CheckBoxValue="1" Text="Enable file caching (improves performance for frequently accessed files)" />
+
+        <!-- Archive Node checkbox with description -->
+        <Control Id="ArchiveCheck" Type="CheckBox" X="15" Y="252" Width="370" Height="17" Property="ARCHIVE_NODE" CheckBoxValue="1" Text="Archive node (pin and retain all content from network peers)" />
+
+        <!-- Startup Section -->
+        <Control Id="StartupHeader" Type="Text" X="15" Y="275" Width="370" Height="12" Text="{\PinShare_Font_Bold}Startup Options" />
+
+        <!-- Start tray after install -->
+        <Control Id="StartTrayCheck" Type="CheckBox" X="15" Y="291" Width="185" Height="17" Property="START_TRAY_NOW" CheckBoxValue="1" Text="Start system tray app" />
+
+        <!-- Auto-start service on boot -->
+        <Control Id="ServiceAutoStartCheck" Type="CheckBox" X="200" Y="291" Width="185" Height="17" Property="SERVICE_AUTO_START" CheckBoxValue="1" Text="Auto-start service on boot" />
+
+        <!-- Tray auto-start on login -->
+        <Control Id="TrayAutoStartCheck" Type="CheckBox" X="15" Y="309" Width="370" Height="17" Property="TRAY_AUTO_START" CheckBoxValue="1" Text="Start tray app automatically when you log in" />
+
+        <!-- Navigation buttons -->
+        <Control Id="Back" Type="PushButton" X="210" Y="353" Width="56" Height="17" Text="!(loc.WixUIBack)">
+          <Publish Event="NewDialog" Value="InstallDirDlg" />
+        </Control>
+        <Control Id="Next" Type="PushButton" X="266" Y="353" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
+          <Publish Event="NewDialog" Value="VerifyReadyDlg" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="334" Y="353" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <!-- Insert our dialog after InstallDirDlg in the sequence -->
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="PinShareConfigDlg" Order="5" Condition="1" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="PinShareConfigDlg" Order="5" Condition="NOT Installed" />
+
+    </UI>
+  </Fragment>
+
+</Wix>

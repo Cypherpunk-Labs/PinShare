@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <?define ProductName = "PinShare" ?>
+  <!-- ProductVersion is passed from wixproj via DefineConstants, with fallback -->
+  <?ifndef ProductVersion ?>
+    <?define ProductVersion = "1.0.0" ?>
+  <?endif ?>
+  <?define Manufacturer = "PinShare Contributors" ?>
+  <?define UpgradeCode = "12345678-1234-1234-1234-123456789012" ?>
+
+  <Package Name="$(var.ProductName)"
+           Version="$(var.ProductVersion)"
+           Manufacturer="$(var.Manufacturer)"
+           UpgradeCode="$(var.UpgradeCode)"
+           Language="1033"
+           Compressed="yes"
+           InstallerVersion="500"
+           Scope="perMachine">
+
+    <SummaryInformation Description="PinShare - Decentralized IPFS Pinning Service"
+                        Comments="$(var.ProductVersion)" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+
+    <Media Id="1" Cabinet="PinShare.cab" EmbedCab="yes" />
+
+    <!-- Configurable properties - can be set via command line -->
+    <!-- Example: msiexec /i PinShare-Setup.msi ORG_NAME="MyCompany" UI_PORT="9000" -->
+    <Property Id="ORG_NAME" Value="MyOrganization" Secure="yes" />
+    <Property Id="GROUP_NAME" Value="MyGroup" Secure="yes" />
+    <Property Id="UI_PORT" Value="8888" Secure="yes" />
+    <Property Id="PINSHARE_API_PORT" Value="9090" Secure="yes" />
+    <Property Id="PINSHARE_P2P_PORT" Value="50001" Secure="yes" />
+    <Property Id="IPFS_API_PORT" Value="5001" Secure="yes" />
+    <Property Id="IPFS_GATEWAY_PORT" Value="8080" Secure="yes" />
+    <Property Id="IPFS_SWARM_PORT" Value="4001" Secure="yes" />
+    <Property Id="ENABLE_CACHE" Value="1" Secure="yes" />
+    <Property Id="ARCHIVE_NODE" Value="0" Secure="yes" />
+    <Property Id="LOG_LEVEL" Value="info" Secure="yes" />
+    <!-- Upload directory - default to user's LOCALAPPDATA\PinShare\upload -->
+    <SetProperty Id="UPLOAD_DIR" Value="[LocalAppDataFolder]PinShare\upload" Before="CostFinalize" Sequence="ui" Condition="NOT UPLOAD_DIR" />
+    <!-- Startup options: 1 = yes, 0 = no -->
+    <!-- Note: Service is Manual start - tray app controls when it runs -->
+    <Property Id="START_SERVICE_NOW" Value="0" Secure="yes" />
+    <Property Id="START_TRAY_NOW" Value="1" Secure="yes" />
+    <Property Id="SERVICE_AUTO_START" Value="1" Secure="yes" />
+    <Property Id="TRAY_AUTO_START" Value="1" Secure="yes" />
+
+    <!-- Icons -->
+    <!-- TEMPORARILY DISABLED: icon.ico file not yet created -->
+    <!-- <Icon Id="PinShareIcon" SourceFile="icon.ico" /> -->
+    <!-- <Property Id="ARPPRODUCTICON" Value="PinShareIcon" /> -->
+
+    <!-- UI - Use WixUI_InstallDir with custom configuration dialog -->
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <UIRef Id="PinShareConfigUI" />
+
+    <!-- License agreement - GPLv3 with PinShare disclaimer -->
+    <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
+
+    <!-- Custom actions -->
+    <!-- Use PowerShell script for reliable service start with retry logic -->
+    <!-- This handles Windows 11's stricter service startup requirements -->
+    <SetProperty Id="StartServicePS"
+                 Value="&quot;[SystemFolder]WindowsPowerShell\v1.0\powershell.exe&quot; -ExecutionPolicy Bypass -NoProfile -File &quot;[INSTALLFOLDER]start-service.ps1&quot;"
+                 Before="StartServicePS"
+                 Sequence="execute" />
+    <CustomAction Id="StartServicePS"
+                  DllEntry="WixQuietExec64"
+                  Impersonate="no"
+                  BinaryRef="Wix4UtilCA_X64"
+                  Execute="deferred"
+                  Return="ignore" />
+
+    <SetProperty Id="StopService" Value="&quot;[SystemFolder]net.exe&quot; stop PinShareService" Before="StopService" Sequence="execute" />
+    <CustomAction Id="StopService"
+                  DllEntry="WixQuietExec64"
+                  Impersonate="no"
+                  BinaryRef="Wix4UtilCA_X64"
+                  Execute="deferred"
+                  Return="ignore" />
+
+    <!-- Install/Uninstall use our exe - brief console flash is acceptable -->
+    <!-- InstallService: manual start (tray controls service lifecycle) -->
+    <CustomAction Id="InstallService"
+                  FileRef="PinShareSvcExe"
+                  ExeCommand="install"
+                  Execute="deferred"
+                  Return="check"
+                  Impersonate="no" />
+
+    <!-- InstallServiceAutoStart: automatic start on boot -->
+    <CustomAction Id="InstallServiceAutoStart"
+                  FileRef="PinShareSvcExe"
+                  ExeCommand="install --auto-start"
+                  Execute="deferred"
+                  Return="check"
+                  Impersonate="no" />
+
+    <CustomAction Id="UninstallService"
+                  FileRef="PinShareSvcExe"
+                  ExeCommand="uninstall"
+                  Execute="deferred"
+                  Return="ignore"
+                  Impersonate="no" />
+
+    <!-- Start tray application after install -->
+    <CustomAction Id="StartTray"
+                  FileRef="PinShareTrayExe"
+                  ExeCommand=""
+                  Execute="deferred"
+                  Return="asyncNoWait"
+                  Impersonate="yes" />
+
+    <InstallExecuteSequence>
+      <!-- Stop service before uninstall -->
+      <Custom Action="StopService" Before="RemoveFiles" Condition="Installed AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="UninstallService" Before="RemoveFiles" Condition="Installed AND NOT UPGRADINGPRODUCTCODE" />
+
+      <!-- Install service on fresh install - choose manual or auto-start based on checkbox -->
+      <Custom Action="InstallService" After="InstallFiles" Condition="NOT Installed AND SERVICE_AUTO_START&lt;&gt;1" />
+      <Custom Action="InstallServiceAutoStart" After="InstallFiles" Condition="NOT Installed AND SERVICE_AUTO_START=1" />
+
+      <!-- Start service using PowerShell script with retry logic -->
+      <!-- This works reliably on both Windows 10 and Windows 11 -->
+      <!-- Start immediately if auto-start is enabled, or if user checked START_SERVICE_NOW -->
+      <Custom Action="StartServicePS" After="InstallServiceAutoStart" Condition="NOT Installed AND (SERVICE_AUTO_START=1 OR START_SERVICE_NOW=1)" />
+
+      <!-- Start tray application if START_TRAY_NOW=1 -->
+      <Custom Action="StartTray" After="StartServicePS" Condition="NOT Installed AND START_TRAY_NOW=1" />
+    </InstallExecuteSequence>
+
+    <!-- Features -->
+    <Feature Id="ProductFeature"
+             Title="PinShare"
+             Level="1"
+             Description="Core PinShare application">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentGroupRef Id="TrayResources" />
+      <!-- TEMPORARILY DISABLED: UI will be added from infra/refactor branch later -->
+      <!-- <ComponentGroupRef Id="UIComponents" /> -->
+      <!-- Registry entries removed - configuration is now handled via config.json only -->
+      <!-- <ComponentRef Id="RegistryEntries" /> -->
+      <ComponentRef Id="DataDirectories" />
+      <ComponentRef Id="StartupEntry" />
+      <ComponentRef Id="Shortcuts" />
+    </Feature>
+
+    <!-- Directory structure -->
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="PinShare">
+        <!-- TEMPORARILY DISABLED: UI will be added from infra/refactor branch later -->
+        <!-- <Directory Id="UIFolder" Name="ui" /> -->
+        <Directory Id="ResourcesFolder" Name="resources" />
+      </Directory>
+    </StandardDirectory>
+
+    <!-- Minimal ProgramData folder for session marker file only -->
+    <!-- User data directories are now created in %LOCALAPPDATA%\PinShare by the tray app -->
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="DataFolder" Name="PinShare" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="PinShare" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="StartupFolder" />
+
+  </Package>
+
+  <!-- Components -->
+  <Fragment>
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+
+      <!-- Main executables -->
+      <Component Id="PinShareSvc" Bitness="always64">
+        <File Id="PinShareSvcExe"
+              Name="pinsharesvc.exe"
+              Source="..\dist\windows\pinsharesvc.exe" />
+      </Component>
+
+      <Component Id="PinShareBackend" Bitness="always64">
+        <File Id="PinShareExe"
+              Name="pinshare.exe"
+              Source="..\dist\windows\pinshare.exe" />
+      </Component>
+
+      <Component Id="PinShareTray" Bitness="always64">
+        <File Id="PinShareTrayExe"
+              Name="pinshare-tray.exe"
+              Source="..\dist\windows\pinshare-tray.exe" />
+      </Component>
+
+      <Component Id="IPFS" Bitness="always64">
+        <File Id="IPFSExe"
+              Name="ipfs.exe"
+              Source="..\dist\windows\ipfs.exe" />
+      </Component>
+
+      <!-- PowerShell script for service start -->
+      <Component Id="StartServiceScript" Bitness="always64">
+        <File Id="StartServicePS1"
+              Name="start-service.ps1"
+              Source="start-service.ps1" />
+      </Component>
+
+      <!-- TEMPORARILY DISABLED: icon.ico file not yet created -->
+      <!--
+      <Component Id="Icon" Bitness="always64">
+        <File Id="IconFile"
+              Name="icon.ico"
+              Source="icon.ico" />
+      </Component>
+      -->
+
+    </ComponentGroup>
+  </Fragment>
+
+  <!-- Tray application resources -->
+  <Fragment>
+    <ComponentGroup Id="TrayResources" Directory="ResourcesFolder">
+      <Component Id="SettingsScript" Bitness="always64">
+        <File Id="SettingsPS1"
+              Name="settings.ps1"
+              Source="..\dist\windows\resources\settings.ps1" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+
+  <!-- Shortcuts -->
+  <Fragment>
+    <Component Id="Shortcuts" Directory="ApplicationProgramsFolder" Bitness="always64">
+      <!-- TEMPORARILY DISABLED: URL shortcuts require different approach -->
+      <!-- Users can access UI via system tray application -->
+      <!--
+      <Shortcut Id="PinShareUIShortcut"
+                Name="Open PinShare UI"
+                Target="http://localhost:8888/" />
+      -->
+
+      <Shortcut Id="UninstallShortcut"
+                Name="Uninstall PinShare"
+                Target="[System64Folder]msiexec.exe"
+                Arguments="/x [ProductCode]" />
+
+      <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+
+      <RegistryValue Root="HKCU"
+                     Key="Software\PinShare"
+                     Name="installed"
+                     Type="integer"
+                     Value="1" />
+    </Component>
+  </Fragment>
+
+  <!-- TEMPORARILY DISABLED: UI will be added from infra/refactor branch later -->
+  <!--
+  <Fragment>
+    <ComponentGroup Id="UIComponents" Directory="UIFolder">
+      This will be auto-generated by heat/HarvestDirectory in .wixproj
+    </ComponentGroup>
+  </Fragment>
+  -->
+
+  <!-- Registry entries removed - configuration is now handled via config.json only
+       The service creates config.json on first install via pinsharesvc.exe install
+  <Fragment>
+    <Component Id="RegistryEntries" Directory="INSTALLFOLDER" Bitness="always64">
+      <RegistryKey Root="HKLM" Key="SOFTWARE\PinShare">
+        ...
+      </RegistryKey>
+    </Component>
+  </Fragment>
+  -->
+
+  <!-- Minimal ProgramData directory for session marker -->
+  <!-- User data directories (ipfs, logs, upload, cache, rejected, pinshare) are -->
+  <!-- now created in %LOCALAPPDATA%\PinShare by the tray application on startup -->
+  <Fragment>
+    <Component Id="DataDirectories" Directory="DataFolder" Bitness="always64">
+      <CreateFolder />
+
+      <!-- Registry key used as KeyPath for WiX component tracking (required for proper uninstall) -->
+      <RegistryValue Root="HKCU"
+                     Key="Software\PinShare"
+                     Name="DataDirectoriesCreated"
+                     Type="integer"
+                     Value="1"
+                     KeyPath="yes" />
+    </Component>
+  </Fragment>
+
+  <!-- Startup entry for tray app -->
+  <Fragment>
+    <Component Id="StartupEntry" Directory="StartupFolder" Bitness="always64">
+      <Shortcut Id="StartupShortcut"
+                Name="PinShare Tray"
+                Description="PinShare System Tray"
+                Target="[INSTALLFOLDER]pinshare-tray.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+
+      <RegistryValue Root="HKCU"
+                     Key="Software\PinShare"
+                     Name="startupentry"
+                     Type="integer"
+                     Value="1" />
+    </Component>
+  </Fragment>
+
+</Wix>
