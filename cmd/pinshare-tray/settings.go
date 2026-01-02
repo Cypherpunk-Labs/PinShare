@@ -8,9 +8,11 @@ import (
 
 const (
 	MB_YESNO        = 0x00000004
+	MB_YESNOCANCEL  = 0x00000003
 	MB_ICONQUESTION = 0x00000020
 	IDYES           = 6
 	IDNO            = 7
+	IDCANCEL        = 2
 )
 
 // showSettingsDialog launches the walk-based settings dialog.
@@ -46,4 +48,20 @@ func showConfirmDialog(title, message string) bool {
 	)
 
 	return int(ret) == IDYES
+}
+
+// showYesNoCancelDialog shows a Yes/No/Cancel dialog and returns the button ID clicked.
+// Returns IDYES, IDNO, or IDCANCEL.
+func showYesNoCancelDialog(title, message string) int {
+	titlePtr, _ := syscall.UTF16PtrFromString(title)
+	messagePtr, _ := syscall.UTF16PtrFromString(message)
+
+	ret, _, _ := procMessageBoxW.Call(
+		0,
+		uintptr(unsafe.Pointer(messagePtr)),
+		uintptr(unsafe.Pointer(titlePtr)),
+		uintptr(MB_YESNOCANCEL|MB_ICONQUESTION),
+	)
+
+	return int(ret)
 }

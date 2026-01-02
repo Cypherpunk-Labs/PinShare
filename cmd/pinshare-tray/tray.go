@@ -136,8 +136,9 @@ func (t *Tray) handleMenuClicks(ctx context.Context) {
 			t.handleAbout()
 
 		case <-t.menuExit.ClickedCh:
-			systray.Quit()
-			return
+			if t.handleExit() {
+				return
+			}
 		}
 	}
 }
@@ -227,6 +228,35 @@ func (t *Tray) handleAbout() {
 		"PinShare - Decentralized IPFS Pinning Service\n"+
 			"Version "+winservice.Version+"\n\n"+
 			"https://github.com/Cypherpunk-Labs/PinShare")
+}
+
+// handleExit handles the Exit menu item with a confirmation dialog.
+// Returns true if the application should exit, false to stay in tray.
+func (t *Tray) handleExit() bool {
+	result := showYesNoCancelDialog(
+		"Exit PinShare",
+		"Do you want to stop the PinShare service before exiting?\n\n"+
+			"Yes - Stop service and exit\n"+
+			"No - Exit (service continues running)\n"+
+			"Cancel - Stay in tray")
+
+	switch result {
+	case IDYES:
+		log.Println("User chose to stop service and exit")
+		if err := stopService(); err != nil {
+			log.Printf("Failed to stop service: %v", err)
+			showError("PinShare", fmt.Sprintf("Failed to stop service:\n\n%v", err))
+		}
+		systray.Quit()
+		return true
+	case IDNO:
+		log.Println("User chose to exit without stopping service")
+		systray.Quit()
+		return true
+	default:
+		log.Println("User cancelled exit")
+		return false
+	}
 }
 
 // UpdateStatusLoop periodically updates the status
