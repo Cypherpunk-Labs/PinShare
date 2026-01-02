@@ -228,7 +228,7 @@ func (pm *ProcessManager) initializeIPFS() error {
 // This MAY ONLY be called when IPFS is NOT running (no repo.lock held).
 //
 // TODO: Add support for configuring which network interface/IP version to bind to.
-// See: https://github.com/Cypherpunk-Labs/PinShare/issues/10
+// See: https://github.com/Episk-pos/PinShare/issues/10
 func (pm *ProcessManager) configureIPFS() error {
 	ipfsDataPath := pm.config.GetIPFSDataPath()
 	env := append(os.Environ(), fmt.Sprintf("IPFS_PATH=%s", ipfsDataPath))
