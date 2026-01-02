@@ -157,7 +157,7 @@ func (t *Tray) handleMenuClicks(ctx context.Context) {
 func (t *Tray) handleStartService() {
 	if err := startService(); err != nil {
 		log.Printf("Failed to start service: %v", err)
-		showError("PinShare", fmt.Sprintf("Failed to start service:\n\n%v", err))
+		showError(appName, fmt.Sprintf("Failed to start service:\n\n%v", err))
 	} else {
 		time.Sleep(serviceActionDelay)
 		t.updateStatus()
@@ -168,7 +168,7 @@ func (t *Tray) handleStartService() {
 func (t *Tray) handleStopService() {
 	if err := stopService(); err != nil {
 		log.Printf("Failed to stop service: %v", err)
-		showError("PinShare", fmt.Sprintf("Failed to stop service:\n\n%v", err))
+		showError(appName, fmt.Sprintf("Failed to stop service:\n\n%v", err))
 	} else {
 		time.Sleep(serviceActionDelay)
 		t.updateStatus()
@@ -245,7 +245,7 @@ func (t *Tray) handleExit() bool {
 		log.Println("User chose to stop service and exit")
 		if err := stopService(); err != nil {
 			log.Printf("Failed to stop service: %v", err)
-			showError("PinShare", fmt.Sprintf("Failed to stop service:\n\n%v", err))
+			showError(appName, fmt.Sprintf("Failed to stop service:\n\n%v", err))
 		}
 		systray.Quit()
 		return true
@@ -690,7 +690,7 @@ func (t *Tray) ensureServiceRunning() {
 		log.Printf("Service stopped, starting it...")
 		if err := startService(); err != nil {
 			log.Printf("Failed to start service: %v", err)
-			showError("PinShare", fmt.Sprintf("Failed to start service:\n\n%v", err))
+			showError(appName, fmt.Sprintf("Failed to start service:\n\n%v", err))
 		} else {
 			// Wait a moment and update status
 			time.Sleep(winservice.HealthCheckPoll)

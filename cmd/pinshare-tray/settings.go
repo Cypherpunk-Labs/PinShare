@@ -6,15 +6,6 @@ import (
 	"unsafe"
 )
 
-const (
-	MB_YESNO        = 0x00000004
-	MB_YESNOCANCEL  = 0x00000003
-	MB_ICONQUESTION = 0x00000020
-	IDYES           = 6
-	IDNO            = 7
-	IDCANCEL        = 2
-)
-
 // showSettingsDialog launches the settings dialog.
 // Returns true if settings were changed and saved, false if cancelled.
 func showSettingsDialog() (changed bool, err error) {

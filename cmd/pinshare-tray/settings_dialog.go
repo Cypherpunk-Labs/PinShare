@@ -118,7 +118,7 @@ type SettingsDialog struct {
 // loadFullConfig loads the complete configuration from config.json in user's LOCALAPPDATA
 func loadFullConfig() (*FullConfig, string, error) {
 	dataDir := getUserDataDirectory()
-	configPath := filepath.Join(dataDir, "config.json")
+	configPath := filepath.Join(dataDir, fileConfig)
 
 	config := &FullConfig{
 		// Defaults

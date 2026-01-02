@@ -19,18 +19,18 @@ var appConfig *TrayConfig
 
 // getUserDataDirectory returns the user's PinShare data directory
 func getUserDataDirectory() string {
-	localAppData := os.Getenv("LOCALAPPDATA")
+	localAppData := os.Getenv(envLocalAppData)
 	if localAppData == "" {
 		// Fall back to constructing from USERPROFILE
-		userProfile := os.Getenv("USERPROFILE")
+		userProfile := os.Getenv(envUserProfile)
 		if userProfile != "" {
 			localAppData = filepath.Join(userProfile, "AppData", "Local")
 		} else {
 			// Last resort
-			localAppData = `C:\Users\Default\AppData\Local`
+			localAppData = defaultLocalAppDataPath
 		}
 	}
-	return filepath.Join(localAppData, "PinShare")
+	return filepath.Join(localAppData, appName)
 }
 
 // loadConfig loads configuration from config.json in user's LOCALAPPDATA
@@ -42,7 +42,7 @@ func loadConfig() *TrayConfig {
 	}
 
 	dataDir := getUserDataDirectory()
-	configPath := filepath.Join(dataDir, "config.json")
+	configPath := filepath.Join(dataDir, fileConfig)
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {

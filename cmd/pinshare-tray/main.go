@@ -38,13 +38,6 @@ var (
 	trayInstance *Tray
 )
 
-const (
-	MB_OK              = 0x00000000
-	MB_ICONINFORMATION = 0x00000040
-	MB_ICONERROR       = 0x00000010
-	MB_ICONWARNING     = 0x00000030
-)
-
 // ensureUserDataDirectories creates all required directories in user's LOCALAPPDATA
 // and grants SYSTEM account full access so the Windows service can read/write them
 func ensureUserDataDirectories() error {
@@ -52,12 +45,12 @@ func ensureUserDataDirectories() error {
 
 	dirs := []string{
 		dataDir,
-		filepath.Join(dataDir, "ipfs"),
-		filepath.Join(dataDir, "pinshare"),
-		filepath.Join(dataDir, "upload"),
-		filepath.Join(dataDir, "cache"),
-		filepath.Join(dataDir, "rejected"),
-		filepath.Join(dataDir, "logs"),
+		filepath.Join(dataDir, dirIPFS),
+		filepath.Join(dataDir, dirPinShare),
+		filepath.Join(dataDir, dirUpload),
+		filepath.Join(dataDir, dirCache),
+		filepath.Join(dataDir, dirRejected),
+		filepath.Join(dataDir, dirLogs),
 	}
 
 	for _, dir := range dirs {
@@ -93,20 +86,20 @@ func grantSystemAccess(dir string) error {
 
 // writeSessionMarker writes session info to ProgramData for the service to read
 func writeSessionMarker() error {
-	programData := os.Getenv("PROGRAMDATA")
+	programData := os.Getenv(envProgramData)
 	if programData == "" {
-		programData = `C:\ProgramData`
+		programData = defaultProgramDataPath
 	}
 
 	// Ensure ProgramData\PinShare exists for the marker file
-	markerDir := filepath.Join(programData, "PinShare")
+	markerDir := filepath.Join(programData, appName)
 	if err := os.MkdirAll(markerDir, 0755); err != nil {
 		return err
 	}
 
-	localAppData := os.Getenv("LOCALAPPDATA")
+	localAppData := os.Getenv(envLocalAppData)
 	if localAppData == "" {
-		userProfile := os.Getenv("USERPROFILE")
+		userProfile := os.Getenv(envUserProfile)
 		if userProfile != "" {
 			localAppData = filepath.Join(userProfile, "AppData", "Local")
 		}
@@ -114,7 +107,7 @@ func writeSessionMarker() error {
 
 	marker := SessionMarker{
 		LocalAppData: localAppData,
-		Username:     os.Getenv("USERNAME"),
+		Username:     os.Getenv(envUsername),
 		Timestamp:    time.Now(),
 	}
 
@@ -123,7 +116,7 @@ func writeSessionMarker() error {
 		return err
 	}
 
-	markerPath := filepath.Join(markerDir, "session.json")
+	markerPath := filepath.Join(markerDir, fileSession)
 	if err := os.WriteFile(markerPath, data, 0644); err != nil {
 		return err
 	}
@@ -165,8 +158,8 @@ func onReady() {
 		systray.SetIcon(iconData)
 	}
 
-	systray.SetTitle("PinShare")
-	systray.SetTooltip("PinShare - Decentralized IPFS Pinning")
+	systray.SetTitle(appName)
+	systray.SetTooltip(appTooltip)
 
 	// Create tray instance and store in package-level variable
 	trayInstance = NewTray()
